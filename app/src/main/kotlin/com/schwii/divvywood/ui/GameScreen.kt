@@ -56,6 +56,14 @@ import com.schwii.divvywood.board.Editor
 import com.schwii.divvywood.board.Haptic
 import com.schwii.divvywood.board.TrayItem
 import com.schwii.divvywood.board.readoutOf
+import com.schwii.divvywood.engine.CHECK_TICKS
+import com.schwii.divvywood.game.Game
+import com.schwii.divvywood.wood.Fonts
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.platform.LocalContext
 import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.LETTERS
 import com.schwii.divvywood.engine.Tile
@@ -65,13 +73,6 @@ import com.schwii.divvywood.wood.angleOf
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
-private val Ink = Color(Palette.ink)
-private val Dim = Color(Palette.dim)
-private val Page = Color(Palette.page)
-private val Panel = Color(Palette.panel)
-private val Raise = Color(0xFFFFFDF8)
-private val Line = Color(0xFFDDD3C3)
-private val Bad = Color(Palette.bad)
 
 /** Plays the editor's haptic cues through the view, so they work on every phone. */
 fun hapticOf(view: android.view.View): (Haptic) -> Unit = { h ->
@@ -84,15 +85,19 @@ fun hapticOf(view: android.view.View): (Haptic) -> Unit = { h ->
     )
 }
 
-/** The game: the board with its overlays, then the tray and the toolbar in thumb reach. */
+/** The game: readouts on top, the board with its overlays, then the tray and the toolbar in thumb reach. */
 @Composable
-fun GameScreen(editor: Editor, modifier: Modifier = Modifier, animate: Boolean = true) {
+fun GameScreen(game: Game, modifier: Modifier = Modifier, animate: Boolean = true) {
+    Fonts.load(LocalContext.current)   // before any block is drawn
+    val editor = game.editor
     val board = editor.board
     var boardBounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     var dragIcon by remember { mutableStateOf<Pair<ImageBitmap, Offset>?>(null) }
+    CompositionLocalProvider(LocalTextStyle provides Body) {
     Box(modifier.fillMaxSize().background(Page)) {
         Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { boardBounds = it.boundsInRoot() }) {
+            TopStrip(game)
+            Box(Modifier.weight(1f).fillMaxWidth().clipToBounds().onGloballyPositioned { boardBounds = it.boundsInRoot() }) {
                 Board(board, Modifier.fillMaxSize(), editor, animate = animate)
                 Overlays(editor)
             }
@@ -101,13 +106,15 @@ fun GameScreen(editor: Editor, modifier: Modifier = Modifier, animate: Boolean =
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Tray(editor, boardBounds) { dragIcon = it }
-                Toolbar(editor)
+                Toolbar(game)
             }
         }
         // a chip dragged off the board follows the finger; over the board, the board draws where it would land
         dragIcon?.let { (img, at) ->
             Image(img, null, Modifier.size(56.dp).offset { IntOffset((at.x - 28.dp.toPx()).roundToInt(), (at.y - 70.dp.toPx()).roundToInt()) })
         }
+        SheetHost(game)
+    }
     }
 }
 
@@ -117,8 +124,9 @@ private fun Overlays(editor: Editor) {
     board.frame   // follow the board's camera and live numbers
     val notice = editor.notice
     LaunchedEffect(notice) { if (notice != null) { delay(1800); editor.dismissNotice() } }
-    Box(Modifier.fillMaxSize().statusBarsPadding()) {
+    Box(Modifier.fillMaxSize()) {
         val banner = when {
+            board.checking -> "Checking · tick ${board.sim.tick} / $CHECK_TICKS"
             editor.move != null -> "Drag to move"
             notice != null -> notice
             else -> null
@@ -130,7 +138,7 @@ private fun Overlays(editor: Editor) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(banner, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp))
+                Text(banner, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold, style = BodyTnum, modifier = Modifier.padding(vertical = 8.dp))
                 if (editor.move != null) Pill("Cancel") { editor.cancelMove() }
             }
         }
@@ -248,6 +256,7 @@ private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect,
                         if (placed) return@pointerInput
                         awaitEachGesture {
                             val down = awaitFirstDown()
+                            if (editor.locked()) return@awaitEachGesture
                             var moved = false
                             var last = origin + down.position
                             while (true) {
@@ -276,27 +285,42 @@ private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect,
 // ---------- toolbar ----------
 
 @Composable
-private fun Toolbar(editor: Editor) {
-    val board = editor.board
+private fun Toolbar(game: Game) {
+    val editor = game.editor
+    val board = game.board
     var playing by remember { mutableStateOf(board.playing) }
     var speed by remember { androidx.compose.runtime.mutableIntStateOf(board.speed) }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Tool("Select", Modifier.weight(1f), on = editor.selectMode) { editor.switchSelectMode(!editor.selectMode) }
-        Tool("Undo", Modifier.weight(1f), enabled = editor.canUndo) { editor.undo() }
-        Tool(if (playing) "Pause" else "Play", Modifier.weight(1f)) { board.playing = !board.playing; playing = board.playing }
-        Tool("×$speed", Modifier.weight(1f)) {
+        Tool("Select", Modifier.weight(1f), on = editor.selectMode, icon = { selectIcon(it) }) { editor.switchSelectMode(!editor.selectMode) }
+        Tool("Undo", Modifier.weight(1f), enabled = editor.canUndo && !board.checking, icon = { undoIcon(it) }) { editor.undo() }
+        Tool(if (playing) "Pause" else "Play", Modifier.weight(1f), icon = { if (playing) pauseIcon(it) else playIcon(it) }) {
+            board.playing = !board.playing; playing = board.playing
+        }
+        Tool("Speed", Modifier.weight(1f), text = "×$speed") {
             board.speed = when (board.speed) { 1 -> 4; 4 -> 16; else -> 1 }; speed = board.speed
         }
+        Tool("Check", Modifier.weight(1f), check = true, enabled = !board.checking, icon = { checkIcon(it) }) { game.startCheck() }
     }
 }
 
+/** A toolbar button: an icon (or bold [text]) over a small label. Select lights up dark when on; Check is green. */
 @Composable
-private fun Tool(label: String, modifier: Modifier, on: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
-    Box(
-        modifier.heightIn(min = 48.dp).background(if (on) Ink else Page, RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled, onClick = onClick).alpha(if (enabled) 1f else 0.4f),
-        contentAlignment = Alignment.Center,
-    ) { Text(label, color = if (on) Raise else Ink, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
+private fun Tool(
+    label: String, modifier: Modifier, on: Boolean = false, check: Boolean = false, enabled: Boolean = true,
+    text: String? = null, icon: (androidx.compose.ui.graphics.drawscope.DrawScope.(Color) -> Unit)? = null, onClick: () -> Unit,
+) {
+    val bg = when { check -> Out; on -> Ink; else -> Page }
+    val fg = if (check || on) On else Dim
+    Column(
+        modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else if (check) 0.5f else 0.4f).background(bg, RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled, onClick = onClick).semantics { contentDescription = label }.padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+    ) {
+        if (text != null) Text(text, color = Ink, fontWeight = FontWeight.Bold, fontSize = 15.sp, lineHeight = 22.sp)
+        else androidx.compose.foundation.Canvas(Modifier.size(22.dp)) { scale(size.width / 24f, pivot = Offset.Zero) { icon?.invoke(this, fg) } }
+        Text(label, color = fg, fontSize = 10.sp, fontWeight = if (check) FontWeight.ExtraBold else FontWeight.Medium, lineHeight = 12.sp)
+    }
 }
 
 @Composable

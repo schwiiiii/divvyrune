@@ -1,0 +1,120 @@
+package com.schwii.divvywood.game
+
+import com.schwii.divvywood.board.TrayItem
+import com.schwii.divvywood.engine.Kind
+import com.schwii.divvywood.engine.encodeGrid
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** Levels, Check, saves and Build as text, driven without a screen. */
+class GameTest {
+    private val halves = "IR SL FL\n.. FT2 .."
+
+    private fun check(g: Game): Sheet.Result {
+        g.startCheck()
+        g.board.finishCheck()
+        return g.sheet as Sheet.Result
+    }
+
+    @Test fun `a solved Check records the best score and offers the next level`() {
+        val store = MemoryStore()
+        val g = Game(Saves(store))
+        assertNull(g.buildFromText(halves))
+        val r = check(g)
+        assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
+        assertEquals(listOf("1/2", "1/2"), r.verdict.rows.map { it.exact.toString() })
+        assertEquals(Best(1, 6, 6), r.best)
+        assertTrue(r.next)
+        assertEquals(Best(1, 6, 6), Saves(store).best(0))
+
+        g.loadLevel(1)
+        assertEquals(1, g.levelIndex)
+        assertNull(g.sheet)
+        assertTrue(g.board.tiles.isEmpty())
+        assertFalse(g.hintHidden)
+    }
+
+    @Test fun `best keeps the fewest parts and the smallest and largest area`() {
+        val g = Game(Saves(MemoryStore()))
+        g.buildFromText(halves); check(g)
+        g.buildFromText("IR LR SL FL\n.. .. FT2 .."); val r = check(g)   // one belt more, 4×2
+        assertEquals(Best(1, 6, 8), r.best)
+    }
+
+    @Test fun `a build with no input is judged at once without running`() {
+        val g = Game(Saves(MemoryStore()))
+        g.startCheck()
+        assertFalse(g.board.checking)
+        val r = g.sheet as Sheet.Result
+        assertFalse(r.verdict.solved)
+        assertEquals(listOf("Place the input.", "Place output A.", "Place output B."), r.verdict.reasons)
+        assertNull(r.best)
+        assertFalse(r.next)
+    }
+
+    @Test fun `a wrong split runs and says what each output gets`() {
+        val g = Game(Saves(MemoryStore()))
+        g.loadLevel(1)   // 1/4 and 3/4
+        g.buildFromText(halves)
+        val r = check(g)
+        assertFalse(r.verdict.solved)
+        assertEquals("Output A gets 1/2 of the input. It needs 1/4.", r.verdict.reasons.first())
+        assertEquals(0.5, r.verdict.rows[0].measured, 0.01)
+    }
+
+    @Test fun `builds and the current level survive a restart`() {
+        val store = MemoryStore()
+        Game(Saves(store)).apply { loadLevel(4); buildFromText(halves) }
+        val g = Game(Saves(store))
+        assertEquals(4, g.levelIndex)
+        assertEquals(halves, encodeGrid(g.board.tiles))
+        assertFalse(g.editor.canUndo)
+    }
+
+    @Test fun `every edit is saved`() {
+        val store = MemoryStore()
+        val g = Game(Saves(store))
+        g.board.apply { ox = 0f; oy = 0f; z = 10f }
+        assertTrue(g.editor.chipDrop(TrayItem(Kind.SRC), 5f, 5f))
+        assertEquals("IR", Saves(store).data.levels[0]?.build)
+        g.editor.undo()
+        assertEquals("", Saves(store).data.levels[0]?.build)
+    }
+
+    @Test fun `the build is locked while a Check runs`() {
+        val g = Game(Saves(MemoryStore()))
+        g.buildFromText(halves)
+        g.board.apply { ox = 0f; oy = 0f; z = 10f }
+        g.startCheck()
+        assertTrue(g.board.checking)
+        assertFalse(g.editor.chipDrop(TrayItem(Kind.SPLIT), 5f, 25f))
+        g.editor.undo()
+        assertEquals(halves, encodeGrid(g.board.tiles))
+        g.showLevels()
+        assertNull(g.sheet)
+        g.board.finishCheck()
+        assertNotNull(g.sheet)
+    }
+
+    @Test fun `build from text reports bad codes and pieces the level lacks`() {
+        val g = Game(Saves(MemoryStore()))
+        assertEquals("Row 1, cell 2: \"XX\" isn't a cell code.", g.buildFromText("IR XX"))
+        g.loadLevel(8)   // Seventh: one output, one bypass
+        assertEquals("This level has 1 final output; the text uses 2.", g.buildFromText(halves))
+        assertTrue(g.board.tiles.isEmpty())
+        assertNull(g.buildFromText("IR SL FL\n.. OT .."))
+        assertEquals("Built from text", g.editor.notice)
+        g.editor.undo()
+        assertTrue(g.board.tiles.isEmpty())
+    }
+
+    @Test fun `a corrupt save starts fresh`() {
+        val g = Game(Saves(MemoryStore("{not json")))
+        assertEquals(0, g.levelIndex)
+        assertTrue(g.board.tiles.isEmpty())
+    }
+}

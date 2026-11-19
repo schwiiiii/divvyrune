@@ -68,6 +68,11 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     private val undoStack = ArrayDeque<Map<Cell, Tile>>()
     private val tiles get() = board.tiles
 
+    /** Called after every change to the build (edits and undo), e.g. to save it. */
+    var onChange: () -> Unit = {}
+    /** While true (a Check is running) the build can't be changed and gestures are ignored. */
+    var locked: () -> Boolean = { false }
+
     /** Movement beyond this many pixels turns a tap into a drag; holding this long opens the menu. */
     var slop = 8f
     val holdMs = 450L
@@ -95,9 +100,25 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     private fun afterEdit() {
         board.rebuild()
         selection = selection.filter { it in tiles }.toSet()
+        onChange()
+    }
+
+    /** Puts the whole build in place of the current one, as one undo step. */
+    fun replaceAll(newTiles: Map<Cell, Tile>) {
+        move = null; menu = null; readout = null
+        selection = emptySet()
+        edit { tiles.clear(); tiles.putAll(newTiles); true }
+    }
+
+    /** Forgets undo history, selection and any gesture: for a freshly loaded level. */
+    fun reset() {
+        undoStack.clear(); canUndo = false
+        selection = emptySet(); selectMode = false
+        move = null; menu = null; readout = null; chipGhost = null; gesture = null
     }
 
     fun undo() {
+        if (locked()) return
         val snap = undoStack.removeLastOrNull() ?: return
         tiles.clear(); tiles.putAll(snap)
         move = null; menu = null; readout = null
@@ -109,6 +130,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     fun down(x: Float, y: Float, t: Long) {
         val c = board.cellAt(x, y)
+        if (locked()) { gesture = null; return }
         if (menu != null) { menu = null; gesture = null; return }   // a tap anywhere closes the menu
         readout = null
         val m = move
@@ -241,6 +263,9 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     fun dismissNotice() { notice = null }
 
+    /** Shows [msg] briefly in the banner. */
+    fun say(msg: String) { notice = msg }
+
     /** Tapping a tray chip does nothing but say how to use it: chips only drag. */
     fun notifyDragOnly() { notice = "Drag it onto the board" }
 
@@ -283,7 +308,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     fun chipDrop(item: TrayItem, x: Float, y: Float): Boolean {
         chipGhost = null
         val c = board.cellAt(x, y)
-        if (!chipFits(item, c)) return false
+        if (locked() || !chipFits(item, c)) return false
         val tile = chipTile(item, c)
         val ok = edit {
             if (item.kind == Kind.SPLIT || item.kind == Kind.MERGE) placePiece(tiles, c, item.kind) else { tiles[c] = tile; true }
