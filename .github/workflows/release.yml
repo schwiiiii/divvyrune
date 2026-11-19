@@ -1,0 +1,56 @@
+name: Release build
+
+# Every merge to main becomes a GitHub release with a signed APK, so Obtainium (or a browser) can install and
+# update it. Needs the signing secrets; until they exist this skips without failing.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.DIVVYWOOD_KEYSTORE_BASE64 != '' }}
+    steps:
+      - name: Check for the signing key
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::The signing secrets aren't set yet, so no release was published."
+      - uses: actions/checkout@v4
+        if: env.HAS_KEY == 'true'
+      - uses: actions/setup-java@v4
+        if: env.HAS_KEY == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        if: env.HAS_KEY == 'true'
+      - name: Build the signed release APK
+        if: env.HAS_KEY == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.DIVVYWOOD_KEYSTORE_BASE64 }}
+          DIVVYWOOD_KEYSTORE_PASSWORD: ${{ secrets.DIVVYWOOD_KEYSTORE_PASSWORD }}
+          DIVVYWOOD_KEY_ALIAS: ${{ secrets.DIVVYWOOD_KEY_ALIAS }}
+          DIVVYWOOD_KEY_PASSWORD: ${{ secrets.DIVVYWOOD_KEY_PASSWORD }}
+          DIVVYWOOD_VERSION_CODE: ${{ github.run_number }}
+          DIVVYWOOD_VERSION_NAME: 0.1.${{ github.run_number }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/divvywood.jks"
+          DIVVYWOOD_KEYSTORE="$RUNNER_TEMP/divvywood.jks" ./gradlew --no-daemon :app:assembleRelease
+          rm -f "$RUNNER_TEMP/divvywood.jks"
+          cp app/build/outputs/apk/release/app-release.apk "divvywood-0.1.${{ github.run_number }}.apk"
+      - name: Publish the release
+        if: env.HAS_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" "divvywood-0.1.${{ github.run_number }}.apk" \
+            --title "Build ${{ github.run_number }} (0.1.${{ github.run_number }})" \
+            --notes "Development build of ${GITHUB_SHA::7}: $(git log -1 --format=%s)" \
+            --target "$GITHUB_SHA"

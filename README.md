@@ -10,6 +10,13 @@ Press **Check** to have the exact flow worked out and the build run, then chase 
 - Offline, no permissions, no ads, no tracking.
 - Builds and layouts can be shared as short text codes, e.g. `IR SL FL / .. FT ..` (a splitter halving the input between two outputs).
 
+## Development builds
+
+Every merge to `main` is published as a [release](https://github.com/schwiiiii/divvywood/releases) with a signed
+APK (`divvywood-0.1.N.apk`). To install it and get each new build as an update, add the repository URL
+`https://github.com/schwiiiii/divvywood` to [Obtainium](https://github.com/ImranR98/Obtainium) (available on F-Droid).
+Every build is signed with the same key, so each one installs over the last.
+
 ## Building
 
 Requirements: JDK 17 or newer and the Android SDK (platform 36).
