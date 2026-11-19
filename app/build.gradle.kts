@@ -12,12 +12,25 @@ android {
         applicationId = "com.schwii.divvywood"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // CI numbers each build of main so installed copies can update; source builds (F-Droid) use the fixed values
+        versionCode = System.getenv("DIVVYWOOD_VERSION_CODE")?.toInt() ?: 1
+        versionName = System.getenv("DIVVYWOOD_VERSION_NAME") ?: "0.1.0"
+    }
+
+    // Release builds are signed only when CI provides the key; without it they build unsigned, as F-Droid expects.
+    val keystore = System.getenv("DIVVYWOOD_KEYSTORE")
+    signingConfigs {
+        if (keystore != null) create("release") {
+            storeFile = file(keystore)
+            storePassword = System.getenv("DIVVYWOOD_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("DIVVYWOOD_KEY_ALIAS")
+            keyPassword = System.getenv("DIVVYWOOD_KEY_PASSWORD")
+        }
     }
 
     buildTypes {
         release {
+            if (keystore != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
