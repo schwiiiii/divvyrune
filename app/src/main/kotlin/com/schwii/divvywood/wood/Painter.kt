@@ -1,0 +1,237 @@
+package com.schwii.divvywood.wood
+
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RadialGradient
+import android.graphics.RectF
+import android.graphics.Shader
+import android.graphics.Typeface
+import com.schwii.divvywood.engine.DX
+import com.schwii.divvywood.engine.DY
+import com.schwii.divvywood.engine.Kind
+import com.schwii.divvywood.engine.NONE
+import com.schwii.divvywood.engine.Tile
+import com.schwii.divvywood.engine.opp
+import com.schwii.divvywood.wood.Palette.rgba
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.sin
+
+/** Where a channel meets side [d] of the cell centred on (x, y): f = 0.475 is the block's edge, 0.5 the cell's. */
+fun edge(x: Float, y: Float, z: Float, d: Int, f: Float = 0.475f) = floatArrayOf(x + DX[d] * z * f, y + DY[d] * z * f)
+
+/**
+ * Point [t] (0..1) along the route through a cell entering on side [a] and leaving on side [b] (NONE = the centre).
+ * Turns are quadratic curves bending around the centre, so marbles never take a sharp corner.
+ */
+fun routePoint(x: Float, y: Float, z: Float, a: Int, b: Int, t: Float): FloatArray {
+    val p0 = if (a == NONE) floatArrayOf(x, y) else edge(x, y, z, a, 0.5f)
+    val p2 = if (b == NONE) floatArrayOf(x, y) else edge(x, y, z, b, 0.5f)
+    if (a == NONE || b == NONE || a == opp(b)) return floatArrayOf(p0[0] + (p2[0] - p0[0]) * t, p0[1] + (p2[1] - p0[1]) * t)
+    val u = 1 - t
+    return floatArrayOf(u * u * p0[0] + 2 * u * t * x + t * t * p2[0], u * u * p0[1] + 2 * u * t * y + t * t * p2[1])
+}
+
+private fun routePath(p: Path, x: Float, y: Float, z: Float, a: Int, b: Int) {
+    val e0 = edge(x, y, z, a); val e1 = edge(x, y, z, b)
+    p.moveTo(e0[0], e0[1])
+    if (a == opp(b)) p.lineTo(e1[0], e1[1]) else p.quadTo(x, y, e1[0], e1[1])
+}
+
+fun angleOf(d: Int) = atan2(DY[d].toFloat(), DX[d].toFloat())
+
+/** Draws walnut and maple blocks, carved channels, cups, flippers and glass marbles; a port of the prototype's renderer. */
+class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)) {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; typeface = labelFace }
+    private val rect = RectF()
+    private val path = Path()
+    private val matrix = Matrix()
+    private val shaders = HashMap<Bitmap, BitmapShader>()
+
+    private fun shaderOf(b: Bitmap) = shaders.getOrPut(b) { BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT) }
+
+    /** The linen table, its grain anchored to the board so it pans and zooms with the blocks; plus faint pencil dots. */
+    fun table(c: Canvas, w: Float, h: Float, ox: Float, oy: Float, z: Float) {
+        val sh = shaderOf(Woods.table)
+        matrix.reset(); matrix.setTranslate(ox, oy); matrix.preScale(z / 34f, z / 34f)
+        sh.setLocalMatrix(matrix)
+        fill.shader = sh; c.drawRect(0f, 0f, w, h, fill); fill.shader = null
+        fill.color = rgba(255, 255, 255, 0.16); c.drawRect(0f, 0f, w, h, fill)
+        fill.color = rgba(90, 70, 50, 0.16)
+        val gx0 = Math.floor((-ox / z).toDouble()).toInt() - 1
+        val gy0 = Math.floor((-oy / z).toDouble()).toInt() - 1
+        var gx = gx0
+        while (gx < gx0 + w / z + 2) {
+            var gy = gy0
+            while (gy < gy0 + h / z + 2) { c.drawRect(ox + gx * z - 1, oy + gy * z - 1, ox + gx * z + 1, oy + gy * z + 1, fill); gy++ }
+            gx++
+        }
+    }
+
+    fun blockShadow(c: Canvas, x: Float, y: Float, z: Float) {
+        val s = z * 0.95f
+        fill.color = rgba(60, 38, 20, 0.10)
+        rect.set(x - s / 2 + z * 0.01f, y - s / 2 + z * 0.06f, x - s / 2 + z * 0.01f + s + z * 0.05f, y - s / 2 + z * 0.06f + s + z * 0.04f)
+        c.drawRoundRect(rect, z * 0.1f, z * 0.1f, fill)
+        fill.color = rgba(60, 38, 20, 0.16)
+        rect.set(x - s / 2 + z * 0.025f, y - s / 2 + z * 0.045f, x + s / 2 + z * 0.025f, y + s / 2 + z * 0.045f)
+        c.drawRoundRect(rect, z * 0.08f, z * 0.08f, fill)
+    }
+
+    private fun blockBody(c: Canvas, x: Float, y: Float, z: Float, wood: Bitmap, seed: Int, stain: Int?) {
+        val s = z * 0.95f; val x0 = x - s / 2; val y0 = y - s / 2; val r = z * 0.07f
+        val rr = rand(seed)
+        c.save()
+        path.reset(); rect.set(x0, y0, x0 + s, y0 + s); path.addRoundRect(rect, r, r, Path.Direction.CW); c.clipPath(path)
+        val sh = shaderOf(wood)
+        matrix.reset(); matrix.setTranslate(x, y); matrix.preScale(z / 60f, z / 60f)
+        if (rr() >= 0.5) matrix.preRotate(90f)
+        matrix.preTranslate((rr() * 384).toFloat(), (rr() * 384).toFloat())
+        sh.setLocalMatrix(matrix)
+        fill.shader = sh; c.drawRect(rect, fill); fill.shader = null
+        if (stain != null) { fill.color = stain; fill.alpha = (0.78 * 255).toInt(); c.drawRect(rect, fill) }
+        fill.shader = LinearGradient(x0, y0, x0 + s, y0 + s, intArrayOf(rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.0), rgba(80, 50, 25, 0.16)),
+            floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(rect, fill); fill.shader = null
+        stroke.strokeWidth = max(1f, z * 0.025f); stroke.strokeCap = Paint.Cap.BUTT
+        stroke.color = rgba(255, 255, 255, 0.45)
+        c.drawLine(x0 + r, y0 + 1, x0 + s - r, y0 + 1, stroke); c.drawLine(x0 + 1, y0 + r, x0 + 1, y0 + s - r, stroke)
+        stroke.color = rgba(80, 50, 25, 0.22)
+        c.drawLine(x0 + r, y0 + s - 1, x0 + s - r, y0 + s - 1, stroke); c.drawLine(x0 + s - 1, y0 + r, x0 + s - 1, y0 + s - r, stroke)
+        c.restore()
+    }
+
+    /** A routed channel: cut edge, recessed floor, shade under the upper wall, light on the lower lip. */
+    private fun carve(c: Canvas, z: Float, p: Path, dark: Boolean, bad: Boolean = false) {
+        val w = z * 0.24f
+        stroke.strokeCap = Paint.Cap.BUTT; stroke.strokeJoin = Paint.Join.ROUND
+        stroke.color = if (dark) rgba(40, 24, 12, 0.55) else rgba(95, 62, 32, 0.38); stroke.strokeWidth = w + max(1.5f, z * 0.03f); c.drawPath(p, stroke)
+        stroke.color = if (bad) rgba(192, 84, 74, 0.6) else if (dark) rgba(60, 38, 22, 0.45) else rgba(160, 115, 70, 0.20); stroke.strokeWidth = w; c.drawPath(p, stroke)
+        c.save()
+        c.translate(0f, -w * 0.1f); stroke.color = rgba(50, 30, 15, 0.2); stroke.strokeWidth = w * 0.45f; c.drawPath(p, stroke)
+        c.translate(0f, w * 0.4f); stroke.color = if (dark) rgba(255, 240, 215, 0.22) else rgba(255, 250, 240, 0.38); stroke.strokeWidth = w * 0.16f; c.drawPath(p, stroke)
+        c.restore()
+    }
+
+    private fun hollow(c: Canvas, x: Float, y: Float, r: Float, deep: Boolean) {
+        fill.shader = RadialGradient(x - r * 0.25f, y - r * 0.35f, r, intArrayOf(
+            if (deep) rgba(30, 18, 10, 0.9) else rgba(70, 42, 20, 0.45),
+            if (deep) rgba(50, 30, 16, 0.75) else rgba(110, 72, 40, 0.25),
+            rgba(255, 248, 235, 0.3)), floatArrayOf(0.1f, 0.8f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(x, y, r, fill); fill.shader = null
+    }
+
+    private fun chevron(c: Canvas, at: FloatArray, d: Int, z: Float, light: Boolean) {
+        val a = angleOf(d); val s = z * 0.065f
+        stroke.color = if (light) rgba(255, 240, 215, 0.55) else rgba(59, 38, 22, 0.45)
+        stroke.strokeWidth = max(1.2f, z * 0.028f); stroke.strokeCap = Paint.Cap.ROUND
+        path.reset()
+        path.moveTo(at[0] - cos(a - 0.8f) * s, at[1] - sin(a - 0.8f) * s); path.lineTo(at[0], at[1])
+        path.lineTo(at[0] - cos(a + 0.8f) * s, at[1] - sin(a + 0.8f) * s)
+        c.drawPath(path, stroke)
+    }
+
+    fun burnText(c: Canvas, s: String, x: Float, y: Float, size: Float, maxWidth: Float = Float.MAX_VALUE, light: Boolean = false) {
+        text.textSize = size
+        text.color = if (light) rgba(255, 240, 215, 0.7) else rgba(59, 38, 22, 0.75)
+        val w = text.measureText(s)
+        c.save()
+        if (w > maxWidth) { c.translate(x, 0f); c.scale(maxWidth / w, 1f); c.translate(-x, 0f) }
+        val fm = text.fontMetrics
+        c.drawText(s, x, y - (fm.ascent + fm.descent) / 2, text)
+        c.restore()
+    }
+
+    /**
+     * One block. [ins] / [outs] are the sides its channels connect to; [bad] tints overloaded channels;
+     * [label] is burned onto inputs and outputs ("IN", "A 1/2").
+     */
+    fun tile(c: Canvas, x: Float, y: Float, z: Float, t: Tile, ins: List<Int>, outs: List<Int>, seed: Int, bad: Boolean = false, label: String? = null, labelScale: Float = 1f) {
+        val mech = t.kind == Kind.SPLIT || t.kind == Kind.MERGE
+        val stain = when (t.kind) { Kind.SRC -> Palette.stainSrc; Kind.OUT -> Palette.stainOut; Kind.DUMP -> Palette.stainDump; else -> null }
+        blockBody(c, x, y, z, if (mech) Woods.walnut else Woods.maple, seed, stain)
+        val p = Path()
+        when (t.kind) {
+            Kind.BELT -> {
+                routePath(p, x, y, z, t.from, t.out); carve(c, z, p, false, bad)
+                chevron(c, edge(x, y, z, t.out, 0.3f), t.out, z, false)
+            }
+            Kind.SPLIT -> if (outs.isNotEmpty()) {
+                outs.forEach { routePath(p, x, y, z, t.inSide, it) }; carve(c, z, p, true, bad)
+                outs.forEach { chevron(c, edge(x, y, z, it, 0.36f), it, z, true) }
+            } else stub(c, p, x, y, z, t.inSide, true)
+            Kind.MERGE -> {
+                if (ins.isNotEmpty()) { ins.forEach { routePath(p, x, y, z, it, t.out) }; carve(c, z, p, true, bad) }
+                else stub(c, p, x, y, z, t.out, false)
+                chevron(c, edge(x, y, z, t.out, 0.36f), t.out, z, true)
+            }
+            Kind.SRC -> {
+                val e = edge(x, y, z, t.out); p.moveTo(x, y); p.lineTo(e[0], e[1]); carve(c, z, p, false)
+                hollow(c, x, y, z * 0.27f, false)
+                burnText(c, label ?: "IN", x, y - z * 0.33f, z * 0.15f * labelScale)
+            }
+            Kind.OUT, Kind.DUMP -> {
+                val side = if (t.inSide != NONE) t.inSide else ins.firstOrNull() ?: NONE
+                if (side != NONE) { val e = edge(x, y, z, side); p.moveTo(e[0], e[1]); p.lineTo(x, y); carve(c, z, p, false) }
+                if (t.kind == Kind.OUT) {
+                    hollow(c, x, y, z * 0.23f, true)
+                    if (label != null) burnText(c, label, x, y - z * 0.35f, z * 0.14f * labelScale, z * 0.84f)
+                } else {
+                    fill.color = rgba(40, 24, 12, 0.7)
+                    rect.set(x - z * 0.2f, y - z * 0.08f, x + z * 0.2f, y + z * 0.08f); c.drawRoundRect(rect, z * 0.08f, z * 0.08f, fill)
+                }
+            }
+        }
+    }
+
+    /** An unconnected splitter or converger: a channel stub toward its marked side and a small hollow. */
+    private fun stub(c: Canvas, p: Path, x: Float, y: Float, z: Float, side: Int, inward: Boolean) {
+        val e = edge(x, y, z, side)
+        if (inward) { p.moveTo(e[0], e[1]); p.lineTo(x, y) } else { p.moveTo(x, y); p.lineTo(e[0], e[1]) }
+        carve(c, z, p, true)
+        hollow(c, x, y, z * 0.2f, false)
+    }
+
+    /** Round robin: a maple paddle on a brass pin, pointing down the channel the next marble takes. */
+    fun flipper(c: Canvas, x: Float, y: Float, z: Float, angle: Float) {
+        val l = z * 0.3f; val t = z * 0.085f
+        c.save(); c.translate(x, y); c.rotate(Math.toDegrees(angle.toDouble()).toFloat())
+        fill.color = rgba(30, 18, 8, 0.35)
+        rect.set(-t * 0.6f + z * 0.02f, -t / 2 + z * 0.035f, -t * 0.6f + z * 0.02f + l, t / 2 + z * 0.035f); c.drawRoundRect(rect, t / 2, t / 2, fill)
+        fill.shader = LinearGradient(0f, -t / 2, 0f, t / 2, 0xFFF6E7C6.toInt(), 0xFFD6B98A.toInt(), Shader.TileMode.CLAMP)
+        rect.set(-t * 0.6f, -t / 2, -t * 0.6f + l, t / 2); c.drawRoundRect(rect, t / 2, t / 2, fill); fill.shader = null
+        stroke.color = rgba(90, 60, 30, 0.5); stroke.strokeWidth = 1f; c.drawRoundRect(rect, t / 2, t / 2, stroke)
+        fill.shader = RadialGradient(-z * 0.015f, -z * 0.015f, z * 0.05f, intArrayOf(0xFFFFF2C8.toInt(), 0xFFCFA24E.toInt(), 0xFF7A561C.toInt()),
+            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(0f, 0f, z * 0.048f, fill); fill.shader = null
+        c.restore()
+    }
+
+    /** A clear glass marble with its shadow; [alpha] fades it as it drops into a cup. */
+    fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float = 1f) {
+        val a = (alpha * 255).toInt().coerceIn(0, 255)
+        fill.color = rgba(50, 30, 15, 0.25); fill.alpha = (fill.alpha * alpha).toInt()
+        rect.set(x + r * 0.25f - r * 0.95f, y + r * 0.45f - r * 0.55f, x + r * 0.25f + r * 0.95f, y + r * 0.45f + r * 0.55f); c.drawOval(rect, fill)
+        fill.shader = RadialGradient(x - r * 0.35f, y - r * 0.4f, r * 1.35f, intArrayOf(rgba(255, 255, 255, 0.95), rgba(190, 225, 222, 0.8), rgba(80, 140, 140, 0.9)),
+            floatArrayOf(0.04f, 0.25f, 0.75f), Shader.TileMode.CLAMP)
+        fill.alpha = a
+        c.drawCircle(x, y, r, fill); fill.shader = null; fill.alpha = 255
+    }
+
+    /** A selection or placement outline around one cell. */
+    fun outline(c: Canvas, x: Float, y: Float, z: Float, color: Int, width: Float, dashed: Boolean = false) {
+        stroke.color = color; stroke.strokeWidth = width; stroke.strokeCap = Paint.Cap.BUTT
+        stroke.pathEffect = if (dashed) android.graphics.DashPathEffect(floatArrayOf(z * 0.12f, z * 0.08f), 0f) else null
+        rect.set(x - z * 0.5f + 1, y - z * 0.5f + 1, x + z * 0.5f - 1, y + z * 0.5f - 1)
+        c.drawRoundRect(rect, z * 0.14f, z * 0.14f, stroke)
+        stroke.pathEffect = null
+    }
+}
