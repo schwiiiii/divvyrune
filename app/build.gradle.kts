@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -50,7 +49,4 @@ dependencies {
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
-    testImplementation(libs.roborazzi)
 }
-
-roborazzi { outputDir.set(file("src/test/screenshots")) }

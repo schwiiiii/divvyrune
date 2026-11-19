@@ -2,7 +2,6 @@ package com.schwii.divvywood.board
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import com.github.takahirom.roborazzi.captureRoboImage
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Frac
 import com.schwii.divvywood.engine.Kind
@@ -12,6 +11,7 @@ import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.tilesOf
 import org.junit.Assert.assertTrue
+import java.io.File
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -31,7 +31,8 @@ class BoardScreenshotTest {
         state.advance(0f)
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         BoardRenderer(state, reduceMotion = true).draw(Canvas(bmp), w, h)
-        bmp.captureRoboImage("src/test/screenshots/$name.png")
+        File("src/test/screenshots").mkdirs()
+        File("src/test/screenshots/$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         return bmp
     }
 
@@ -45,12 +46,12 @@ class BoardScreenshotTest {
     }
 
     @Test fun everyBlock() {
-        // a splitter fed by the input, feeding an output, a bypass and a converger loop; an overloaded loop at full speed,
-        // plus a stray converger and an output with nothing feeding it (outlined in red)
-        val tiles = decodeGrid("IR SL OL\n.. ST RT\n.. CL TL\n.. FT ..").tiles!!
+        // the input feeds a splitter (bypass + converger); the converger feeds a second splitter that loops back
+        // through two belts and feeds output A; a stray converger and an unfed output B are outlined in red
+        val tiles = decodeGrid("IR SL OL\n.. CB BL\n.. ST LT\n.. FT ..").tiles!!
         tiles[Cell(4, 0)] = Tile(Kind.MERGE, out = 0)
         tiles[Cell(4, 2)] = Tile(Kind.OUT, id = 1, inSide = 3)
-        val level = Level("blocks", 1, listOf(Frac(1, 2), Frac(1, 2)), 1, "")
+        val level = Level("blocks", 2, listOf(Frac(1, 2), Frac(1, 2)), 1, "")
         render(BoardState(level, tiles, density).apply { z = 72 * density }, 7, "board-every-block")
     }
 }
