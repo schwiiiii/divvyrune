@@ -28,6 +28,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures { compose = true }
+    testOptions { unitTests.isIncludeAndroidResources = true }
     // F-Droid builds from source; keep the APK free of Google's dependency metadata blob
     dependenciesInfo {
         includeInApk = false
@@ -45,4 +46,7 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
 }
