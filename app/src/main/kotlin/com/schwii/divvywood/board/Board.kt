@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 @Composable
 fun Board(state: BoardState, modifier: Modifier = Modifier, editor: Editor? = null, reduceMotion: Boolean = false, animate: Boolean = true) {
     val renderer = remember(state, editor) { BoardRenderer(state, reduceMotion = reduceMotion, editor = editor) }
-    val fitted = remember(state) { booleanArrayOf(false) }
     val slop = LocalViewConfiguration.current.touchSlop
     if (animate) LaunchedEffect(state) {
         var last = 0L
@@ -36,7 +35,7 @@ fun Board(state: BoardState, modifier: Modifier = Modifier, editor: Editor? = nu
     }
     Canvas(
         modifier
-            .onSizeChanged { if (!fitted[0] && it.width > 0) { state.fit(it.width.toFloat(), it.height.toFloat()); fitted[0] = true } }
+            .onSizeChanged { if (it.width > 0) state.setView(it.width.toFloat(), it.height.toFloat()) }
             .pointerInput(state, editor) {
                 editor?.slop = slop
                 awaitEachGesture {

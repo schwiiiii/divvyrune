@@ -2,7 +2,9 @@ package com.schwii.divvywood.board
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.schwii.divvywood.engine.CHECK_TICKS
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Graph
 import com.schwii.divvywood.engine.Kind
@@ -10,8 +12,10 @@ import com.schwii.divvywood.engine.LETTERS
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.NONE
 import com.schwii.divvywood.engine.Sim
+import com.schwii.divvywood.engine.Snapshot
 import com.schwii.divvywood.engine.Solution
 import com.schwii.divvywood.engine.Tiles
+import com.schwii.divvywood.engine.WARM_TICKS
 import com.schwii.divvywood.engine.buildGraph
 import com.schwii.divvywood.engine.dirTo
 import com.schwii.divvywood.engine.overloaded
@@ -45,18 +49,75 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     /** Each flipper's current angle, easing toward the channel it points at next. */
     val flipperAngles = HashMap<Int, Float>()
 
+    /** Node index of each final output A, B, C, or -1 when it isn't placed. */
+    var outNode = IntArray(0); private set
+    /** Each final output's measured share of the input, sampled as the simulation runs: the readout sparklines. */
+    var hist = List(0) { ArrayDeque<Float>() }; private set
+
+    /** A Check in progress: the simulation restarts and runs [CHECK_TICKS] fast, measured after [WARM_TICKS]. */
+    var checking by mutableStateOf(false); private set
+    private var w0: Snapshot? = null
+    /** Called when a Check run ends, with the snapshots bounding its measuring window. */
+    var onCheckDone: ((Snapshot?, Snapshot) -> Unit)? = null
+
+    /** The view's size in pixels, once laid out. */
+    var viewW = 0f; private set
+    var viewH = 0f; private set
+
     init { rebuild() }
 
-    fun setBuild(level: Level, tiles: Tiles) { this.level = level; this.tiles = tiles; rebuild() }
+    fun setBuild(level: Level, tiles: Tiles) { this.level = level; this.tiles = tiles; checking = false; rebuild() }
 
     fun rebuild() {
         graph = buildGraph(tiles, level)
         sol = solve(graph)
+        restartSim()
+        version++
+    }
+
+    private fun restartSim() {
         sim = Sim(graph, level.t)
         flipperAngles.clear()
         acc = 0f
-        version++
+        outNode = IntArray(level.out.size) { id -> graph.nodes.indexOfFirst { it.kind == Kind.OUT && it.id == id } }
+        hist = List(level.out.size) { ArrayDeque() }
     }
+
+    fun startCheck() {
+        restartSim()
+        w0 = null
+        checking = true
+    }
+
+    /** One Check tick; ends the run after the last. */
+    private fun checkStep() {
+        step()
+        if (sim.tick == WARM_TICKS) w0 = sim.snap()
+        if (sim.tick % 25 == 0) sampleHist()
+        if (sim.tick >= CHECK_TICKS) { checking = false; onCheckDone?.invoke(w0, sim.snap()) }
+    }
+
+    /** Runs the Check in progress to its end at once. */
+    fun finishCheck() { while (checking) checkStep(); frame++ }
+
+    private fun sampleHist() {
+        if (sim.emitted == 0) return
+        hist.forEachIndexed { id, h ->
+            val i = outNode[id]
+            h.addLast(if (i >= 0) sim.n[i].sunk.toFloat() / sim.emitted else 0f)
+            if (h.size > HIST) h.removeFirst()
+        }
+    }
+
+    /** Remembers the view's size; the first time, centres the build in it. */
+    fun setView(w: Float, h: Float) {
+        val first = viewW == 0f
+        viewW = w; viewH = h
+        if (first) fit(w, h)
+    }
+
+    /** Centres the build in the view. */
+    fun refit() { if (viewW > 0f) fit(viewW, viewH) }
 
     /** Centres the build in a [w] × [h] view. */
     fun fit(w: Float, h: Float) {
@@ -83,10 +144,13 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
 
     /** Advances the simulation by [dtMs] of real time at 6 ticks a second times [speed]. */
     fun advance(dtMs: Float) {
-        if (playing) {
+        if (checking) {
+            repeat(40) { if (checking) checkStep() }
+            alpha = 1f
+        } else if (playing) {
             val tickMs = 1000f / (6 * speed)
             acc += dtMs.coerceAtMost(100f)
-            while (acc >= tickMs) { acc -= tickMs; step() }
+            while (acc >= tickMs) { acc -= tickMs; step(); if (sim.tick % 8 == 0) sampleHist() }
             alpha = acc / tickMs
         }
         frame++
@@ -115,6 +179,15 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
 
     fun isOverloaded(i: Int) = overloaded(graph, sol, level, i)
 
+    /** The input has been blocked within the last 30 ticks. */
+    val inputBlocked get() = sim.tick - sim.lastBlock < 30
+
+    /** Final output [id]'s measured share so far, or null before anything is measured. */
+    fun measured(id: Int): Double? {
+        val i = outNode.getOrElse(id) { -1 }
+        return if (i >= 0 && sim.emitted > 0) sim.n[i].sunk.toDouble() / sim.emitted else null
+    }
+
     /** The label burned onto an input or output block. */
     fun labelOf(i: Int): String? {
         val n = graph.nodes[i]
@@ -126,5 +199,10 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
             }
             else -> null
         }
+    }
+
+    companion object {
+        /** How many samples a sparkline holds. */
+        const val HIST = 120
     }
 }

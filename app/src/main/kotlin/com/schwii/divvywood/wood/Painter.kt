@@ -47,10 +47,13 @@ private fun routePath(p: Path, x: Float, y: Float, z: Float, a: Int, b: Int) {
 fun angleOf(d: Int) = atan2(DY[d].toFloat(), DX[d].toFloat())
 
 /** Draws walnut and maple blocks, carved channels, cups, flippers and glass marbles; a port of the prototype's renderer. */
-class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)) {
+class Painter(private val labelFace: Typeface = Fonts.label, private val labelVariation: String? = Fonts.labelVariation) {
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; typeface = labelFace }
+    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER; typeface = labelFace
+        labelVariation?.let { fontVariationSettings = it }
+    }
     private val rect = RectF()
     private val path = Path()
     private val matrix = Matrix()

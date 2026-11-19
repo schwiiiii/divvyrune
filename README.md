@@ -23,6 +23,7 @@ Requirements: JDK 17 or newer and the Android SDK (platform 36).
 
 ```
 ./gradlew :engine:test          # rules, exact solver and simulation tests
+./gradlew :app:testDebugUnitTest # controls, game, saves and screenshot tests
 ./gradlew :app:assembleDebug    # app/build/outputs/apk/debug/app-debug.apk
 ```
 
@@ -36,3 +37,6 @@ The project has two modules:
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+The [Nunito](https://github.com/googlefonts/nunito) font is by Vernon Adams and the Nunito Project Authors, under the
+SIL Open Font License 1.1 ([app/src/main/assets/licenses/Nunito-OFL.txt](app/src/main/assets/licenses/Nunito-OFL.txt)).

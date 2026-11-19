@@ -1,0 +1,40 @@
+package com.schwii.divvywood.ui
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+
+// The prototype's toolbar icons, drawn on a 24-unit square.
+
+private fun line(w: Float) = Stroke(w, cap = StrokeCap.Round, join = StrokeJoin.Round)
+
+fun DrawScope.selectIcon(c: Color) =
+    drawRoundRect(c, Offset(4f, 4f), Size(16f, 16f), CornerRadius(2f), style = Stroke(2.2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.5f, 2.5f))))
+
+fun DrawScope.undoIcon(c: Color) {
+    val p = Path().apply {
+        moveTo(9f, 7f); lineTo(4f, 12f); lineTo(9f, 17f)
+        moveTo(4f, 12f); lineTo(14f, 12f)
+        arcTo(Rect(8f, 12f, 20f, 24f), -90f, 180f, false)
+    }
+    drawPath(p, c, style = line(2.4f))
+}
+
+fun DrawScope.playIcon(c: Color) =
+    drawPath(Path().apply { moveTo(7f, 5f); lineTo(19f, 12f); lineTo(7f, 19f); close() }, c)
+
+fun DrawScope.pauseIcon(c: Color) {
+    drawRect(c, Offset(6f, 5f), Size(4f, 14f))
+    drawRect(c, Offset(14f, 5f), Size(4f, 14f))
+}
+
+fun DrawScope.checkIcon(c: Color) =
+    drawPath(Path().apply { moveTo(5f, 12.5f); lineTo(9.5f, 17f); lineTo(19f, 7f) }, c, style = line(2.6f))
