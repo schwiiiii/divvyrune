@@ -56,6 +56,9 @@ class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SE
     private val matrix = Matrix()
     private val shaders = HashMap<Bitmap, BitmapShader>()
 
+    /** Puts [sh] on the fill paint at full opacity: a paint keeps the last alpha set on it otherwise. */
+    private fun shade(sh: Shader): Paint { fill.color = android.graphics.Color.BLACK; fill.shader = sh; return fill }
+
     private fun shaderOf(b: Bitmap) = shaders.getOrPut(b) { BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT) }
 
     /** The linen table, its grain anchored to the board so it pans and zooms with the blocks; plus faint pencil dots. */
@@ -63,7 +66,7 @@ class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SE
         val sh = shaderOf(Woods.table)
         matrix.reset(); matrix.setTranslate(ox, oy); matrix.preScale(z / 34f, z / 34f)
         sh.setLocalMatrix(matrix)
-        fill.shader = sh; c.drawRect(0f, 0f, w, h, fill); fill.shader = null
+        c.drawRect(0f, 0f, w, h, shade(sh)); fill.shader = null
         fill.color = rgba(255, 255, 255, 0.16); c.drawRect(0f, 0f, w, h, fill)
         fill.color = rgba(90, 70, 50, 0.16)
         val gx0 = Math.floor((-ox / z).toDouble()).toInt() - 1
@@ -96,10 +99,10 @@ class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SE
         if (rr() >= 0.5) matrix.preRotate(90f)
         matrix.preTranslate((rr() * 384).toFloat(), (rr() * 384).toFloat())
         sh.setLocalMatrix(matrix)
-        fill.shader = sh; c.drawRect(rect, fill); fill.shader = null
+        c.drawRect(rect, shade(sh)); fill.shader = null
         if (stain != null) { fill.color = stain; fill.alpha = (0.78 * 255).toInt(); c.drawRect(rect, fill) }
-        fill.shader = LinearGradient(x0, y0, x0 + s, y0 + s, intArrayOf(rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.0), rgba(80, 50, 25, 0.16)),
-            floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+        shade(LinearGradient(x0, y0, x0 + s, y0 + s, intArrayOf(rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.0), rgba(80, 50, 25, 0.16)),
+            floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP))
         c.drawRect(rect, fill); fill.shader = null
         stroke.strokeWidth = max(1f, z * 0.025f); stroke.strokeCap = Paint.Cap.BUTT
         stroke.color = rgba(255, 255, 255, 0.45)
@@ -122,10 +125,10 @@ class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SE
     }
 
     private fun hollow(c: Canvas, x: Float, y: Float, r: Float, deep: Boolean) {
-        fill.shader = RadialGradient(x - r * 0.25f, y - r * 0.35f, r, intArrayOf(
+        shade(RadialGradient(x - r * 0.25f, y - r * 0.35f, r, intArrayOf(
             if (deep) rgba(30, 18, 10, 0.9) else rgba(70, 42, 20, 0.45),
             if (deep) rgba(50, 30, 16, 0.75) else rgba(110, 72, 40, 0.25),
-            rgba(255, 248, 235, 0.3)), floatArrayOf(0.1f, 0.8f, 1f), Shader.TileMode.CLAMP)
+            rgba(255, 248, 235, 0.3)), floatArrayOf(0.1f, 0.8f, 1f), Shader.TileMode.CLAMP))
         c.drawCircle(x, y, r, fill); fill.shader = null
     }
 
@@ -206,11 +209,11 @@ class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SE
         c.save(); c.translate(x, y); c.rotate(Math.toDegrees(angle.toDouble()).toFloat())
         fill.color = rgba(30, 18, 8, 0.35)
         rect.set(-t * 0.6f + z * 0.02f, -t / 2 + z * 0.035f, -t * 0.6f + z * 0.02f + l, t / 2 + z * 0.035f); c.drawRoundRect(rect, t / 2, t / 2, fill)
-        fill.shader = LinearGradient(0f, -t / 2, 0f, t / 2, 0xFFF6E7C6.toInt(), 0xFFD6B98A.toInt(), Shader.TileMode.CLAMP)
+        shade(LinearGradient(0f, -t / 2, 0f, t / 2, 0xFFF6E7C6.toInt(), 0xFFD6B98A.toInt(), Shader.TileMode.CLAMP))
         rect.set(-t * 0.6f, -t / 2, -t * 0.6f + l, t / 2); c.drawRoundRect(rect, t / 2, t / 2, fill); fill.shader = null
         stroke.color = rgba(90, 60, 30, 0.5); stroke.strokeWidth = 1f; c.drawRoundRect(rect, t / 2, t / 2, stroke)
-        fill.shader = RadialGradient(-z * 0.015f, -z * 0.015f, z * 0.05f, intArrayOf(0xFFFFF2C8.toInt(), 0xFFCFA24E.toInt(), 0xFF7A561C.toInt()),
-            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        shade(RadialGradient(-z * 0.015f, -z * 0.015f, z * 0.05f, intArrayOf(0xFFFFF2C8.toInt(), 0xFFCFA24E.toInt(), 0xFF7A561C.toInt()),
+            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP))
         c.drawCircle(0f, 0f, z * 0.048f, fill); fill.shader = null
         c.restore()
     }
@@ -220,10 +223,27 @@ class Painter(private val labelFace: Typeface = Typeface.create(Typeface.SANS_SE
         val a = (alpha * 255).toInt().coerceIn(0, 255)
         fill.color = rgba(50, 30, 15, 0.25); fill.alpha = (fill.alpha * alpha).toInt()
         rect.set(x + r * 0.25f - r * 0.95f, y + r * 0.45f - r * 0.55f, x + r * 0.25f + r * 0.95f, y + r * 0.45f + r * 0.55f); c.drawOval(rect, fill)
-        fill.shader = RadialGradient(x - r * 0.35f, y - r * 0.4f, r * 1.35f, intArrayOf(rgba(255, 255, 255, 0.95), rgba(190, 225, 222, 0.8), rgba(80, 140, 140, 0.9)),
-            floatArrayOf(0.04f, 0.25f, 0.75f), Shader.TileMode.CLAMP)
+        shade(RadialGradient(x - r * 0.35f, y - r * 0.4f, r * 1.35f, intArrayOf(rgba(255, 255, 255, 0.95), rgba(190, 225, 222, 0.8), rgba(80, 140, 140, 0.9)),
+            floatArrayOf(0.04f, 0.25f, 0.75f), Shader.TileMode.CLAMP))
         fill.alpha = a
         c.drawCircle(x, y, r, fill); fill.shader = null; fill.alpha = 255
+    }
+
+    /** The belt being drawn: a soft stroke through cell centres, [color] red when it can't be placed. */
+    fun previewPath(c: Canvas, pts: List<Float>, width: Float, color: Int) {
+        path.reset(); path.moveTo(pts[0], pts[1])
+        for (k in 2 until pts.size step 2) path.lineTo(pts[k], pts[k + 1])
+        stroke.color = color; stroke.alpha = (0.55 * 255).toInt(); stroke.strokeWidth = width
+        stroke.strokeCap = Paint.Cap.ROUND; stroke.strokeJoin = Paint.Join.ROUND
+        c.drawPath(path, stroke); stroke.alpha = 255
+    }
+
+    /** The Select-mode box: a faint fill with a dashed edge. */
+    fun box(c: Canvas, l: Float, t: Float, r: Float, b: Float, color: Int) {
+        fill.color = color; fill.alpha = (0.06 * 255).toInt(); c.drawRect(l, t, r, b, fill); fill.alpha = 255
+        stroke.color = color; stroke.strokeWidth = 3f; stroke.strokeCap = Paint.Cap.BUTT
+        stroke.pathEffect = android.graphics.DashPathEffect(floatArrayOf(12f, 8f), 0f)
+        c.drawRect(l, t, r, b, stroke); stroke.pathEffect = null
     }
 
     /** A selection or placement outline around one cell. */
