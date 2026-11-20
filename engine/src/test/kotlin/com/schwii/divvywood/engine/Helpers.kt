@@ -66,28 +66,28 @@ fun measure(tiles: Map<Cell, Tile>, t: Int, ticks: Int = 6000, warm: Int = 1000)
 // ---- reference layouts ----
 
 /** Compact layouts where pieces touch with no belts between them. */
-val compact: Map<Int, Tiles> by lazy {
+val compact: Map<String, Tiles> by lazy {
     mapOf(
-        0 to grid { put(0, 1, Kind.SRC); put(1, 1, Kind.SPLIT, inSide = 2); put(1, 0, Kind.OUT, 0); put(1, 2, Kind.OUT, 1) },
-        1 to grid {
+        "Halves" to grid { put(0, 1, Kind.SRC); put(1, 1, Kind.SPLIT, inSide = 2); put(1, 0, Kind.OUT, 0); put(1, 2, Kind.OUT, 1) },
+        "Quarter back" to grid {
             put(0, 0, Kind.SRC); put(1, 0, Kind.SPLIT, inSide = 2); put(2, 0, Kind.SPLIT, inSide = 2); put(2, -1, Kind.OUT, 0)
             put(1, 1, Kind.BELT, from = 3, out = 0); put(2, 1, Kind.MERGE, out = 1); put(2, 2, Kind.OUT, 1)
         },
     )
 }
 
-val gridRefs: Map<Int, Tiles> by lazy {
+val gridRefs: Map<String, Tiles> by lazy {
     mapOf(
-        0 to grid {
+        "Halves" to grid {
             put(0, 0, Kind.SRC); put(2, 0, Kind.SPLIT); put(2, -2, Kind.OUT, 0); put(2, 2, Kind.OUT, 1)
             path(0 to 0, 2 to 0); path(2 to 0, 2 to -2); path(2 to 0, 2 to 2)
         },
-        6 to grid {
+        "Thirds by halves" to grid {
             put(0, 0, Kind.SRC); put(2, 0, Kind.MERGE); put(4, 0, Kind.SPLIT); put(6, 0, Kind.SPLIT); put(8, 0, Kind.OUT, 0); put(4, -2, Kind.OUT, 1)
             path(0 to 0, 2 to 0); path(2 to 0, 4 to 0); path(4 to 0, 4 to -2); path(4 to 0, 6 to 0); path(6 to 0, 8 to 0)
             path(6 to 0, 6 to 2, 2 to 2, 2 to 0)
         },
-        7 to grid {
+        "Fifth" to grid {
             put(0, 0, Kind.SRC); put(2, 0, Kind.MERGE); put(4, 0, Kind.SPLIT); put(6, 0, Kind.SPLIT); put(8, 0, Kind.SPLIT)
             put(10, 0, Kind.OUT, 0); put(4, -2, Kind.OUT, 1)
             path(0 to 0, 2 to 0); path(2 to 0, 4 to 0); path(4 to 0, 4 to -2); path(4 to 0, 6 to 0); path(6 to 0, 8 to 0); path(8 to 0, 10 to 0)
@@ -96,26 +96,36 @@ val gridRefs: Map<Int, Tiles> by lazy {
     )
 }
 
-/** Abstract-network solutions, by level index. */
-val netRefs: Map<Int, () -> Graph> = mapOf(
-    1 to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val m = add(Kind.MERGE); val b = add(Kind.SPLIT); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
+/** Abstract-network solutions, by level name. */
+val netRefs: Map<String, () -> Graph> = mapOf(
+    "Quarter back" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val m = add(Kind.MERGE); val b = add(Kind.SPLIT); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
         link(s, a); link(a, b); link(a, m); link(b, A); link(b, m); link(m, B); g } },
-    2 to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1); val C = add(Kind.OUT, 2)
+    "Three ways" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1); val C = add(Kind.OUT, 2)
         link(s, a); link(a, A); link(a, B); link(a, C); g } },
-    3 to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val t = add(Kind.SPLIT); val m = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
+    "Sixth" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val t = add(Kind.SPLIT); val m = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
         link(s, a); link(a, t); link(a, m); link(t, A); link(t, m); link(t, m); link(m, B); g } },
-    4 to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val c = add(Kind.SPLIT); val mA = add(Kind.MERGE); val mB = add(Kind.MERGE)
+    "Eighths" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val c = add(Kind.SPLIT); val mA = add(Kind.MERGE); val mB = add(Kind.MERGE)
         val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
         link(s, a); link(a, b); link(a, mB); link(b, mA); link(b, c); link(c, mA); link(c, mB); link(mA, A); link(mB, B); g } },
-    5 to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val t = add(Kind.SPLIT); val m = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1); val C = add(Kind.OUT, 2)
+    "One two three" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val t = add(Kind.SPLIT); val m = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1); val C = add(Kind.OUT, 2)
         link(s, a); link(a, C); link(a, t); link(t, A); link(t, m); link(t, m); link(m, B); g } },
-    8 to { Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val c = add(Kind.SPLIT); val D = add(Kind.DUMP, 0); val A = add(Kind.OUT, 0)
+    "Seventh" to { Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val c = add(Kind.SPLIT); val D = add(Kind.DUMP, 0); val A = add(Kind.OUT, 0)
         link(s, m); link(m, a); link(a, D); link(a, b); link(b, D); link(b, c); link(c, A); link(c, m); g } },
-    9 to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val mA = add(Kind.MERGE); val mB = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
+    "Full belt" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val mA = add(Kind.MERGE); val mB = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
         link(s, a); link(a, b); link(a, mB); link(a, mB); link(b, mA); link(b, mA); link(b, mB); link(mA, A); link(mB, B); g } },
-    10 to { Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val h = add(Kind.SPLIT); val t1 = add(Kind.SPLIT); val t2 = add(Kind.SPLIT)
+    "Seventeenth" to { Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val h = add(Kind.SPLIT); val t1 = add(Kind.SPLIT); val t2 = add(Kind.SPLIT)
         val D = add(Kind.DUMP, 0); val D2 = add(Kind.DUMP, 1); val A = add(Kind.OUT, 0)
         link(s, m); link(m, h); link(h, D); link(h, t1); link(t1, D); link(t1, D2); link(t1, t2); link(t2, A); link(t2, m); link(t2, D2); g } },
+)
+
+/** Hand-built grid solutions as text codes, by level name. */
+val textRefs: Map<String, String> = mapOf(
+    "Ninths" to ".. .. IB FB .. ..\nFR3 CL ST SL LB ..\n.. RT TL TR CR FL2",
+    "Twelfths" to ".. BR LR LR LB\n.. SB LB .. TB\nIR SL TB .. TB\nRB ST CR FL TB\nTR CB RL RL TL\n.. FT2 .. .. ..",
+    "One two four" to ".. .. FB3 FB2 FB\nIR CR SL SL SL\n.. RT RL RL TL",
+    "Tenth" to ".. .. .. FB .. ..\nIR SL CR SL .. ..\n.. TB RT ST LB ..\n.. TB .. TB TB ..\n.. TR LR CR CR FL2",
+    "Fifths by halves" to ".. RB SB LR CR FL2\nIR CR SL .. BT ..\n.. SR ST FL BT ..\n.. TR LR LR LT ..",
+    "Thirtieth" to SKETCH_1_30,
 )
 
 const val SKETCH_1_30 = "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT .."

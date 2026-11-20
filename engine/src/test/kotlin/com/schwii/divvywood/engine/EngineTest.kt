@@ -14,7 +14,11 @@ class LevelsTest {
     fun `every level has a reference solution that passes Check with no jams`(): List<DynamicTest> =
         LEVELS.withIndex().filter { !it.value.sandbox }.flatMap { (li, level) ->
             val tests = mutableListOf<DynamicTest>()
-            for ((label, tiles) in listOfNotNull(gridRefs[li]?.let { "grid" to it }, compact[li]?.let { "compact" to it })) {
+            val name = level.name
+            for ((label, tiles) in listOfNotNull(
+                gridRefs[name]?.let { "grid" to it }, compact[name]?.let { "compact" to it },
+                textRefs[name]?.let { "text" to decodeGrid(it).tiles!! },
+            )) {
                 tests += DynamicTest.dynamicTest("L${li + 1} ${level.name} ($label)") {
                     val g = buildGraph(tiles, level)
                     assertEquals(0, g.errCount, g.nodes.filter { it.errs.isNotEmpty() }.joinToString { "${it.cell}: ${it.errs}" })
@@ -22,7 +26,7 @@ class LevelsTest {
                     assertTrue(v.solved, fmt(v)); assertEquals(0, v.skips, fmt(v))
                 }
             }
-            netRefs[li]?.let { make ->
+            netRefs[name]?.let { make ->
                 tests += DynamicTest.dynamicTest("L${li + 1} ${level.name} (network)") {
                     val v = check(make(), level)
                     assertTrue(v.solved, fmt(v)); assertEquals(0, v.skips, fmt(v))
@@ -39,15 +43,15 @@ class BrokenLayoutTest {
             put(0, 0, Kind.SRC); put(2, 0, Kind.SPLIT); put(2, -2, Kind.OUT, 0); put(2, 2, Kind.OUT, 1)
             path(0 to 0, 2 to 0); path(2 to 0, 2 to -2); path(2 to 0, 3 to 0)
         }
-        val g = buildGraph(t, LEVELS[0])
-        val v = judge(g, LEVELS[0], solve(g))
+        val g = buildGraph(t, levelNamed("Halves"))
+        val v = judge(g, levelNamed("Halves"), solve(g))
         assertTrue(!v.solved && v.reasons.any { "fixing" in it }, v.reasons.toString())
     }
 
     @Test fun `over-capacity loop is flagged`() {
         val g = Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
             link(s, m); link(m, a); link(a, A); link(a, B); link(a, m); g }
-        val v = check(g, LEVELS[9])
+        val v = check(g, levelNamed("Full belt"))
         assertTrue(!v.solved && v.reasons.any { "more than one item" in it }, v.reasons.toString())
     }
 
@@ -87,24 +91,24 @@ class BrokenLayoutTest {
 
 class DirectionTest {
     @Test fun `the input's direction decides what it feeds`() {
-        val t = compact.getValue(0).copyTiles()
+        val t = compact.getValue("Halves").copyTiles()
         t[Cell(0, 1)] = Tile(Kind.SRC, out = 3)
-        val g = buildGraph(t, LEVELS[0])
+        val g = buildGraph(t, levelNamed("Halves"))
         assertTrue(g.nodes.first { it.kind == Kind.SRC }.errs.any { "faces nothing" in it })
         t[Cell(0, 1)] = Tile(Kind.SRC, out = 0)
-        val g2 = buildGraph(t, LEVELS[0])
-        assertEquals(0, g2.errCount); assertTrue(check(g2, LEVELS[0]).solved)
+        val g2 = buildGraph(t, levelNamed("Halves"))
+        assertEquals(0, g2.errCount); assertTrue(check(g2, levelNamed("Halves")).solved)
     }
 
     private fun eighths(f: String) = "..  BR  CB  RL  BL\n..  BT  $f IB  BT\nRB  SR  SR  ST  LT\nTB  RB  ST  ..  ..\nTR  CB  TL  ..  ..\n..  FT  ..  ..  .."
 
     @Test fun `outputs take items from one side only`() {
-        val g = buildGraph(decodeGrid(eighths("FT2")).tiles!!, LEVELS[4])
-        val v = check(g, LEVELS[4])
+        val g = buildGraph(decodeGrid(eighths("FT2")).tiles!!, levelNamed("Eighths"))
+        val v = check(g, levelNamed("Eighths"))
         val b = g.nodes.first { it.kind == Kind.OUT && it.id == 1 }
         assertTrue(v.solved, fmt(v))
         assertEquals(listOf(Kind.MERGE), b.pred.map { g.nodes[it].kind })
-        val down = buildGraph(decodeGrid(eighths("FB2")).tiles!!, LEVELS[4])
+        val down = buildGraph(decodeGrid(eighths("FB2")).tiles!!, levelNamed("Eighths"))
         assertEquals(1, down.errCount)
         assertTrue(down.nodes.any { n -> n.errs.any { "closed side of an output" in it } })
     }
@@ -140,14 +144,14 @@ class DirectionTest {
 
 class GroupTest {
     @Test fun `level 7 moved as a whole group still solves`() {
-        val t = gridRefs.getValue(6).copyTiles()
+        val t = gridRefs.getValue("Thirds by halves").copyTiles()
         assertNotNull(moveGroup(t, t.keys.toList(), 5, -3))
-        val g = buildGraph(t, LEVELS[6])
-        assertEquals(0, g.errCount); assertTrue(check(g, LEVELS[6]).solved)
+        val g = buildGraph(t, levelNamed("Thirds by halves"))
+        assertEquals(0, g.errCount); assertTrue(check(g, levelNamed("Thirds by halves")).solved)
     }
 
     @Test fun `move onto an occupied square is refused and changes nothing`() {
-        val t = gridRefs.getValue(6).copyTiles()
+        val t = gridRefs.getValue("Thirds by halves").copyTiles()
         t[Cell(100, 100)] = Tile(Kind.BELT, from = 2, out = 0)
         val before = t.copyTiles()
         assertNull(moveGroup(t, listOf(Cell(0, 0)), 100, 100))
@@ -155,17 +159,17 @@ class GroupTest {
     }
 
     @Test fun `rotating level 1 keeps it solved and four turns restore it`() {
-        val t0 = gridRefs.getValue(0)
+        val t0 = gridRefs.getValue("Halves")
         val t = t0.copyTiles()
         var cells = rotateGroup(t, t.keys.toList())!!
-        val g = buildGraph(t, LEVELS[0])
-        assertEquals(0, g.errCount); assertTrue(check(g, LEVELS[0]).solved)
+        val g = buildGraph(t, levelNamed("Halves"))
+        assertEquals(0, g.errCount); assertTrue(check(g, levelNamed("Halves")).solved)
         repeat(3) { cells = rotateGroup(t, cells)!! }
         assertEquals(t0, t)
     }
 
     @Test fun `rotation blocked by an outside tile is refused and changes nothing`() {
-        val t0 = gridRefs.getValue(0)
+        val t0 = gridRefs.getValue("Halves")
         val t = t0.copyTiles().apply { this[Cell(3, 1)] = Tile(Kind.BELT, from = 2, out = 0) }
         val before = t.copyTiles()
         assertNull(rotateGroup(t, t0.keys.toList()))
@@ -183,20 +187,21 @@ class TextCodeTest {
         val v = check(g, level)
         assertTrue(v.solved, fmt(v)); assertEquals(0, v.skips)
         assertEquals(SKETCH_1_30, encodeGrid(d.tiles!!))
-        assertTrue(fitsLevel(d.tiles!!, LEVELS[10])!!.contains("3"))
+        assertTrue(fitsLevel(d.tiles!!, levelNamed("Seventeenth"))!!.contains("3"))
     }
 
     @TestFactory
     fun `reference layouts round-trip through text`(): List<DynamicTest> = listOf(
-        Triple("L1 grid", gridRefs.getValue(0), 0), Triple("L7 grid", gridRefs.getValue(6), 6), Triple("L8 grid", gridRefs.getValue(7), 7),
-        Triple("L1 compact", compact.getValue(0), 0), Triple("L2 compact", compact.getValue(1), 1),
-    ).map { (name, t, li) ->
+        Triple("Halves grid", gridRefs.getValue("Halves"), "Halves"), Triple("Thirds by halves grid", gridRefs.getValue("Thirds by halves"), "Thirds by halves"),
+        Triple("Fifth grid", gridRefs.getValue("Fifth"), "Fifth"),
+        Triple("Halves compact", compact.getValue("Halves"), "Halves"), Triple("Quarter back compact", compact.getValue("Quarter back"), "Quarter back"),
+    ).map { (name, t, ln) ->
         DynamicTest.dynamicTest(name) {
             val text = encodeGrid(t)
             val d = decodeGrid(text)
             assertNull(d.error)
             assertEquals(text, encodeGrid(d.tiles!!))
-            assertTrue(check(buildGraph(d.tiles!!, LEVELS[li]), LEVELS[li]).solved)
+            assertTrue(check(buildGraph(d.tiles!!, levelNamed(ln)), levelNamed(ln)).solved)
         }
     }
 
