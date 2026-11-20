@@ -2,6 +2,8 @@ package com.schwii.divvywood.game
 
 import com.schwii.divvywood.board.TrayItem
 import com.schwii.divvywood.engine.Kind
+import com.schwii.divvywood.engine.LEVELS
+import com.schwii.divvywood.engine.levelNamed
 import com.schwii.divvywood.engine.encodeGrid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,7 +31,7 @@ class GameTest {
         assertEquals(listOf("1/2", "1/2"), r.verdict.rows.map { it.exact.toString() })
         assertEquals(Best(1, 6, 6), r.best)
         assertTrue(r.next)
-        assertEquals(Best(1, 6, 6), Saves(store).best(0))
+        assertEquals(Best(1, 6, 6), Saves(store).best("Halves"))
 
         g.loadLevel(1)
         assertEquals(1, g.levelIndex)
@@ -80,9 +82,9 @@ class GameTest {
         val g = Game(Saves(store))
         g.board.apply { ox = 0f; oy = 0f; z = 10f }
         assertTrue(g.editor.chipDrop(TrayItem(Kind.SRC), 5f, 5f))
-        assertEquals("IR", Saves(store).data.levels[0]?.build)
+        assertEquals("IR", Saves(store).data.levels["Halves"]?.build)
         g.editor.undo()
-        assertEquals("", Saves(store).data.levels[0]?.build)
+        assertEquals("", Saves(store).data.levels["Halves"]?.build)
     }
 
     @Test fun `the build is locked while a Check runs`() {
@@ -103,13 +105,31 @@ class GameTest {
     @Test fun `build from text reports bad codes and pieces the level lacks`() {
         val g = Game(Saves(MemoryStore()))
         assertEquals("Row 1, cell 2: \"XX\" isn't a cell code.", g.buildFromText("IR XX"))
-        g.loadLevel(8)   // Seventh: one output, one bypass
+        g.loadLevel(LEVELS.indexOf(levelNamed("Seventh")))   // one output, one bypass
         assertEquals("This level has 1 final output; the text uses 2.", g.buildFromText(halves))
         assertTrue(g.board.tiles.isEmpty())
         assertNull(g.buildFromText("IR SL FL\n.. OT .."))
         assertEquals("Built from text", g.editor.notice)
         g.editor.undo()
         assertTrue(g.board.tiles.isEmpty())
+    }
+
+    @Test fun `saves keyed by level index move to level names`() {
+        // as 0.1.x wrote them: Fifth (index 7) open, Eighths (index 4) solved
+        val v1 = """{"cur":7,"levels":{"4":{"build":"IR SL","best":{"parts":5,"small":9,"large":12}},"7":{"build":"IR"}}}"""
+        val store = MemoryStore(v1)
+        val g = Game(Saves(store))
+        assertEquals("Fifth", g.level.name)
+        assertEquals("IR", encodeGrid(g.board.tiles))
+        assertEquals(Best(5, 9, 12), g.best(LEVELS.indexOf(levelNamed("Eighths"))))
+        g.editor.undo()   // any write stores the new form
+        g.loadLevel(0)
+        assertEquals(setOf("Eighths", "Fifth"), Saves(store).data.levels.keys)
+        assertEquals("Halves", Saves(store).cur)
+    }
+
+    @Test fun `level names are unique`() {
+        assertEquals(LEVELS.size, LEVELS.map { it.name }.toSet().size)
     }
 
     @Test fun `a corrupt save starts fresh`() {

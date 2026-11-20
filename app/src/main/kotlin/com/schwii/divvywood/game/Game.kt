@@ -30,30 +30,30 @@ sealed interface Sheet {
  * Every change to the build is saved at once.
  */
 class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}) {
-    var levelIndex by mutableIntStateOf(saves.cur.takeIf { it in LEVELS.indices } ?: 0); private set
+    var levelIndex by mutableIntStateOf(LEVELS.indexOfFirst { it.name == saves.cur }.coerceAtLeast(0)); private set
     val level: Level get() = LEVELS[levelIndex]
 
-    val board = BoardState(level, saves.build(levelIndex), density)
+    val board = BoardState(level, saves.build(level.name), density)
     val editor = Editor(board, haptic)
 
     var sheet by mutableStateOf<Sheet?>(null); private set
     var hintHidden by mutableStateOf(false); private set
 
     init {
-        editor.onChange = { saves.putBuild(levelIndex, board.tiles) }
+        editor.onChange = { saves.putBuild(level.name, board.tiles) }
         editor.locked = { board.checking }
         board.onCheckDone = { w0, w1 -> finishCheck(w0, w1) }
     }
 
-    fun best(i: Int) = saves.best(i)
+    fun best(i: Int) = saves.best(LEVELS[i].name)
 
     fun loadLevel(i: Int) {
         levelIndex = i
-        saves.cur = i
+        saves.cur = LEVELS[i].name
         hintHidden = false
         sheet = null
         editor.reset()
-        board.setBuild(LEVELS[i], saves.build(i))
+        board.setBuild(LEVELS[i], saves.build(LEVELS[i].name))
         board.refit()
     }
 
@@ -74,7 +74,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     private fun showResult(v: Verdict) {
         val score = scoreOf(board.tiles)
-        val best = if (v.solved) saves.recordSolve(levelIndex, score) else saves.best(levelIndex)
+        val best = if (v.solved) saves.recordSolve(level.name, score) else saves.best(level.name)
         sheet = Sheet.Result(v, score, best, next = v.solved && levelIndex < LEVELS.lastIndex)
     }
 

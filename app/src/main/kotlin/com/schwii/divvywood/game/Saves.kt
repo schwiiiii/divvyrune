@@ -17,8 +17,21 @@ import kotlinx.serialization.json.Json
 /** A level's build, as its text code, and its best scores once solved. */
 @Serializable data class LevelSave(val build: String = "", val best: Best? = null)
 
-/** Everything saved: the level last played and each level's save, by level index. */
-@Serializable data class SaveData(val cur: Int = 0, val levels: Map<Int, LevelSave> = emptyMap())
+/**
+ * Everything saved: the name of the level last played and each level's save, by level name.
+ * Saves from 0.1.x keyed levels by their index in the first 12-level list and kept the current one in [cur].
+ */
+@Serializable data class SaveData(val level: String? = null, val levels: Map<String, LevelSave> = emptyMap(), val cur: Int = 0)
+
+/** The level order of saves that keyed levels by index. */
+private val V1_ORDER = listOf(
+    "Halves", "Quarter back", "Three ways", "Sixth", "Eighths", "One two three",
+    "Thirds by halves", "Fifth", "Seventh", "Full belt", "Seventeenth", "Sandbox",
+)
+
+private fun migrate(d: SaveData): SaveData =
+    if (d.level != null) d
+    else SaveData(level = V1_ORDER.getOrNull(d.cur), levels = d.levels.mapKeys { (k, _) -> k.toIntOrNull()?.let { V1_ORDER.getOrNull(it) } ?: k })
 
 /** Where the save JSON lives. */
 interface SaveStore {
@@ -38,35 +51,36 @@ class MemoryStore(var json: String? = null) : SaveStore {
     override fun write(json: String) { this.json = json }
 }
 
-/** Saves per level and best scores, written through to [store] on every change. */
+/** Saves per level and best scores, by level name, written through to [store] on every change. */
 class Saves(private val store: SaveStore) {
     private val json = Json { ignoreUnknownKeys = true }
-    var data: SaveData = store.read()?.let { runCatching { json.decodeFromString<SaveData>(it) }.getOrNull() } ?: SaveData()
+    var data: SaveData = store.read()?.let { runCatching { migrate(json.decodeFromString<SaveData>(it)) }.getOrNull() } ?: SaveData()
         private set
 
     private fun put(d: SaveData) { data = d; store.write(json.encodeToString(d)) }
-    private fun level(i: Int) = data.levels[i] ?: LevelSave()
+    private fun level(name: String) = data.levels[name] ?: LevelSave()
 
-    var cur: Int
-        get() = data.cur
-        set(v) { if (v != data.cur) put(data.copy(cur = v)) }
+    /** The name of the level last played, if any. */
+    var cur: String?
+        get() = data.level
+        set(v) { if (v != data.level) put(data.copy(level = v)) }
 
-    fun best(i: Int): Best? = data.levels[i]?.best
+    fun best(name: String): Best? = data.levels[name]?.best
 
-    /** Level [i]'s saved build; empty when there is none or it no longer decodes. */
-    fun build(i: Int): Tiles = level(i).build.takeIf { it.isNotBlank() }?.let { decodeGrid(it).tiles } ?: linkedMapOf<Cell, Tile>()
+    /** The named level's saved build; empty when there is none or it no longer decodes. */
+    fun build(name: String): Tiles = level(name).build.takeIf { it.isNotBlank() }?.let { decodeGrid(it).tiles } ?: linkedMapOf<Cell, Tile>()
 
-    fun putBuild(i: Int, tiles: Map<Cell, Tile>) {
+    fun putBuild(name: String, tiles: Map<Cell, Tile>) {
         val code = encodeGrid(tiles)
-        if (code != level(i).build) put(data.copy(levels = data.levels + (i to level(i).copy(build = code))))
+        if (code != level(name).build) put(data.copy(levels = data.levels + (name to level(name).copy(build = code))))
     }
 
-    /** Records a solve of level [i] with [score]; returns the level's best afterwards. */
-    fun recordSolve(i: Int, score: Score): Best {
-        val b = level(i).best
+    /** Records a solve of the named level with [score]; returns the level's best afterwards. */
+    fun recordSolve(name: String, score: Score): Best {
+        val b = level(name).best
         val nb = if (b == null) Best(score.parts, score.area, score.area)
         else Best(minOf(b.parts, score.parts), minOf(b.small, score.area), maxOf(b.large, score.area))
-        put(data.copy(levels = data.levels + (i to level(i).copy(best = nb))))
+        put(data.copy(levels = data.levels + (name to level(name).copy(best = nb))))
         return nb
     }
 }

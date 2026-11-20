@@ -11,6 +11,8 @@ import com.schwii.divvywood.board.Editor
 import com.schwii.divvywood.board.TrayItem
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Kind
+import com.schwii.divvywood.engine.levelNamed
+import com.schwii.divvywood.engine.LEVELS
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -51,7 +53,7 @@ class GameScreenshotTest {
     private fun Editor.tapCell(c: Cell) { down(board.screenX(c.x), board.screenY(c.y), 0); up(board.screenX(c.x), board.screenY(c.y)) }
 
     @Test fun holdMenu() {
-        val g = gameFor(11, "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT ..", 56f)
+        val g = gameFor(LEVELS.lastIndex, "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT ..", 56f)
         val e = g.editor
         compose.setContent { GameScreen(g, animate = false) }   // a still board, so the screen goes idle
         compose.runOnIdle { g.editor.openMenu(Cell(2, 2)) }
@@ -59,7 +61,7 @@ class GameScreenshotTest {
     }
 
     @Test fun selectAndMove() {
-        val g = gameFor(4, "IR SL FL\n.. ST ..\n.. FT2 ..", 64f)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "IR SL FL\n.. ST ..\n.. FT2 ..", 64f)
         val e = g.editor
         compose.setContent { GameScreen(g, animate = false) }   // a still board, so the screen goes idle
         compose.runOnIdle {
@@ -84,7 +86,7 @@ class GameScreenshotTest {
     }
 
     @Test fun readoutsAndHint() {
-        val g = gameFor(4, "IR SL FL\n.. ST ..\n.. FT2 ..", 64f, hint = true)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "IR SL FL\n.. ST ..\n.. FT2 ..", 64f, hint = true)
         g.run(900)
         compose.setContent { GameScreen(g, animate = false) }
         save("screen-readouts")
@@ -105,7 +107,7 @@ class GameScreenshotTest {
     }
 
     @Test fun checking() {
-        val g = gameFor(4, "IR SL FL\n.. ST ..\n.. FT2 ..", 64f)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "IR SL FL\n.. ST ..\n.. FT2 ..", 64f)
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.startCheck(); repeat(30) { g.board.advance(16f) } }
         save("screen-checking")
@@ -115,7 +117,7 @@ class GameScreenshotTest {
         val store = MemoryStore()
         Game(Saves(store)).apply {
             buildFromText("IR SL FL\n.. FT2 .."); startCheck(); board.finishCheck()
-            loadLevel(4); buildFromText("IR SL FL\n.. ST ..\n.. FT2 ..")
+            loadLevel(LEVELS.indexOf(levelNamed("Eighths"))); buildFromText("IR SL FL\n.. ST ..\n.. FT2 ..")
         }
         val g = Game(Saves(store), density = 3f).apply { board.z = 64f * 3; hideHint() }
         compose.setContent { GameScreen(g, animate = false) }
@@ -124,7 +126,7 @@ class GameScreenshotTest {
     }
 
     @Test fun textSheet() {
-        val g = gameFor(11, "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT ..", 56f)
+        val g = gameFor(LEVELS.lastIndex, "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT ..", 56f)
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.showText() }
         save("screen-text")
