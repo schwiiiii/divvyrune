@@ -104,7 +104,7 @@ class BoardRenderer(
         val z = s.z
         val m = e.move
         val outlineW = 2f * max(1f, z / 44f)
-        (if (m != null) (if (m.shifted) emptyList() else m.cells) else e.selection).forEach {
+        (if (m != null && m.shifted) emptyList() else e.selection).forEach {
             painter.outline(c, s.screenX(it.x), s.screenY(it.y), z, Palette.ink, outlineW)
         }
         when (val g = e.gesture) {

@@ -61,6 +61,7 @@ import com.schwii.divvywood.game.Game
 import com.schwii.divvywood.wood.Fonts
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalContext
@@ -127,19 +128,17 @@ private fun Overlays(editor: Editor) {
     Box(Modifier.fillMaxSize()) {
         val banner = when {
             board.checking -> "Checking · tick ${board.sim.tick} / $CHECK_TICKS"
-            editor.move != null -> "Drag to move"
             notice != null -> notice
             else -> null
         }
         if (banner != null) {
             Row(
                 Modifier.align(Alignment.TopCenter).padding(top = 10.dp).background(Raise, RoundedCornerShape(50)).border(1.dp, Line, RoundedCornerShape(50))
-                    .padding(start = 16.dp, end = if (editor.move != null) 4.dp else 16.dp, top = 4.dp, bottom = 4.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(banner, color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Bold, style = BodyTnum, modifier = Modifier.padding(vertical = 8.dp))
-                if (editor.move != null) Pill("Cancel") { editor.cancelMove() }
             }
         }
         if (editor.selectMode) {
@@ -156,31 +155,55 @@ private fun Overlays(editor: Editor) {
             }
         }
     }
-    editor.menu?.let { m ->
-        AnchoredAbove(board.screenX(m.anchor.x), board.screenY(m.anchor.y), board.z) {
-            Row(Modifier.background(Raise, RoundedCornerShape(12.dp)).border(1.dp, Line, RoundedCornerShape(12.dp)).padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                MenuButton(if (m.cells.size > 1) "Move ${m.cells.size}" else "Move") { editor.menuMove() }
-                MenuButton("Rotate") { editor.menuRotate() }
-                MenuButton("Delete", Bad) { editor.menuDelete() }
+    SelectionPanel(editor)
+}
+
+/**
+ * What's selected: one piece's numbers, or how many pieces, with Rotate and Delete beside them. Floats above the
+ * selection, and hides while the selection is being dragged.
+ */
+@Composable
+private fun SelectionPanel(editor: Editor) {
+    val board = editor.board
+    val sel = editor.selection
+    if (sel.isEmpty() || editor.move != null) return
+    val single = sel.singleOrNull()
+    val info = single?.let { readoutOf(board, it) }
+    val ax = (sel.minOf { it.x } + sel.maxOf { it.x }) / 2f
+    val top = sel.minOf { it.y }
+    val enabled = !board.checking
+    AnchoredAbove(board.ox + (ax + 0.5f) * board.z, board.screenY(top), board.z) {
+        Column(Modifier.widthIn(max = 280.dp).background(Raise, RoundedCornerShape(10.dp)).border(1.dp, Line, RoundedCornerShape(10.dp))
+            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(info?.title ?: "${sel.size} pieces", color = Ink, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp,
+                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp))
+                ActionIcon("Rotate", enabled, { editor.rotateSelection() }) { rotateIcon(it) }
+                ActionIcon("Delete", enabled, { editor.deleteSelection() }) { deleteIcon(it) }
             }
-        }
-    }
-    editor.readout?.let { cell ->
-        val info = readoutOf(board, cell) ?: return@let
-        AnchoredAbove(board.screenX(cell.x), board.screenY(cell.y), board.z) {
-            Column(Modifier.widthIn(max = 260.dp).background(Raise, RoundedCornerShape(10.dp)).border(1.dp, Line, RoundedCornerShape(10.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Text(info.title, color = Ink, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
-                info.errors.forEach { Text(it, color = Bad, fontSize = 13.sp) }
-                info.note?.let { Text(it, color = Dim, fontSize = 13.sp) }
-                info.rows.forEach { (k, v) ->
+            Column(Modifier.padding(end = 8.dp)) {
+                info?.errors?.forEach { Text(it, color = Bad, fontSize = 13.sp) }
+                info?.note?.let { Text(it, color = Dim, fontSize = 13.sp) }
+                info?.rows?.forEach { (k, v) ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(k, color = Dim, fontSize = 13.sp, modifier = Modifier.padding(end = 12.dp)); Text(v, color = Ink, fontSize = 13.sp)
                     }
                 }
             }
         }
+    }
+}
+
+/** A 44 dp icon button on the selection panel. */
+@Composable
+private fun ActionIcon(label: String, enabled: Boolean, onClick: () -> Unit, icon: androidx.compose.ui.graphics.drawscope.DrawScope.(Color) -> Unit) {
+    Box(
+        Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)).clickable(enabled = enabled, onClick = onClick)
+            .semantics { contentDescription = label }.alpha(if (enabled) 1f else 0.4f),
+        contentAlignment = Alignment.Center,
+    ) {
+        val tint = if (label == "Delete") Bad else Ink
+        androidx.compose.foundation.Canvas(Modifier.size(22.dp)) { scale(size.width / 24f, pivot = Offset.Zero) { icon(tint) } }
     }
 }
 
@@ -205,12 +228,6 @@ private fun AnchoredAbove(x: Float, y: Float, z: Float, content: @Composable () 
 private fun Pill(label: String, onClick: () -> Unit) {
     Box(Modifier.heightIn(min = 36.dp).background(Page, RoundedCornerShape(50)).clickable(onClick = onClick).padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center) { Text(label, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 14.sp) }
-}
-
-@Composable
-private fun MenuButton(label: String, color: Color = Ink, onClick: () -> Unit) {
-    Box(Modifier.heightIn(min = 44.dp).widthIn(min = 64.dp).background(Page, RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 12.dp),
-        contentAlignment = Alignment.Center) { Text(label, color = color, fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
 }
 
 // ---------- tray ----------

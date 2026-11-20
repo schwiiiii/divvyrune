@@ -9,6 +9,6 @@
 <li>A random level with a new target whenever you like</li>
 <li>Tap any block for its exact share and measured load</li>
 <li>Share builds as short text codes</li>
-<li>Touch controls: drag to draw belts, hold to move, rotate or delete, Select for groups</li>
+<li>Touch controls: drag from a piece to draw a belt, tap it to rotate or delete it, drag it once selected to move it, Select for groups</li>
 <li>Offline, no permissions, no ads, no tracking</li>
 </ul>

@@ -1,11 +1,15 @@
 package com.schwii.divvywood.engine
 
-/** Moves or rotates several tiles together; refused (null, nothing changed) when one would land on a tile outside the group. */
-private fun relocate(tiles: Map<Cell, Tile>, cells: List<Cell>, place: (Cell) -> Cell): List<Pair<Cell, Cell>>? {
+/**
+ * Moves or rotates several tiles together; refused (null, nothing changed) when one would land on a tile outside the
+ * group, except that with [overBelts] a belt outside the group is no obstacle: the piece landing there replaces it.
+ */
+private fun relocate(tiles: Map<Cell, Tile>, cells: List<Cell>, overBelts: Boolean = false, place: (Cell) -> Cell): List<Pair<Cell, Cell>>? {
     val set = cells.toSet()
     return cells.map { c ->
         val nc = place(c)
-        if (nc in tiles && nc !in set) return null
+        val there = tiles[nc]
+        if (there != null && nc !in set && !(overBelts && there.kind == Kind.BELT)) return null
         c to nc
     }
 }
@@ -13,13 +17,20 @@ private fun relocate(tiles: Map<Cell, Tile>, cells: List<Cell>, place: (Cell) ->
 private fun applyMoves(tiles: Tiles, moved: List<Pair<Cell, Cell>>, change: (Tile) -> Tile = { it }): List<Cell> {
     val vals = moved.map { tiles.getValue(it.first) }
     moved.forEach { tiles.remove(it.first) }
+    moved.forEach { tiles.remove(it.second) }   // belts the group lands on (relocate allowed only those)
     moved.forEachIndexed { i, (_, nc) -> tiles[nc] = change(vals[i]) }
     return moved.map { it.second }
 }
 
-/** Returns the group's new cells, or null when refused. */
+/** Returns the group's new cells, or null when refused. Pieces dragged over belts replace them. */
 fun moveGroup(tiles: Tiles, cells: List<Cell>, dx: Int, dy: Int): List<Cell>? =
-    relocate(tiles, cells) { Cell(it.x + dx, it.y + dy) }?.let { applyMoves(tiles, it) }
+    relocate(tiles, cells, overBelts = true) { Cell(it.x + dx, it.y + dy) }?.let { applyMoves(tiles, it) }
+
+/** True when a moved piece landing on [c] is blocked: [c] holds a tile outside the group [cells] that isn't a belt. */
+fun moveBlockedAt(tiles: Map<Cell, Tile>, cells: Collection<Cell>, c: Cell): Boolean {
+    val t = tiles[c] ?: return false
+    return c !in cells && t.kind != Kind.BELT
+}
 
 /** 90 degrees clockwise about the middle of the group's bounding box. */
 fun rotateGroup(tiles: Tiles, cells: List<Cell>): List<Cell>? {

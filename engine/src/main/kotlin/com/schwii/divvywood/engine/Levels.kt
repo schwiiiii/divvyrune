@@ -27,7 +27,7 @@ fun levelNamed(name: String): Level = LEVELS.first { it.name == name }
 
 val LEVELS = listOf(
     Level("Halves", 2, listOf(Frac(1, 2), Frac(1, 2)), 0,
-        "Drag the input, both outputs and a splitter from the tray onto the grid. Drag a finger to draw a belt. Tap a piece for its numbers; hold it to move, rotate or delete."),
+        "Drag the input, both outputs and a splitter from the tray onto the grid. Drag from a piece to draw a belt; drag the table to look around. Tap a piece for its numbers, Rotate and Delete, then drag it to move it."),
     Level("Quarter back", 2, listOf(Frac(1, 4), Frac(3, 4)), 0,
         "A converger joins up to three inputs into one, out of its arrow side. Draw from one piece into the next to point them at each other. Select gathers several pieces to move or rotate together."),
     Level("Three ways", 2, listOf(Frac(1, 3), Frac(1, 3), Frac(1, 3)), 0,

@@ -38,3 +38,20 @@ fun DrawScope.pauseIcon(c: Color) {
 
 fun DrawScope.checkIcon(c: Color) =
     drawPath(Path().apply { moveTo(5f, 12.5f); lineTo(9.5f, 17f); lineTo(19f, 7f) }, c, style = line(2.6f))
+
+/** A clockwise turn: three quarters of a circle from the bottom round to the right, with the arrowhead there. */
+fun DrawScope.rotateIcon(c: Color) {
+    drawPath(Path().apply { arcTo(Rect(5f, 5f, 19f, 19f), 90f, 270f, true) }, c, style = line(2.4f))
+    drawPath(Path().apply { moveTo(15.5f, 10f); lineTo(19f, 13.5f); lineTo(22.5f, 10f) }, c, style = line(2.4f))
+}
+
+/** A bin. */
+fun DrawScope.deleteIcon(c: Color) {
+    val p = Path().apply {
+        moveTo(4f, 7f); lineTo(20f, 7f)
+        moveTo(9f, 7f); lineTo(9.5f, 4f); lineTo(14.5f, 4f); lineTo(15f, 7f)
+        moveTo(6f, 7f); lineTo(7f, 20f); lineTo(17f, 20f); lineTo(18f, 7f)
+        moveTo(10f, 11f); lineTo(10f, 16f); moveTo(14f, 11f); lineTo(14f, 16f)
+    }
+    drawPath(p, c, style = line(2.2f))
+}

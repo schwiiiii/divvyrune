@@ -83,7 +83,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     /** Check: a build with structural problems gets its reasons at once; otherwise the simulation runs first. */
     fun startCheck() {
         if (board.checking) return
-        editor.closeMenu(); editor.cancelMove()
+        editor.cancel()
         val pre = judge(board.graph, level, board.sol)
         if (pre.reasons.isNotEmpty() && (pre.rows.isEmpty() || !board.sol.ok)) { showResult(pre); return }
         board.startCheck()

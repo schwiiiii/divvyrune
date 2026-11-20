@@ -1,6 +1,7 @@
 package com.schwii.divvywood.engine
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -150,12 +151,23 @@ class GroupTest {
         assertEquals(0, g.errCount); assertTrue(check(g, levelNamed("Thirds by halves")).solved)
     }
 
-    @Test fun `move onto an occupied square is refused and changes nothing`() {
+    @Test fun `move onto another piece is refused and changes nothing`() {
         val t = gridRefs.getValue("Thirds by halves").copyTiles()
-        t[Cell(100, 100)] = Tile(Kind.BELT, from = 2, out = 0)
+        t[Cell(100, 100)] = Tile(Kind.SPLIT, inSide = 2)
         val before = t.copyTiles()
         assertNull(moveGroup(t, listOf(Cell(0, 0)), 100, 100))
         assertEquals(before, t)
+        assertTrue(moveBlockedAt(t, listOf(Cell(0, 0)), Cell(100, 100)))
+    }
+
+    @Test fun `a piece moved onto a belt replaces it`() {
+        val t = decodeGrid("IR LR LR SL FL\n.. .. .. FT2 ..").tiles!!
+        val splitter = t.getValue(Cell(3, 0))
+        assertFalse(moveBlockedAt(t, listOf(Cell(3, 0)), Cell(1, 0)))
+        assertEquals(listOf(Cell(1, 0)), moveGroup(t, listOf(Cell(3, 0)), -2, 0))
+        assertEquals(splitter, t.getValue(Cell(1, 0)))
+        assertNull(t[Cell(3, 0)])
+        assertEquals(Kind.BELT, t.getValue(Cell(2, 0)).kind)
     }
 
     @Test fun `rotating level 1 keeps it solved and four turns restore it`() {
