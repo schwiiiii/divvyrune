@@ -50,14 +50,14 @@ class GameScreenshotTest {
     /** Runs the live simulation for about [ticks] ticks at top speed, as the frame clock would. */
     private fun Game.run(ticks: Int) { board.speed = 16; repeat(ticks / 9) { board.advance(100f) } }
 
-    private fun Editor.tapCell(c: Cell) { down(board.screenX(c.x), board.screenY(c.y), 0); up(board.screenX(c.x), board.screenY(c.y)) }
+    private fun Editor.tapCell(c: Cell) { down(board.screenX(c.x), board.screenY(c.y)); up(board.screenX(c.x), board.screenY(c.y)) }
 
-    @Test fun holdMenu() {
+    @Test fun selectedPiece() {
         val g = gameFor(LEVELS.lastIndex, "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT ..", 56f)
         val e = g.editor
         compose.setContent { GameScreen(g, animate = false) }   // a still board, so the screen goes idle
-        compose.runOnIdle { g.editor.openMenu(Cell(2, 2)) }
-        save("screen-hold-menu")
+        compose.runOnIdle { g.editor.tapCell(Cell(2, 2)) }
+        save("screen-selected")
     }
 
     @Test fun selectAndMove() {
@@ -67,11 +67,18 @@ class GameScreenshotTest {
         compose.runOnIdle {
             e.switchSelectMode(true)
             listOf(Cell(1, 0), Cell(1, 1), Cell(2, 0)).forEach { e.tapCell(it) }
-            e.openMenu(Cell(1, 0)); e.menuMove()
-            e.down(e.board.screenX(1), e.board.screenY(1), 0)
+            e.down(e.board.screenX(1), e.board.screenY(1))
             e.drag(e.board.screenX(1), e.board.screenY(3))
         }
         save("screen-select-move")
+    }
+
+    @Test fun groupSelected() {
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "IR SL FL\n.. ST ..\n.. FT2 ..", 64f)
+        val e = g.editor
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { e.switchSelectMode(true); listOf(Cell(1, 0), Cell(1, 1), Cell(1, 2)).forEach { e.tapCell(it) } }
+        save("screen-group-selected")
     }
 
     @Test fun trayDragAndReadout() {

@@ -17,7 +17,6 @@ import org.junit.Test
 class EditorTest {
     private lateinit var e: Editor
     private val haptics = mutableListOf<Haptic>()
-    private var clock = 0L
     private val tiles get() = e.board.tiles
     private fun at(x: Int, y: Int) = tiles[Cell(x, y)]
     private fun cx(x: Int) = x * 10f + 5f
@@ -27,13 +26,12 @@ class EditorTest {
         e = Editor(board) { haptics += it }
     }
 
-    private fun tap(x: Int, y: Int) { e.down(cx(x), cx(y), clock); e.up(cx(x), cx(y)); clock += 100 }
-    private fun hold(x: Int, y: Int) { e.down(cx(x), cx(y), clock); clock += 500; e.tick(clock); e.up(cx(x), cx(y)) }
+    private fun tap(x: Int, y: Int) { e.down(cx(x), cx(y)); e.up(cx(x), cx(y)) }
     /** A finger drag through cell centres, a few steps per cell. */
     private fun drag(fx: Int, fy: Int, tx: Int, ty: Int) {
-        e.down(cx(fx), cx(fy), clock)
+        e.down(cx(fx), cx(fy))
         for (s in 1..8) e.drag(cx(fx) + (cx(tx) - cx(fx)) * s / 8, cx(fy) + (cx(ty) - cx(fy)) * s / 8)
-        e.up(cx(tx), cx(ty)); clock += 100
+        e.up(cx(tx), cx(ty))
     }
     private fun drop(kind: Kind, x: Int, y: Int, id: Int = -1) = e.chipDrop(TrayItem(kind, id), cx(x), cx(y))
 
@@ -42,75 +40,100 @@ class EditorTest {
         assertEquals(Kind.SPLIT, at(0, 0)?.kind)
         assertTrue(drop(Kind.SRC, -2, 0))
         assertTrue(Haptic.DROP in haptics)
-        assertFalse("an output can't land on an occupied square", drop(Kind.OUT, 0, 0, 0))
+        assertFalse("an output can't land on another piece", drop(Kind.OUT, 0, 0, 0))
         drop(Kind.OUT, 2, 0, 0)
         assertTrue(e.isPlaced(TrayItem(Kind.OUT, 0)))
         assertFalse("each output is placed once", drop(Kind.OUT, 3, 3, 0))
     }
 
-    @Test fun `tap shows the readout, tap empty closes it`() {
+    @Test fun `a chip dropped on a belt replaces it and takes its direction`() {
         drop(Kind.SPLIT, 0, 0)
+        drag(0, 0, 0, 3)   // belts down from the splitter
+        assertTrue(drop(Kind.MERGE, 0, 1))
+        assertEquals(Tile(Kind.MERGE, out = 1), at(0, 1))
+        assertTrue(drop(Kind.OUT, 0, 3, 0))
+        assertEquals(Tile(Kind.OUT, id = 0, inSide = 3), at(0, 3))
+    }
+
+    @Test fun `tap selects a piece and shows its numbers, tapping the table deselects`() {
+        drop(Kind.SPLIT, 0, 0); drop(Kind.MERGE, 2, 2)
         tap(0, 0)
-        assertEquals(Cell(0, 0), e.readout)
-        assertNull(e.menu)
+        assertEquals(setOf(Cell(0, 0)), e.selection)
         assertEquals("Splitter", readoutOf(e.board, Cell(0, 0))?.title)
+        tap(2, 2)
+        assertEquals("tapping another piece selects it instead", setOf(Cell(2, 2)), e.selection)
         tap(4, 3)
-        assertNull(e.readout)
+        assertTrue(e.selection.isEmpty())
     }
 
-    @Test fun `hold opens the menu and Rotate turns the piece`() {
-        drop(Kind.SPLIT, 0, 0)
+    @Test fun `Rotate turns the selected piece and Delete returns an output to the tray`() {
+        drop(Kind.SPLIT, 0, 0); drop(Kind.OUT, 2, 0, 0)
         val in0 = at(0, 0)!!.inSide
-        hold(0, 0)
-        assertNotNull(e.menu)
-        assertTrue(Haptic.PICK in haptics)
-        e.menuRotate()
+        tap(0, 0); e.rotateSelection()
         assertEquals((in0 + 1) % 4, at(0, 0)!!.inSide)
-        tap(4, 3)
-        assertNull("tapping elsewhere closes the menu", e.menu)
-    }
-
-    @Test fun `Move carries pieces by the finger's offset from anywhere`() {
-        drop(Kind.SPLIT, 0, 0)
-        hold(0, 0); e.menuMove()
-        assertNotNull(e.move)
-        drag(3, 3, 3, 1)
-        assertNull(at(0, 0)); assertEquals(Kind.SPLIT, at(0, -2)?.kind)
-        assertNull(e.move)
-    }
-
-    @Test fun `Move onto an occupied square stays lifted until Cancel`() {
-        drop(Kind.SPLIT, 0, -2); drop(Kind.OUT, 2, 0, 0)
-        hold(0, -2); e.menuMove()
-        drag(0, 3, 2, 5)
-        assertEquals(Kind.SPLIT, at(0, -2)?.kind)
-        assertNotNull(e.move)
-        assertTrue(e.blockedAt(Cell(2, 0)))
-        e.cancelMove()
-        assertNull(e.move); assertEquals(Kind.SPLIT, at(0, -2)?.kind)
-    }
-
-    @Test fun `Delete returns an output to the tray`() {
-        drop(Kind.OUT, 2, 0, 0)
-        hold(2, 0); e.menuDelete()
+        assertEquals("the piece stays selected for another turn", setOf(Cell(0, 0)), e.selection)
+        tap(2, 0); e.deleteSelection()
         assertNull(at(2, 0))
         assertFalse(e.isPlaced(TrayItem(Kind.OUT, 0)))
+        assertTrue(e.selection.isEmpty())
     }
 
-    @Test fun `a drag draws a belt only when it's valid`() {
-        drop(Kind.SPLIT, 2, 0)
+    @Test fun `dragging a selected piece moves it, dragging it unselected draws a belt`() {
+        drop(Kind.SPLIT, 0, 0)
+        drag(0, 0, 3, 0)
+        assertEquals("unselected: a belt", Kind.BELT, at(3, 0)?.kind)
+        assertEquals(Kind.SPLIT, at(0, 0)?.kind)
+        e.undo()
+        tap(0, 0)
+        drag(0, 0, 0, -2)
+        assertNull(at(0, 0)); assertEquals(Kind.SPLIT, at(0, -2)?.kind)
+        assertEquals("it stays selected where it lands", setOf(Cell(0, -2)), e.selection)
+        assertNull(e.move)
+        assertTrue(Haptic.PICK in haptics)
+    }
+
+    @Test fun `a piece dragged over a belt replaces it, onto another piece goes back`() {
+        drop(Kind.SPLIT, 0, 0); drag(0, 0, 4, 0)   // belts at 1..4
+        drop(Kind.MERGE, 0, 3); drop(Kind.OUT, 2, 3, 0)
+        tap(0, 3)
+        e.down(cx(0), cx(3)); e.drag(cx(1), cx(3)); e.drag(cx(2), cx(3))
+        assertTrue("an output blocks", e.blockedAt(Cell(2, 3)))
+        e.up(cx(2), cx(3))
+        assertEquals(Kind.MERGE, at(0, 3)?.kind); assertEquals("No room here", e.notice)
+        drag(0, 3, 2, 0)
+        assertEquals(Kind.MERGE, at(2, 0)?.kind)
+        assertNull(at(0, 3))
+        assertEquals(Kind.BELT, at(1, 0)?.kind); assertEquals(Kind.BELT, at(3, 0)?.kind)
+    }
+
+    @Test fun `dragging the table or an unselected output pans`() {
+        drop(Kind.OUT, 2, 2, 0)
+        val ox = e.board.ox; val oy = e.board.oy
+        drag(0, 0, 3, 1)
+        assertEquals(ox + 30f, e.board.ox, 0.01f); assertEquals(oy + 10f, e.board.oy, 0.01f)
+        assertEquals("no belt from the table", 1, tiles.size)
+        val ox2 = e.board.ox
+        drag(5, 5, 4, 5)   // the output, now at (5, 5) on screen after the pan
+        assertEquals(ox2 - 10f, e.board.ox, 0.01f)
+        assertEquals(1, tiles.size)
+    }
+
+    @Test fun `a belt is drawn from a piece only when it's valid`() {
+        drop(Kind.SRC, 0, 0); drop(Kind.SPLIT, 2, 0)
         drag(0, 0, 4, 0)   // straight through the splitter: not allowed
-        assertNull(at(0, 0)); assertNull(at(4, 0))
-        drag(0, 1, 0, 4)
+        assertNull(at(1, 0)); assertNull(at(4, 0))
+        drag(0, 0, 0, 3)
         assertEquals(Kind.BELT, at(0, 2)?.kind)
         assertEquals(1, at(0, 2)!!.out)
+        drag(0, 3, 2, 3)   // on from the belt's end
+        assertEquals(Kind.BELT, at(2, 3)?.kind)
     }
 
     @Test fun `drawing out of a converger and into a splitter sets their sides`() {
         drop(Kind.MERGE, 0, 0)
         drag(0, 0, 0, -2)
         assertEquals(3, at(0, 0)!!.out)
-        drop(Kind.SPLIT, 0, 4)
+        drop(Kind.SPLIT, 0, 4); drop(Kind.SRC, 2, 4)
         drag(2, 4, 0, 4)
         assertEquals(0, at(0, 4)!!.inSide)
     }
@@ -123,25 +146,23 @@ class EditorTest {
         drag(-1, -3, 2, -1)
         assertEquals(3, e.selection.size)
         assertEquals("a drag in Select mode draws no belt", before, tiles.size)
-        hold(1, -2)
-        assertEquals(3, e.menu!!.cells.size)
-        e.menuMove(); drag(0, 2, 0, 4)
+        drag(1, -2, 1, 0)
         assertEquals(Kind.SPLIT, at(0, 0)?.kind); assertEquals(Kind.BELT, at(1, 0)?.kind); assertEquals(Kind.BELT, at(2, 0)?.kind)
-        hold(1, 0); e.menuRotate()
+        e.rotateSelection()
         assertEquals(setOf(Cell(1, -1), Cell(1, 0), Cell(1, 1)), e.selection)
         tap(5, 5)
+        assertTrue("tapping the table deselects in Select mode too", e.selection.isEmpty())
         e.switchSelectMode(false)
-        assertTrue(e.selection.isEmpty())
-        drag(-3, 3, -3, 5)
-        assertEquals("after Select mode a drag draws again", Kind.BELT, at(-3, 4)?.kind)
+        drag(1, 1, 1, 4)
+        assertEquals("after Select mode a drag from a piece draws again", Kind.BELT, at(1, 3)?.kind)
     }
 
     @Test fun `a blocked group rotation changes nothing and says why`() {
         drop(Kind.SPLIT, 0, 0); drag(0, 0, 2, 0)
         drop(Kind.MERGE, 1, 1)
-        e.switchSelectMode(true); drag(0, 0, 2, 0)
+        e.switchSelectMode(true); drag(0, -1, 2, 0)
         val before = LinkedHashMap(tiles)
-        hold(1, 0); e.menuRotate()
+        e.rotateSelection()
         assertEquals(before, LinkedHashMap(tiles))
         assertEquals("No room to rotate here", e.notice)
     }
@@ -157,11 +178,12 @@ class EditorTest {
         assertFalse(e.canUndo)
     }
 
-    @Test fun `two fingers cancel a gesture without drawing`() {
-        e.down(cx(0), cx(0), clock)
-        e.drag(cx(2), cx(0))
-        e.cancel()
-        e.up(cx(2), cx(0))
-        assertTrue(tiles.isEmpty())
+    @Test fun `two fingers cancel a gesture without drawing or moving`() {
+        drop(Kind.SPLIT, 0, 0)
+        e.down(cx(0), cx(0)); e.drag(cx(2), cx(0)); e.cancel(); e.up(cx(2), cx(0))
+        assertEquals(1, tiles.size)
+        tap(0, 0)
+        e.down(cx(0), cx(0)); e.drag(cx(0), cx(2)); e.cancel(); e.up(cx(0), cx(2))
+        assertEquals(Kind.SPLIT, at(0, 0)?.kind); assertNull(e.move)
     }
 }

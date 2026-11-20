@@ -9,6 +9,7 @@ import com.schwii.divvywood.engine.LETTERS
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.commitPath
 import com.schwii.divvywood.engine.inferDir
+import com.schwii.divvywood.engine.moveBlockedAt
 import com.schwii.divvywood.engine.moveGroup
 import com.schwii.divvywood.engine.pathValid
 import com.schwii.divvywood.engine.placePiece
@@ -27,42 +28,39 @@ data class TrayItem(val kind: Kind, val id: Int = -1) {
     val limited get() = kind == Kind.SRC || kind == Kind.OUT || kind == Kind.DUMP
 }
 
-/** Pieces lifted by Move, shifted by (dx, dy) cells from where they sit. */
+/** Selected pieces being dragged, shifted by (dx, dy) cells from where they sit. */
 data class MoveState(val cells: List<Cell>, val dx: Int = 0, val dy: Int = 0) {
     val shifted get() = dx != 0 || dy != 0
 }
-
-/** The hold menu: the pieces it acts on, and the cell it opened over. */
-data class MenuState(val cells: List<Cell>, val anchor: Cell)
 
 /** A tray chip being dragged over the board. */
 data class ChipGhost(val item: TrayItem, val cell: Cell)
 
 /**
- * The building controls, as in the prototype. Coordinates are board-local pixels; one finger only (the board
- * handles two-finger pan and zoom itself).
- * - tap a piece: its readout (in Select mode: add or remove it)
- * - hold a piece: the Move / Rotate / Delete menu, for the whole selection if the piece is selected
- * - drag: draw a belt, placed on release if valid (in Select mode: a selection box)
- * - after Move: the next drag carries the pieces by the finger's offset; release drops them where they fit
+ * The building controls. Coordinates are board-local pixels; one finger only (the board handles two-finger pan and
+ * zoom itself).
+ * - tap a piece: select it, which shows its numbers with Rotate and Delete (in Select mode: add it or take it out)
+ * - tap the table: deselect everything
+ * - drag a selected piece: move the selection; pieces landing on belts replace them, other pieces block the move
+ * - drag from an unselected piece that sends marbles (input, splitter, converger, belt): draw a belt, placed on
+ *   release if valid
+ * - drag anything else: pan the board (in Select mode: a selection box)
  */
 class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     var selection by mutableStateOf(setOf<Cell>()); private set
     var selectMode by mutableStateOf(false); private set
     var move by mutableStateOf<MoveState?>(null); private set
-    var menu by mutableStateOf<MenuState?>(null); private set
-    var readout by mutableStateOf<Cell?>(null); private set
     var notice by mutableStateOf<String?>(null); private set
     var chipGhost by mutableStateOf<ChipGhost?>(null); private set
     var canUndo by mutableStateOf(false); private set
 
     /** The gesture in progress. */
     sealed interface Gesture
-    class Tap(val x: Float, val y: Float, val cell: Cell, val t: Long) : Gesture
+    class Tap(val x: Float, val y: Float, val cell: Cell) : Gesture
     class Draw(val path: MutableList<Cell>) : Gesture
     class Box(val a: Cell, var b: Cell) : Gesture
-    class Moving(val c0: Cell, val dx0: Int, val dy0: Int) : Gesture
-    object Held : Gesture
+    class Moving(val c0: Cell) : Gesture
+    class Pan(var x: Float, var y: Float) : Gesture
     var gesture: Gesture? = null; private set
 
     private val undoStack = ArrayDeque<Map<Cell, Tile>>()
@@ -70,12 +68,11 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     /** Called after every change to the build (edits and undo), e.g. to save it. */
     var onChange: () -> Unit = {}
-    /** While true (a Check is running) the build can't be changed and gestures are ignored. */
+    /** While true (a Check is running) the build can't be changed and gestures only pan. */
     var locked: () -> Boolean = { false }
 
-    /** Movement beyond this many pixels turns a tap into a drag; holding this long opens the menu. */
+    /** Movement beyond this many pixels turns a tap into a drag. */
     var slop = 8f
-    val holdMs = 450L
 
     // ---------- edits ----------
 
@@ -105,7 +102,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     /** Puts the whole build in place of the current one, as one undo step. */
     fun replaceAll(newTiles: Map<Cell, Tile>) {
-        move = null; menu = null; readout = null
+        move = null
         selection = emptySet()
         edit { tiles.clear(); tiles.putAll(newTiles); true }
     }
@@ -114,39 +111,45 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     fun reset() {
         undoStack.clear(); canUndo = false
         selection = emptySet(); selectMode = false
-        move = null; menu = null; readout = null; chipGhost = null; gesture = null
+        move = null; chipGhost = null; gesture = null
     }
 
     fun undo() {
         if (locked()) return
         val snap = undoStack.removeLastOrNull() ?: return
         tiles.clear(); tiles.putAll(snap)
-        move = null; menu = null; readout = null
+        move = null
         canUndo = undoStack.isNotEmpty()
         afterEdit()
     }
 
     // ---------- pointer ----------
 
-    fun down(x: Float, y: Float, t: Long) {
-        val c = board.cellAt(x, y)
-        if (locked()) { gesture = null; return }
-        if (menu != null) { menu = null; gesture = null; return }   // a tap anywhere closes the menu
-        readout = null
-        val m = move
-        gesture = if (m != null) Moving(c, m.dx, m.dy) else Tap(x, y, c, t)
+    /** Pieces a belt can be drawn out of: everything that sends marbles. */
+    private fun sendsMarbles(c: Cell) = when (tiles[c]?.kind) { Kind.SRC, Kind.SPLIT, Kind.MERGE, Kind.BELT -> true; else -> false }
+
+    fun down(x: Float, y: Float) {
+        gesture = Tap(x, y, board.cellAt(x, y))
     }
 
     fun drag(x: Float, y: Float) {
         val c = board.cellAt(x, y)
         when (val g = gesture) {
-            is Moving -> move = move?.copy(dx = g.dx0 + c.x - g.c0.x, dy = g.dy0 + c.y - g.c0.y)
             is Tap -> if (hypot(x - g.x, y - g.y) > slop) {
-                gesture = if (selectMode) Box(g.cell, c) else Draw(mutableListOf(g.cell)).also { extendPath(it.path, c) }
+                gesture = when {
+                    locked() -> Pan(g.x, g.y)
+                    g.cell in selection -> { move = MoveState(selection.toList()); haptic(Haptic.PICK); Moving(g.cell) }
+                    selectMode -> Box(g.cell, c)
+                    sendsMarbles(g.cell) -> Draw(mutableListOf(g.cell))
+                    else -> Pan(g.x, g.y)
+                }
+                drag(x, y)
             }
+            is Moving -> move = move?.copy(dx = c.x - g.c0.x, dy = c.y - g.c0.y)
             is Box -> g.b = c
             is Draw -> extendPath(g.path, c)
-            else -> Unit
+            is Pan -> { board.pan(x - g.x, y - g.y); g.x = x; g.y = y }
+            null -> Unit
         }
     }
 
@@ -154,33 +157,42 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         val g = gesture
         gesture = null
         when (g) {
-            is Moving -> tryDrop()
+            is Moving -> drop()
             is Box -> {
                 val x0 = min(g.a.x, g.b.x); val x1 = max(g.a.x, g.b.x); val y0 = min(g.a.y, g.b.y); val y1 = max(g.a.y, g.b.y)
                 selection = selection + tiles.keys.filter { it.x in x0..x1 && it.y in y0..y1 }
             }
             is Draw -> if (g.path.size > 1 && pathValid(tiles, g.path)) edit { commitPath(tiles, g.path); true }
-            is Tap -> if (g.cell in tiles) {
-                if (selectMode) selection = if (g.cell in selection) selection - g.cell else selection + g.cell
-                else readout = g.cell
+            is Tap -> selection = when {
+                g.cell !in tiles -> emptySet()
+                selectMode -> if (g.cell in selection) selection - g.cell else selection + g.cell
+                else -> setOf(g.cell)
             }
             else -> Unit
         }
     }
 
+    /** A second finger or a cancelled touch: the gesture ends without changing anything. */
     fun cancel() {
-        val g = gesture
-        if (g is Moving) move = move?.copy(dx = g.dx0, dy = g.dy0)
         gesture = null
+        move = null
     }
 
-    /** Called every frame: a still finger on a piece for [holdMs] opens the menu. */
-    fun tick(t: Long) {
-        val g = gesture as? Tap ?: return
-        if (t - g.t < holdMs || g.cell !in tiles) return
-        gesture = Held
-        haptic(Haptic.PICK)
-        openMenu(g.cell)
+    /** Drops the dragged selection where it is; a move onto another piece is refused and the pieces go back. */
+    private fun drop() {
+        val m = move ?: return
+        move = null
+        if (!m.shifted) return
+        var moved: List<Cell>? = null
+        if (!edit { moved = moveGroup(tiles, m.cells, m.dx, m.dy); moved != null }) { notice = "No room here"; return }
+        selection = moved!!.toSet()
+        haptic(Haptic.DROP)
+    }
+
+    /** True if a dragged piece would land on another piece (belts don't count: they get replaced). */
+    fun blockedAt(c: Cell): Boolean {
+        val m = move ?: return false
+        return moveBlockedAt(tiles, m.cells, c)
     }
 
     /** Extends a belt path cell by cell toward [c]; stepping back onto the previous cell retracts it. */
@@ -200,66 +212,38 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         }
     }
 
-    // ---------- menu ----------
-
-    fun openMenu(at: Cell) {
-        menu = MenuState(if (at in selection) selection.toList() else listOf(at), at)
-    }
-
-    fun closeMenu() { menu = null }
+    // ---------- actions on the selection ----------
 
     /** Rotate: one piece turns a quarter; a group turns 90° clockwise as a unit, or not at all if there's no room. */
-    fun menuRotate() {
-        val m = menu ?: return
-        if (m.cells.size == 1) { edit { tiles[m.cells[0]] = turnPiece(tiles.getValue(m.cells[0])); true }; return }
+    fun rotateSelection() {
+        if (locked()) return
+        val cells = selection.toList()
+        if (cells.isEmpty()) return
+        if (cells.size == 1) { edit { tiles[cells[0]] = turnPiece(tiles.getValue(cells[0])); true }; return }
         var moved: List<Cell>? = null
-        val ok = edit { moved = rotateGroup(tiles, m.cells); moved != null }
-        if (!ok) { notice = "No room to rotate here"; return }
+        if (!edit { moved = rotateGroup(tiles, cells); moved != null }) { notice = "No room to rotate here"; return }
         selection = moved!!.toSet()
-        menu = m.copy(cells = moved!!)
     }
 
-    fun menuDelete() {
-        val m = menu ?: return
-        menu = null
-        edit { m.cells.forEach { tiles.remove(it) }; true }
-        selection = selection - m.cells.toSet()
-    }
-
-    fun menuMove() {
-        val m = menu ?: return
-        menu = null
-        move = MoveState(m.cells)
-    }
-
-    fun cancelMove() { move = null }
-
-    private fun tryDrop() {
-        val m = move ?: return
-        if (!m.shifted) return
-        val wasSelected = m.cells.all { it in selection }   // checked before the edit tidies the selection
-        var moved: List<Cell>? = null
-        if (!edit { moved = moveGroup(tiles, m.cells, m.dx, m.dy); moved != null }) return   // blocked: stays lifted
-        if (wasSelected) selection = moved!!.toSet()
-        move = null
-        haptic(Haptic.DROP)
-    }
-
-    /** True if a lifted piece would land on a tile outside the lifted group. */
-    fun blockedAt(c: Cell): Boolean {
-        val m = move ?: return false
-        return c in tiles && c !in m.cells
+    fun deleteSelection() {
+        if (locked()) return
+        val cells = selection
+        if (cells.isEmpty()) return
+        edit { cells.forEach { tiles.remove(it) }; true }
+        selection = emptySet()
     }
 
     // ---------- select mode ----------
 
     fun switchSelectMode(on: Boolean) {
         selectMode = on
-        if (!on && move == null) selection = emptySet()
-        menu = null
+        if (!on) selection = emptySet()
     }
 
     fun clearSelection() { selection = emptySet() }
+
+    /** Selects [cells] (those that hold pieces). */
+    fun select(cells: Collection<Cell>) { selection = cells.filter { it in tiles }.toSet() }
 
     fun dismissNotice() { notice = null }
 
@@ -280,23 +264,22 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     fun isPlaced(item: TrayItem) = item.limited && tiles.values.any { it.kind == item.kind && (item.kind == Kind.SRC || it.id == item.id) }
 
-    /** What a chip would put on the board at [c], facing the way it will be placed. */
+    /** What a chip would put on the board at [c], facing the way it will be placed (a belt there lends its direction). */
     fun chipTile(item: TrayItem, c: Cell): Tile {
-        val ex = tiles[c]
+        val belt = tiles[c]?.takeIf { it.kind == Kind.BELT }
         return when (item.kind) {
-            Kind.SPLIT, Kind.MERGE -> {
-                val dir = if (ex?.kind == Kind.BELT) { if (item.kind == Kind.SPLIT) ex.from else ex.out } else inferDir(tiles, c, item.kind)
-                if (item.kind == Kind.SPLIT) Tile(Kind.SPLIT, inSide = dir) else Tile(Kind.MERGE, out = dir)
-            }
-            Kind.SRC -> Tile(Kind.SRC, out = inferDir(tiles, c, Kind.SRC))
-            else -> Tile(item.kind, id = item.id, inSide = inferDir(tiles, c, item.kind))
+            Kind.SPLIT -> Tile(Kind.SPLIT, inSide = belt?.from ?: inferDir(tiles, c, Kind.SPLIT))
+            Kind.MERGE -> Tile(Kind.MERGE, out = belt?.out ?: inferDir(tiles, c, Kind.MERGE))
+            Kind.SRC -> Tile(Kind.SRC, out = belt?.out ?: inferDir(tiles, c, Kind.SRC))
+            else -> Tile(item.kind, id = item.id, inSide = belt?.from ?: inferDir(tiles, c, item.kind))
         }
     }
 
+    /** A chip lands on an empty square or replaces a belt. */
     fun chipFits(item: TrayItem, c: Cell): Boolean {
         if (isPlaced(item)) return false
         val ex = tiles[c]
-        return if (item.kind == Kind.SPLIT || item.kind == Kind.MERGE) ex == null || ex.kind == Kind.BELT else ex == null
+        return ex == null || ex.kind == Kind.BELT
     }
 
     /** While a chip is dragged: (x, y) in board pixels, or null when the finger is off the board. */

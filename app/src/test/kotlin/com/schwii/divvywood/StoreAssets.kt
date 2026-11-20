@@ -130,7 +130,7 @@ class StoreAssets {
         while (board.inputBlocked && guard++ < 200) board.advance(100f)   // some loops hold the input up often
     }
 
-    private fun Game.tap(x: Int, y: Int) { editor.down(board.screenX(x), board.screenY(y), 0); editor.up(board.screenX(x), board.screenY(y)) }
+    private fun Game.tap(x: Int, y: Int) { editor.down(board.screenX(x), board.screenY(y)); editor.up(board.screenX(x), board.screenY(y)) }
 
     private val oneTwoFour = ".. .. FB3 FB2 FB\nIR CR SL SL SL\n.. RT RL RL TL"
     private val ninths = ".. .. IB FB .. ..\nFR3 CL ST SL LB ..\n.. RT TL TR CR FL2"

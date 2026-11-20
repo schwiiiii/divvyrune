@@ -130,6 +130,9 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
         camVersion++
     }
 
+    /** One-finger pan: shifts the view by (dx, dy) pixels. */
+    fun pan(dx: Float, dy: Float) { ox += dx; oy += dy; camVersion++ }
+
     /** Two-finger pan and pinch: keeps the point under the fingers' centre fixed while zooming. */
     fun panZoom(cx: Float, cy: Float, zoom: Float, dx: Float, dy: Float) {
         val nz = (z * zoom).coerceIn(minZ, maxZ)

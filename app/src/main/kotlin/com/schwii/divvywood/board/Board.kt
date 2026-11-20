@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 
 /**
  * The live board: the table, blocks and rolling marbles. Two fingers pan and pinch-zoom; one finger goes to the
- * [editor] (tap, hold, drag) when there is one.
+ * [editor] (tap, drag) when there is one.
  */
 @Composable
 fun Board(state: BoardState, modifier: Modifier = Modifier, editor: Editor? = null, reduceMotion: Boolean = false, animate: Boolean = true) {
@@ -29,7 +29,6 @@ fun Board(state: BoardState, modifier: Modifier = Modifier, editor: Editor? = nu
         var last = 0L
         while (true) withFrameNanos { t ->
             if (last != 0L) state.advance((t - last) / 1_000_000f)
-            editor?.tick(t / 1_000_000)
             last = t
         }
     }
@@ -41,7 +40,7 @@ fun Board(state: BoardState, modifier: Modifier = Modifier, editor: Editor? = nu
                 awaitEachGesture {
                     val first = awaitFirstDown(requireUnconsumed = false)
                     var single = true
-                    editor?.down(first.position.x, first.position.y, first.uptimeMillis)
+                    editor?.down(first.position.x, first.position.y)
                     do {
                         val ev = awaitPointerEvent()
                         val pressed = ev.changes.count { it.pressed }
