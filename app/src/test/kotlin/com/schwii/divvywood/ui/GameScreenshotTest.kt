@@ -131,4 +131,13 @@ class GameScreenshotTest {
         compose.runOnIdle { g.showText() }
         save("screen-text")
     }
+
+    @Test fun randomLevel() {
+        val store = MemoryStore()
+        Saves(store).randomTarget = com.schwii.divvywood.engine.Frac(5, 13)
+        val g = Game(Saves(store), density = 3f).apply { loadLevel(randomIndex); board.z = 64f * 3 }
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.showLevels() }
+        save("screen-random-levels")
+    }
 }

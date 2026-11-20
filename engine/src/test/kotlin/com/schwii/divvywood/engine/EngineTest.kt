@@ -249,3 +249,53 @@ class FairnessTest {
         assertTrue(abs(m.share(0) - 1.0 / 30) < 0.005 && m.skips == 0, "share ${m.share(0)} skips ${m.skips}")
     }
 }
+
+class RandomLevelTest {
+    /** Joins [lines] into one with converger trees (three inputs each). */
+    private fun Net.join(lines: List<Int>): Int {
+        var ls = lines
+        while (ls.size > 1) ls = ls.chunked(3).map { c -> if (c.size == 1) c[0] else add(Kind.MERGE).also { m -> c.forEach { link(it, m) } } }
+        return ls[0]
+    }
+
+    /** The construction from [RANDOM_TARGETS]' doc: N = 2^a·3^b ≥ q shares, N − q sent back, p to A, the rest to a bypass. */
+    private fun solution(f: Frac): Graph = Net().run {
+        val q = f.d
+        var n = 1; val ways = mutableListOf<Int>()
+        // the smallest 2^a·3^b ≥ q
+        var best = Int.MAX_VALUE; var bestA = 0; var bestB = 0
+        var p3 = 1; var b = 0
+        while (p3 < 4 * q) { var p2 = 1; var a = 0; while (p2 * p3 < 4 * q) { if (p2 * p3 >= q && p2 * p3 < best) { best = p2 * p3; bestA = a; bestB = b }; p2 *= 2; a++ }; p3 *= 3; b++ }
+        repeat(bestB) { ways += 3 }; repeat(bestA) { ways += 2 }
+        n = best
+        val s = add(Kind.SRC)
+        val m = if (n > q) add(Kind.MERGE) else -1
+        val top = if (m >= 0) { link(s, m); m } else s
+        var leaves = listOf(top)
+        for (w in ways) leaves = leaves.flatMap { from -> val sp = add(Kind.SPLIT); link(from, sp); List(w) { sp } }
+        // each leaf is a splitter exit; a belt chain from it becomes the share's line
+        val shares = leaves.map { sp -> add(Kind.BELT).also { link(sp, it, 0) } }
+        val back = shares.take(n - q); val toA = shares.drop(n - q).take(f.n); val toDump = shares.drop(n - q + f.n)
+        if (back.isNotEmpty()) link(join(back), m)
+        link(join(toA), add(Kind.OUT, 0))
+        if (toDump.isNotEmpty()) link(join(toDump), add(Kind.DUMP, 0))
+        check(n == leaves.size)
+        g
+    }
+
+    @TestFactory
+    fun `every random target has a solution that passes Check with no jams`(): List<DynamicTest> = RANDOM_TARGETS.map { f ->
+        DynamicTest.dynamicTest("$f") {
+            val v = check(solution(f), randomLevel(f))
+            assertTrue(v.solved, fmt(v)); assertEquals(0, v.skips, fmt(v))
+        }
+    }
+
+    @Test fun `targets are spread over denominators and never repeat the last`() {
+        val rnd = kotlin.random.Random(1)
+        var last = randomTarget(rnd)
+        val ds = mutableSetOf<Int>()
+        repeat(500) { val f = randomTarget(rnd, last); assertTrue(f != last); assertTrue(f in RANDOM_TARGETS); ds += f.d; last = f }
+        assertEquals((3..RANDOM_MAX_D).toSet(), ds)
+    }
+}

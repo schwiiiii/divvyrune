@@ -2,7 +2,10 @@ package com.schwii.divvywood.game
 
 import com.schwii.divvywood.board.TrayItem
 import com.schwii.divvywood.engine.Kind
+import com.schwii.divvywood.engine.Frac
 import com.schwii.divvywood.engine.LEVELS
+import com.schwii.divvywood.engine.RANDOM
+import com.schwii.divvywood.engine.RANDOM_TARGETS
 import com.schwii.divvywood.engine.levelNamed
 import com.schwii.divvywood.engine.encodeGrid
 import org.junit.Assert.assertEquals
@@ -126,6 +129,37 @@ class GameTest {
         g.loadLevel(0)
         assertEquals(setOf("Eighths", "Fifth"), Saves(store).data.levels.keys)
         assertEquals("Halves", Saves(store).cur)
+    }
+
+    @Test fun `the random level keeps its target and build across restarts and picks a new target on request`() {
+        val store = MemoryStore()
+        val g = Game(Saves(store))
+        g.loadLevel(g.randomIndex)
+        val first = g.level.out[0]!!
+        assertTrue(first in RANDOM_TARGETS)
+        assertNull(g.buildFromText("IR SL FL\n.. OT .."))
+        val again = Game(Saves(store))
+        assertEquals(RANDOM, again.level.name)
+        assertEquals(first, again.level.out[0])
+        assertEquals("IR SL FL\n.. OT ..", encodeGrid(again.board.tiles))
+        again.newTarget()
+        assertTrue(again.level.out[0] != first)
+        assertEquals("IR SL FL\n.. OT ..", encodeGrid(again.board.tiles))
+        assertEquals(again.level.out[0], Saves(store).randomTarget)
+    }
+
+    @Test fun `solving the random level offers a new target and its best resets with the target`() {
+        val store = MemoryStore()
+        Saves(store).randomTarget = Frac(1, 2)   // as if picked: the halves build solves it
+        val g = Game(Saves(store))
+        g.loadLevel(g.randomIndex)
+        g.buildFromText("IR SL FL\n.. OT ..")
+        val r = check(g)
+        assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
+        assertFalse(r.next)
+        assertEquals(Best(1, 6, 6), g.best(g.randomIndex))
+        g.newTarget()
+        assertNull(g.best(g.randomIndex))
     }
 
     @Test fun `level names are unique`() {

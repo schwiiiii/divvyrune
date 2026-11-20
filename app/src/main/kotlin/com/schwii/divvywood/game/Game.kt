@@ -9,6 +9,9 @@ import com.schwii.divvywood.board.Editor
 import com.schwii.divvywood.board.Haptic
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
+import com.schwii.divvywood.engine.RANDOM
+import com.schwii.divvywood.engine.randomLevel
+import com.schwii.divvywood.engine.randomTarget
 import com.schwii.divvywood.engine.Score
 import com.schwii.divvywood.engine.Snapshot
 import com.schwii.divvywood.engine.Verdict
@@ -30,8 +33,14 @@ sealed interface Sheet {
  * Every change to the build is saved at once.
  */
 class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}) {
-    var levelIndex by mutableIntStateOf(LEVELS.indexOfFirst { it.name == saves.cur }.coerceAtLeast(0)); private set
-    val level: Level get() = LEVELS[levelIndex]
+    /** The random level, last in the list after the fixed [LEVELS]. */
+    var randomLevel by mutableStateOf(randomLevel(saves.randomTarget ?: randomTarget().also { saves.randomTarget = it })); private set
+    val levelCount get() = LEVELS.size + 1
+    val randomIndex get() = LEVELS.size
+    fun levelAt(i: Int): Level = if (i < LEVELS.size) LEVELS[i] else randomLevel
+
+    var levelIndex by mutableIntStateOf(if (saves.cur == RANDOM) LEVELS.size else LEVELS.indexOfFirst { it.name == saves.cur }.coerceAtLeast(0)); private set
+    val level: Level get() = levelAt(levelIndex)
 
     val board = BoardState(level, saves.build(level.name), density)
     val editor = Editor(board, haptic)
@@ -45,19 +54,29 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
         board.onCheckDone = { w0, w1 -> finishCheck(w0, w1) }
     }
 
-    fun best(i: Int) = saves.best(LEVELS[i].name)
+    fun best(i: Int) = saves.best(levelAt(i).name)
 
     fun loadLevel(i: Int) {
         levelIndex = i
-        saves.cur = LEVELS[i].name
+        saves.cur = levelAt(i).name
         hintHidden = false
         sheet = null
         editor.reset()
-        board.setBuild(LEVELS[i], saves.build(LEVELS[i].name))
+        board.setBuild(levelAt(i), saves.build(levelAt(i).name))
         board.refit()
     }
 
     fun hideHint() { hintHidden = true }
+
+    /** Gives the random level a new target, keeping its build, and opens it. */
+    fun newTarget() {
+        if (board.checking) return
+        val f = randomTarget(not = randomLevel.out[0])
+        saves.randomTarget = f
+        saves.clearBest(RANDOM)
+        randomLevel = randomLevel(f)
+        loadLevel(randomIndex)
+    }
 
     // ---------- check ----------
 
@@ -75,7 +94,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     private fun showResult(v: Verdict) {
         val score = scoreOf(board.tiles)
         val best = if (v.solved) saves.recordSolve(level.name, score) else saves.best(level.name)
-        sheet = Sheet.Result(v, score, best, next = v.solved && levelIndex < LEVELS.lastIndex)
+        sheet = Sheet.Result(v, score, best, next = v.solved && levelIndex < LEVELS.lastIndex)   // Sandbox is never solved
     }
 
     // ---------- sheets ----------

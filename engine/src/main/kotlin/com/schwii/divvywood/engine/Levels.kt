@@ -53,3 +53,33 @@ val LEVELS = listOf(
     Level("Sandbox", 2, listOf(null, null, null), 4,
         "No targets. Build anything; Check reports the exact split.", sandbox = true),
 )
+
+/** The name of the generated level; its target changes, so it is not in [LEVELS]. */
+const val RANDOM = "Random"
+
+/**
+ * Every target the random level can ask for: p/q with 3 ≤ q ≤ [RANDOM_MAX_D], in lowest terms.
+ * Each is solvable: split into N = 2^a·3^b ≥ q equal shares, send N − q back to a converger at the input,
+ * p of the rest to A and the others to a bypass. The input splitter then carries N/2q ≤ 2/3 of a belt.
+ */
+val RANDOM_TARGETS: List<Frac> = (3..RANDOM_MAX_D).flatMap { q -> (1 until q).filter { gcd(it, q) == 1 }.map { Frac(it, q) } }
+
+const val RANDOM_MAX_D = 24
+
+private tailrec fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)
+
+/** A target picked evenly by denominator, then numerator; never [not]. */
+fun randomTarget(rnd: kotlin.random.Random = kotlin.random.Random.Default, not: Frac? = null): Frac {
+    while (true) {
+        val q = rnd.nextInt(3, RANDOM_MAX_D + 1)
+        val ps = (1 until q).filter { gcd(it, q) == 1 }
+        val f = Frac(ps[rnd.nextInt(ps.size)], q)
+        if (f != not) return f
+    }
+}
+
+/** The random level for [target]: one final output and three bypasses, at the usual input rate. */
+fun randomLevel(target: Frac) = Level(
+    RANDOM, 2, listOf(target), 3,
+    "A random target. Send everything output A does not need to the bypasses. New target picks another.",
+)

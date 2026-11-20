@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.schwii.divvywood.engine.LETTERS
-import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.encodeGrid
 import com.schwii.divvywood.engine.encodeLine
@@ -137,6 +136,7 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     Buttons {
         SheetButton("Keep building") { game.closeSheet() }
         if (r.next) SheetButton("Next level", go = true) { game.loadLevel(game.levelIndex + 1) }
+        if (v.solved && game.levelIndex == game.randomIndex) SheetButton("New target", go = true) { game.newTarget() }
     }
 }
 
@@ -170,7 +170,8 @@ private fun RowScope.ScoreCard(label: String, value: String, note: String) {
 private fun ColumnScope.LevelsSheet(game: Game) {
     Title("Levels")
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        LEVELS.forEachIndexed { i, l ->
+        for (i in 0 until game.levelCount) {
+            val l = game.levelAt(i)
             val b = game.best(i)
             val goal = if (l.sandbox) "free build" else l.out.joinToString(" + ") + if (l.dump > 0) " + dump" else ""
             Row(
@@ -185,7 +186,10 @@ private fun ColumnScope.LevelsSheet(game: Game) {
                     Text(l.name, style = Body, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(goal, style = Body, color = Dim, fontSize = 11.sp)
                 }
-                if (b != null) Column(horizontalAlignment = Alignment.End) {
+                if (i == game.randomIndex) {
+                    Box(Modifier.heightIn(min = 36.dp).background(Page, RoundedCornerShape(50)).clickable { game.newTarget() }.padding(horizontal = 12.dp),
+                        contentAlignment = Alignment.Center) { Text("New target", style = Body, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                } else if (b != null) Column(horizontalAlignment = Alignment.End) {
                     Text(
                         buildAnnotatedString { withStyle(SpanStyle(color = Out)) { append("✓") }; append(" ${b.parts} parts") },
                         style = BodyTnum, color = Dim, fontSize = 11.sp,
