@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed icon: the logo build's channels. The input drops into the loop, which feeds the three cups. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M42,42 V66 H29.6 V54 H42 M42,66 H78.4 V54 M54.4,66 V54 M66.4,66 V54"
+        android:strokeWidth="3.6"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M42,38 a4,4 0 1,0 0.01,0 Z M54.4,50.5 a3.5,3.5 0 1,0 0.01,0 Z M66.4,50.5 a3.5,3.5 0 1,0 0.01,0 Z M78.4,50.5 a3.5,3.5 0 1,0 0.01,0 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>
