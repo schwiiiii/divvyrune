@@ -35,7 +35,10 @@ https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 - Allowed hosts here: dl.google.com, downloads.gradle.org, Maven Central mirror, raw.githubusercontent.com, package registries. Ask Brett before adding hosts.
 
 ## Release
-CI (`.github/workflows/ci.yml`) tests, lints and builds. `release.yml` publishes every merge to main as "Build N" (tag `build-N`, version 0.1.N) signed with Brett's key from Actions secrets; Brett updates via Obtainium. Source builds without the env vars are unsigned with version 0.1.0/1 (what F-Droid wants).
+- Version: `versionName`/`versionCode` in `app/build.gradle.kts` are the release (1.0.0 / 1000000 = major·10⁶ + minor·10⁴ + patch·100). To release: bump both, add `fastlane/metadata/android/en-US/changelogs/<code>.txt`, merge, tag `v<name>` on main.
+- `release.yml`: a `v*` tag builds from source unchanged, signs with Brett's key (Actions secrets DIVVYWOOD_KEYSTORE_BASE64 / _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD) and publishes `divvywood-<name>.apk`. Each merge to main publishes a prerelease `<last release>.K`, code = last release + K (commits since its tag, ≤ 99). Brett updates via Obtainium.
+- Reproducible: two clean builds at different paths give identical unsigned APKs (no vcsInfo, engine compiled with -Xjdk-release=17). F-Droid's recipe draft is `fdroid/com.schwii.divvywood.yml` (Binaries + AllowedAPKSigningKeys).
+- Store listing: `fastlane/metadata/android/en-US`. Icon (Brett's logo build `..,IB,..,..,../BR,CB,FB,FB2,FB3/RT,ST,SL,SL,LT`), feature graphic and screenshots are drawn by `StoreAssets` (`DIVVYWOOD_ASSETS=1 gradle :app:testDebugUnitTest --tests '*StoreAssets*'`; move `res/mipmap-anydpi/ic_launcher.xml` aside the first time, it needs the PNGs to link).
 
 ## Workflow
 - One PR per milestone-sized chunk on a branch; Brett merges (merge = approval). Report verified results with real output and show screenshots of UI changes.

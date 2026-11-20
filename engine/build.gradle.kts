@@ -6,7 +6,8 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
-kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+// compile against the JDK 17 API whatever JDK builds it, so CI (JDK 21) and F-Droid produce the same bytecode
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17); freeCompilerArgs.add("-Xjdk-release=17") } }
 
 dependencies {
     testImplementation(platform(libs.junit.bom))

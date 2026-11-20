@@ -7,9 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.schwii.divvywood.board.BoardRenderer
 import com.schwii.divvywood.board.BoardState
-import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.LEVELS
-import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.levelNamed
 import com.schwii.divvywood.game.Game
@@ -19,7 +17,6 @@ import com.schwii.divvywood.ui.GameScreen
 import com.schwii.divvywood.wood.Fonts
 import com.schwii.divvywood.wood.Painter
 import com.schwii.divvywood.wood.Palette
-import com.schwii.divvywood.wood.angleOf
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -56,53 +53,46 @@ class StoreAssets {
 
     // ---------- icon ----------
 
-    /**
-     * The icon on a canvas [px] square that shows [viewDp] of the 108 dp adaptive-icon square: the linen table
-     * ([table]) and a walnut 3-way splitter block with its flipper ([block]), 52 dp across.
-     */
-    private fun icon(px: Int, viewDp: Float, table: Boolean, block: Boolean): Bitmap {
-        val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        val dp = px / viewDp
-        val z = 52f * dp / 0.95f   // the painter draws a block 0.95 of its cell
-        val x = px / 2f; val y = px / 2f
-        val p = Painter()
-        if (table) p.table(c, px.toFloat(), px.toFloat(), x - px, y - px, px.toFloat())   // grid dots fall on the edges
-        if (block) {
-            p.blockShadow(c, x, y, z)
-            // on the board channels run on into the next block; on the icon they stop at the block's edge
-            val half = z * 0.475f
-            c.save(); c.clipPath(android.graphics.Path().apply { addRoundRect(x - half, y - half, x + half, y + half, z * 0.07f, z * 0.07f, android.graphics.Path.Direction.CW) })
-            p.tile(c, x, y, z, Tile(Kind.SPLIT, inSide = 2), listOf(2), listOf(3, 0, 1), 905)
-            c.restore()
-            p.flipper(c, x, y, z, angleOf(3))
-        }
+    /** Brett's logo build: the input drops into a converger, a splitter loops back to it and feeds three cups. */
+    private val logo = "..,IB,..,..,../BR,CB,FB,FB2,FB3/RT,ST,SL,SL,LT"
+
+    /** The logo build on the board as the game draws it, [cell] pixels a cell, centred in [w] × [h], marbles rolling. */
+    private fun board(w: Int, h: Int, cell: Float, dx: Float = 0f): Bitmap {
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val level = com.schwii.divvywood.engine.Level("logo", 2, listOf(null, null, null), 0, "")
+        val state = BoardState(level, decodeGrid(logo).tiles!!, 1f).apply { z = cell }
+        state.fit(w.toFloat(), h.toFloat())
+        state.ox += dx
+        repeat(41) { state.step() }
+        state.advance(0f)
+        BoardRenderer(state, reduceMotion = true).draw(Canvas(bmp), w, h)
         return bmp
+    }
+
+    /** The icon on a canvas [px] square that shows [viewDp] of the 108 dp adaptive-icon square; the build spans 62 dp. */
+    private fun icon(px: Int, viewDp: Float): Bitmap = board(px, px, 62f / 5 * px / viewDp)
+
+    /** The bare linen table, for the adaptive icon's back layer. */
+    private fun table(px: Int): Bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).also {
+        Painter().table(Canvas(it), px.toFloat(), px.toFloat(), -px.toFloat(), -px.toFloat(), px.toFloat() * 2)
     }
 
     @Test fun launcherIcon() {
         for ((dir, scale) in listOf("mdpi" to 1f, "hdpi" to 1.5f, "xhdpi" to 2f, "xxhdpi" to 3f, "xxxhdpi" to 4f)) {
             val px = (108 * scale).toInt()
-            icon(px, 108f, table = false, block = true).saveTo(File(res, "mipmap-$dir/ic_launcher_foreground.png"))
-            icon(px, 108f, table = true, block = false).saveTo(File(res, "mipmap-$dir/ic_launcher_background.png"))
+            icon(px, 108f).saveTo(File(res, "mipmap-$dir/ic_launcher_foreground.png"))
+            table(px).saveTo(File(res, "mipmap-$dir/ic_launcher_background.png"))
         }
         // the store icon shows the 72 dp an adaptive icon's mask keeps
-        icon(512, 72f, table = true, block = true).saveTo(File(store, "icon.png"))
+        icon(512, 72f).saveTo(File(store, "icon.png"))
     }
 
     // ---------- feature graphic ----------
 
     @Test fun featureGraphic() {
         val w = 1024; val h = 500
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val bmp = board(w, h, 92f, dx = -250f)
         val c = Canvas(bmp)
-        val tiles = decodeGrid(".. .. FB3 FB2 FB\nIR CR SL SL SL\n.. RT RL RL TL").tiles!!
-        val state = BoardState(levelNamed("One two four"), tiles, 2f).apply { z = 88f; speed = 16 }
-        state.fit(w.toFloat(), h.toFloat())
-        state.ox = 44f
-        repeat(220) { state.step() }
-        state.advance(0f)
-        BoardRenderer(state, reduceMotion = true).draw(c, w, h)
         val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Fonts.label; Fonts.labelVariation?.let { fontVariationSettings = it }
             color = Palette.ink; textSize = 84f; textAlign = Paint.Align.RIGHT
@@ -143,12 +133,13 @@ class StoreAssets {
     private fun Game.tap(x: Int, y: Int) { editor.down(board.screenX(x), board.screenY(y), 0); editor.up(board.screenX(x), board.screenY(y)) }
 
     private val oneTwoFour = ".. .. FB3 FB2 FB\nIR CR SL SL SL\n.. RT RL RL TL"
+    private val ninths = ".. .. IB FB .. ..\nFR3 CL ST SL LB ..\n.. RT TL TR CR FL2"
     private val thirtieth = "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT .."
 
     @Test fun screenshot1Running() {
-        val g = game("One two four", oneTwoFour, 60f, hint = true).apply { run(900) }
+        val g = game("Ninths", ninths, 60f, hint = true).apply { run(900) }
         compose.setContent { GameScreen(g, animate = false) }
-        compose.runOnIdle { g.tap(4, 0) }
+        compose.runOnIdle { g.tap(3, 0) }
         shoot(1)
     }
 
@@ -179,7 +170,7 @@ class StoreAssets {
     }
 
     @Test fun screenshot5Text() {
-        val g = game("Ninths", ".. .. IB FB .. ..\nFR3 CL ST SL LB ..\n.. RT TL TR CR FL2", 54f, hint = false).apply { run(300) }
+        val g = game("One two four", oneTwoFour, 60f, hint = false)
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.showText() }
         shoot(5)

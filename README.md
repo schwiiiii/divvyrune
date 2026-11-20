@@ -10,12 +10,16 @@ Press **Check** to have the exact flow worked out and the build run, then chase 
 - Offline, no permissions, no ads, no tracking.
 - Builds and layouts can be shared as short text codes, e.g. `IR SL FL / .. FT ..` (a splitter halving the input between two outputs).
 
-## Development builds
+## Install
 
-Every merge to `main` is published as a [release](https://github.com/schwiiiii/divvywood/releases) with a signed
-APK (`divvywood-0.1.N.apk`). To install it and get each new build as an update, add the repository URL
-`https://github.com/schwiiiii/divvywood` to [Obtainium](https://github.com/ImranR98/Obtainium) (available on F-Droid).
-Every build is signed with the same key, so each one installs over the last.
+Divvywood is headed for [F-Droid](https://f-droid.org). Until it's there, install the signed APK from the
+[releases](https://github.com/schwiiiii/divvywood/releases): add `https://github.com/schwiiiii/divvywood` to
+[Obtainium](https://github.com/ImranR98/Obtainium) to get each new version as an update.
+
+Releases (`v1.0.0`) and the development builds published after every merge to `main` (prereleases, `1.0.0.3`) are
+signed with the same key and numbered so that either kind updates the other; turn on *Include prereleases* in Obtainium
+to follow development builds. F-Droid builds each release from source and, since the build is reproducible, ships the
+same signed APK, so copies from F-Droid and from GitHub update each other too.
 
 ## Building
 
@@ -25,6 +29,7 @@ Requirements: JDK 17 or newer and the Android SDK (platform 36).
 ./gradlew :engine:test          # rules, exact solver and simulation tests
 ./gradlew :app:testDebugUnitTest # controls, game, saves and screenshot tests
 ./gradlew :app:assembleDebug    # app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease  # unsigned release APK, byte for byte what the signed release contains
 ```
 
 The project has two modules:

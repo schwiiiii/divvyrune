@@ -13,9 +13,10 @@ android {
         applicationId = "com.schwii.divvywood"
         minSdk = 26
         targetSdk = 36
-        // CI numbers each build of main so installed copies can update; source builds (F-Droid) use the fixed values
-        versionCode = System.getenv("DIVVYWOOD_VERSION_CODE")?.toInt() ?: 1
-        versionName = System.getenv("DIVVYWOOD_VERSION_NAME") ?: "0.1.0"
+        // The release version, as tagged (v1.0.0) and built by F-Droid. versionCode is major·10⁶ + minor·10⁴ + patch·100.
+        // CI's development builds of main pass the last release's values plus the commits since its tag (1.0.0.3).
+        versionCode = System.getenv("DIVVYWOOD_VERSION_CODE")?.toInt() ?: 1_000_000
+        versionName = System.getenv("DIVVYWOOD_VERSION_NAME") ?: "1.0.0"
     }
 
     // Release builds are signed only when CI provides the key; without it they build unsigned, as F-Droid expects.
@@ -32,6 +33,8 @@ android {
     buildTypes {
         release {
             if (keystore != null) signingConfig = signingConfigs.getByName("release")
+            // reproducible builds: no git commit baked into the APK, so any checkout of a tag builds the same bytes
+            vcsInfo.include = false
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
