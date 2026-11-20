@@ -3,6 +3,7 @@ package com.schwii.divvywood.game
 import android.content.Context
 import androidx.core.content.edit
 import com.schwii.divvywood.engine.Cell
+import com.schwii.divvywood.engine.Frac
 import com.schwii.divvywood.engine.Score
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.Tiles
@@ -21,7 +22,13 @@ import kotlinx.serialization.json.Json
  * Everything saved: the name of the level last played and each level's save, by level name.
  * Saves from 0.1.x keyed levels by their index in the first 12-level list and kept the current one in [cur].
  */
-@Serializable data class SaveData(val level: String? = null, val levels: Map<String, LevelSave> = emptyMap(), val cur: Int = 0)
+@Serializable data class SaveData(
+    val level: String? = null,
+    val levels: Map<String, LevelSave> = emptyMap(),
+    val cur: Int = 0,
+    /** The random level's target, as "p/q". */
+    val random: String? = null,
+)
 
 /** The level order of saves that keyed levels by index. */
 private val V1_ORDER = listOf(
@@ -31,7 +38,7 @@ private val V1_ORDER = listOf(
 
 private fun migrate(d: SaveData): SaveData =
     if (d.level != null) d
-    else SaveData(level = V1_ORDER.getOrNull(d.cur), levels = d.levels.mapKeys { (k, _) -> k.toIntOrNull()?.let { V1_ORDER.getOrNull(it) } ?: k })
+    else d.copy(level = V1_ORDER.getOrNull(d.cur), levels = d.levels.mapKeys { (k, _) -> k.toIntOrNull()?.let { V1_ORDER.getOrNull(it) } ?: k }, cur = 0)
 
 /** Where the save JSON lives. */
 interface SaveStore {
@@ -66,6 +73,14 @@ class Saves(private val store: SaveStore) {
         set(v) { if (v != data.level) put(data.copy(level = v)) }
 
     fun best(name: String): Best? = data.levels[name]?.best
+
+    /** The random level's current target, if one was picked. */
+    var randomTarget: Frac?
+        get() = data.random?.split('/')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 && it[1] > 0 }?.let { Frac(it[0], it[1]) }
+        set(v) { put(data.copy(random = v?.toString())) }
+
+    /** Forgets the named level's best scores (the random level's, when its target changes). */
+    fun clearBest(name: String) { data.levels[name]?.let { put(data.copy(levels = data.levels + (name to it.copy(best = null)))) } }
 
     /** The named level's saved build; empty when there is none or it no longer decodes. */
     fun build(name: String): Tiles = level(name).build.takeIf { it.isNotBlank() }?.let { decodeGrid(it).tiles } ?: linkedMapOf<Cell, Tile>()
