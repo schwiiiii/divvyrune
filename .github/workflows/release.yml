@@ -2,7 +2,8 @@ name: Release build
 
 # A v* tag (v1.0.0) publishes that release: built from the tag exactly as F-Droid builds it, then signed. F-Droid
 # checks its own build against this APK and, when they match, publishes this signed copy.
-# Every merge to main publishes a development build as a prerelease, numbered from the last release:
+# Before the first release tag, merges to main publish prereleases 0.9.N (N = commits on main, versionCode 900000 + N).
+# After it, every merge to main publishes a development build as a prerelease, numbered from the last release:
 # 1.0.0.K with versionCode = 1.0.0's code + K, where K counts the commits since the v1.0.0 tag. It always sorts
 # after the release it follows and before the next one, so installed copies update either way.
 # Needs the signing secrets; until they exist this skips without failing.
@@ -48,8 +49,12 @@ jobs:
           fi
           last=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
           if [ -z "$last" ]; then
-            echo "::notice::No v* release tag yet, so no development build was published."
-            echo "kind=none" >> "$GITHUB_OUTPUT"; exit 0
+            # before the first release: 0.9.N, N = commits on main; above the old Build N codes, below 1.0.0
+            n=$(git rev-list --count HEAD)
+            echo "kind=dev" >> "$GITHUB_OUTPUT"
+            echo "name=0.9.$n" >> "$GITHUB_OUTPUT"
+            echo "code=$((900000 + n))" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           base=${last#v}
           IFS=. read -r major minor patch <<< "$base"
