@@ -7,7 +7,9 @@ import androidx.compose.runtime.setValue
 import com.schwii.divvywood.board.BoardState
 import com.schwii.divvywood.board.Editor
 import com.schwii.divvywood.board.Haptic
+import com.schwii.divvywood.engine.Frac
 import com.schwii.divvywood.engine.Kind
+import com.schwii.divvywood.engine.toFrac
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.randomTarget
@@ -99,7 +101,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     fun openBuilder() = loadLevel(builderIndex)
 
     /**
-     * Changes the builder's definition. The build stays, except outputs the new definition no longer
+     * Changes the builder's definition. The build stays, except inputs and outputs the new definition no longer
      * has; any earlier pass no longer counts.
      */
     fun updateDraft(def: LevelDef) {
@@ -107,13 +109,17 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
         saves.draft = def
         saves.clearResults(BUILDER)
         if (!inBuilder) return
-        board.tiles.entries.removeAll { (_, t) -> t.kind == Kind.OUT && t.id >= def.out.size }
+        board.tiles.entries.removeAll { (_, t) -> (t.kind == Kind.OUT && t.id >= def.out.size) || (t.kind == Kind.SRC && maxOf(t.id, 0) >= def.inputs.size) }
         board.setBuild(builderLevel, board.tiles)
         saves.putBuild(BUILDER, board.tiles)
     }
 
     /** A random single target the builder can always meet, with bypasses taking the rest. */
-    fun surpriseMe() = updateDraft(LevelDef(t = 2, out = listOf(randomTarget(not = draft.targets.singleOrNull()).toString())))
+    fun surpriseMe() {
+        val half = Frac(1, 2)   // the targets are proved solvable with the input at half a belt
+        val f = randomTarget(not = draft.targets.singleOrNull()?.let { (it.q / half.q).toFrac() })
+        updateDraft(LevelDef(listOf(half.toString()), listOf((f * half).toString())))
+    }
 
     /** Saves the builder's design as a custom level, once its current build has passed Check. */
     fun saveCustom(): CustomLevel? {

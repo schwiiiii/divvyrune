@@ -29,34 +29,32 @@ import com.schwii.divvywood.game.Game
 import com.schwii.divvywood.game.LevelDef
 
 /**
- * The level builder's settings: how fast the input runs, each output's target, and whether
- * 3-way splits are allowed. Every change applies at once; the design can be saved after its build passes Check.
+ * The level builder's settings: each input's rate and each output's target (every rate a share of one full belt,
+ * up to three of each), and whether 3-way splits are allowed. Every change applies at once; the design can be saved
+ * after its build passes Check.
  */
 @Composable
 fun ColumnScope.BuilderSheet(game: Game) {
     val d = game.draft
     fun set(nd: LevelDef) = game.updateDraft(nd)
     Text("New level", style = Body, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+    Text("Rates are shares of a full belt, which carries one marble a tick.", style = Body, color = Dim, fontSize = 13.sp)
 
-    Setting("Input") {
-        Stepper("1 every ${d.t} tick${if (d.t == 1) "" else "s"}", d.t > 1, d.t < 4, "slower and faster input") { set(d.copy(t = (d.t + it).coerceIn(1, 4))) }
+    d.inputs.forEachIndexed { k, v ->
+        FracSetting(if (d.inputs.size == 1) "Input" else "Input ${k + 1}", v, removable = d.inputs.size > 1,
+            onChange = { set(d.copy(inputs = d.inputs.replaced(k, it))) },
+            onRemove = { set(d.copy(inputs = d.inputs.filterIndexed { i, _ -> i != k })) })
     }
-    d.out.forEachIndexed { k, s ->
-        val f = s.split('/').map { it.toInt() }
-        val (n, q) = f[0] to f[1]
-        Setting("Output ${LETTERS[k]}") {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Stepper("$n", n > 1, n < q, "numerator") { set(d.withOut(k, "${n + it}/$q")) }
-                Text("/", style = Body, color = Dim, fontSize = 18.sp)
-                Stepper("$q", q > 2 && q > n, q < 60, "denominator") { set(d.withOut(k, "$n/${q + it}")) }
-                if (d.out.size > 1) SmallButton("×", "remove output ${LETTERS[k]}") {
-                    set(d.copy(out = d.out.filterIndexed { i, _ -> i != k }))
-                }
-            }
-        }
+    if (d.inputs.size < 3) Row(Modifier.fillMaxWidth()) {
+        SmallButton("+ Input ${d.inputs.size + 1}", "add an input") { set(d.copy(inputs = d.inputs + "1/2")) }
+    }
+    d.out.forEachIndexed { k, v ->
+        FracSetting("Output ${LETTERS[k]}", v, removable = d.out.size > 1,
+            onChange = { set(d.copy(out = d.out.replaced(k, it))) },
+            onRemove = { set(d.copy(out = d.out.filterIndexed { i, _ -> i != k })) })
     }
     if (d.out.size < 3) Row(Modifier.fillMaxWidth()) {
-        SmallButton("+ Output ${LETTERS[d.out.size]}", "add an output") { set(d.copy(out = d.out + "1/2")) }
+        SmallButton("+ Output ${LETTERS[d.out.size]}", "add an output") { set(d.copy(out = d.out + "1/4")) }
     }
     Setting("3-way splits") {
         SmallButton(if (d.no3) "Off" else "On", "3-way splits") { set(d.copy(no3 = !d.no3)) }
@@ -72,7 +70,21 @@ fun ColumnScope.BuilderSheet(game: Game) {
     }
 }
 
-private fun LevelDef.withOut(k: Int, v: String) = copy(out = out.toMutableList().also { it[k] = v })
+private fun List<String>.replaced(k: Int, v: String) = toMutableList().also { it[k] = v }
+
+/** A rate n/q, at most a full belt, with steppers for each part and a remove button. */
+@Composable
+private fun FracSetting(label: String, value: String, removable: Boolean, onChange: (String) -> Unit, onRemove: () -> Unit) {
+    val (n, q) = value.split('/').map { it.toInt() }.let { it[0] to it[1] }
+    Setting(label) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Stepper("$n", n > 1, n < q, "numerator") { onChange("${n + it}/$q") }
+            Text("/", style = Body, color = Dim, fontSize = 18.sp)
+            Stepper("$q", q > n, q < 60, "denominator") { onChange("$n/${q + it}") }
+            if (removable) SmallButton("×", "remove $label") { onRemove() }
+        }
+    }
+}
 
 @Composable
 private fun Setting(label: String, content: @Composable () -> Unit) {

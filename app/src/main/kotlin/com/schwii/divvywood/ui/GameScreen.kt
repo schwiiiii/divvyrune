@@ -236,7 +236,7 @@ private fun Pill(label: String, onClick: () -> Unit) {
 private val iconPainter by lazy { Painter() }
 
 /** A tray item drawn as the block it places, at [px] pixels square. */
-fun chipIcon(item: TrayItem, levelTargets: List<String?>, px: Int): Bitmap {
+fun chipIcon(item: TrayItem, level: com.schwii.divvywood.engine.Level, px: Int): Bitmap {
     val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
     val c = android.graphics.Canvas(bmp)
     val z = px * 0.875f; val x = px / 2f; val y = px / 2f - px * 0.02f
@@ -245,9 +245,10 @@ fun chipIcon(item: TrayItem, levelTargets: List<String?>, px: Int): Bitmap {
     when (item.kind) {
         Kind.SPLIT -> { p.tile(c, x, y, z, Tile(Kind.SPLIT, inSide = 2), listOf(2), listOf(3, 1), 905); p.flipper(c, x, y, z, angleOf(3)); p.burnText(c, "÷", x + z * 0.27f, y, z * 0.36f, light = true) }
         Kind.MERGE -> { p.tile(c, x, y, z, Tile(Kind.MERGE, out = 0), listOf(3, 1), listOf(0), 906); p.flipper(c, x, y, z, angleOf(3)); p.burnText(c, "+", x - z * 0.27f, y, z * 0.36f, light = true) }
-        Kind.SRC -> p.tile(c, x, y, z, Tile(Kind.SRC, out = 0), emptyList(), listOf(0), 903, label = "IN", labelScale = 1.5f)
+        Kind.SRC -> p.tile(c, x, y, z, Tile(Kind.SRC, out = 0), emptyList(), listOf(0), 903 + maxOf(item.id, 0),
+            label = level.inputLabel(maxOf(item.id, 0)) + (level.inputs.getOrNull(maxOf(item.id, 0))?.let { " $it" } ?: ""), labelScale = 1.5f)
         Kind.OUT -> p.tile(c, x, y, z, Tile(Kind.OUT, id = item.id, inSide = 2), emptyList(), emptyList(), 910 + item.id,
-            label = LETTERS[item.id] + (levelTargets.getOrNull(item.id)?.let { " $it" } ?: ""), labelScale = 1.9f)
+            label = LETTERS[item.id] + (level.out.getOrNull(item.id)?.let { " $it" } ?: ""), labelScale = 1.9f)
         else -> p.tile(c, x, y, z, Tile(Kind.DUMP, id = item.id, inSide = 2), emptyList(), emptyList(), 920 + item.id)
     }
     return bmp
@@ -257,13 +258,12 @@ fun chipIcon(item: TrayItem, levelTargets: List<String?>, px: Int): Bitmap {
 private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect, onDragIcon: (Pair<ImageBitmap, Offset>?) -> Unit) {
     val board = editor.board
     board.version   // placed state follows the build
-    val targets = board.level.out.map { it?.toString() }
     val px = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.roundToPx() }
     val slop = LocalViewConfiguration.current.touchSlop
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         for (item in editor.trayItems()) {
-            val icon = remember(item, board.level) { chipIcon(item, targets, px).asImageBitmap() }
+            val icon = remember(item, board.level) { chipIcon(item, board.level, px).asImageBitmap() }
             val placed = editor.isPlaced(item)
             var origin by remember { mutableStateOf(Offset.Zero) }
             Image(icon, null,

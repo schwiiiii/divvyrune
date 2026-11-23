@@ -1,19 +1,19 @@
 package com.schwii.divvywood.engine
 
-/** The exact flow through every node, as a fraction of the input; or why there isn't one. */
+/** The exact flow through every node, in marbles per tick (a share of one full belt); or why there isn't one. */
 class Solution(val ok: Boolean, val why: String = "", val flow: List<Q> = emptyList())
 
 /**
  * Exact solve: each splitter divides evenly, each converger sums. Belt chains are collapsed so only pieces become
  * unknowns, then the linear system is solved by Gaussian elimination over exact fractions.
  */
-fun solve(g: Graph): Solution {
+fun solve(g: Graph, level: Level): Solution {
     val n = g.nodes
-    val src = n.indexOfFirst { it.kind == Kind.SRC }
-    if (src < 0) return Solution(false, "Place the input.")
+    val srcs = n.indices.filter { n[it].kind == Kind.SRC }
+    if (srcs.isEmpty()) return Solution(false, if (level.inputs.size == 1) "Place the input." else "Place the inputs.")
     if (g.errCount > 0) return Solution(false, "Fix the outlined pieces first.")
-    val reach = linkedSetOf(src)
-    val stack = ArrayDeque(listOf(src))
+    val reach = linkedSetOf<Int>().apply { addAll(srcs) }
+    val stack = ArrayDeque(srcs)
     while (stack.isNotEmpty()) {
         val i = stack.removeLast()
         for (j in n[i].succ) if (reach.add(j)) stack += j
@@ -23,7 +23,7 @@ fun solve(g: Graph): Solution {
     val m = keyIds.size
     val a = Array(m) { r -> Array(m) { c -> if (r == c) Q.ONE else Q.ZERO } }
     val b = Array(m) { Q.ZERO }
-    b[col.getValue(src)] = Q.ONE
+    for (s in srcs) b[col.getValue(s)] = level.inputs.getOrNull(n[s].inputId)?.q ?: Q.ZERO
     data class Chain(val from: Int, val share: Q, val belts: List<Int>)
     val chains = mutableListOf<Chain>()
     for (i in keyIds) {

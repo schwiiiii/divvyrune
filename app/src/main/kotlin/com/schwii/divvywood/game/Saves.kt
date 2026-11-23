@@ -34,21 +34,32 @@ import kotlinx.serialization.json.Json
 )
 
 /**
- * A level a player designs in the builder: the input sends one marble every [t] ticks; [out] holds each final
- * output's target as "p/q", a share of the input; [no3] turns 3-way splits off.
+ * A level a player designs in the builder. Every rate is a share of one full belt, as "p/q": each input's rate in
+ * [inputs], each final output's target in [out]; [no3] turns 3-way splits off.
+ * Designs saved before inputs had rates carry [t] (one marble every t ticks, targets as shares of that input);
+ * [normalized] turns them into rates.
  */
 @Serializable data class LevelDef(
-    val t: Int = 2,
-    val out: List<String> = listOf("1/2", "1/2"),
+    val inputs: List<String> = listOf("1/2"),
+    val out: List<String> = listOf("1/4", "1/4"),
     val no3: Boolean = false,
+    val t: Int? = null,
 ) {
+    val rates: List<Frac> get() = inputs.mapNotNull { parseFrac(it) }
     val targets: List<Frac> get() = out.mapNotNull { parseFrac(it) }
-    fun toLevel(name: String) = Level(name, t, targets, no3)
+    fun toLevel(name: String) = Level(name, rates, targets, no3)
 
-    /** Why these targets can't be met, if they can't: together they can't ask for more than the input sends. */
+    fun normalized(): LevelDef {
+        val t = t ?: return this
+        val per = Frac(1, t)
+        return LevelDef(listOf(per.toString()), targets.map { (it * per).toString() }, no3)
+    }
+
+    /** Why these targets can't be met, if they can't: together they can't ask for more than the inputs send. */
     fun problem(): String? {
-        val sum = targets.fold(Q.ZERO) { a, f -> a + f.q }
-        return if (sum > Q.ONE) "The targets add up to $sum, more than the input sends." else null
+        val want = targets.fold(Q.ZERO) { a, f -> a + f.q }
+        val have = rates.fold(Q.ZERO) { a, f -> a + f.q }
+        return if (want > have) "The targets add up to $want of a belt, more than the inputs send ($have)." else null
     }
 }
 
@@ -84,7 +95,11 @@ private val V1_ORDER = listOf(
     "Thirds by halves", "Fifth", "Seventh", "Full belt", "Seventeenth", "Sandbox",
 )
 
-private fun migrate(d: SaveData): SaveData =
+private fun migrate(d: SaveData): SaveData = migrateIndex(d).let { m ->
+    m.copy(draft = m.draft.normalized(), custom = m.custom.map { it.copy(def = it.def.normalized()) })
+}
+
+private fun migrateIndex(d: SaveData): SaveData =
     if (d.level != null) d
     else d.copy(level = V1_ORDER.getOrNull(d.cur), levels = d.levels.mapKeys { (k, _) -> k.toIntOrNull()?.let { V1_ORDER.getOrNull(it) } ?: k }, cur = 0)
 

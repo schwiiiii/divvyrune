@@ -5,8 +5,8 @@ Open-source (GPL-3.0-or-later) Android puzzle game for F-Droid. Package `com.sch
 ## The game
 Walnut and maple blocks on an open grid. Belts, splitters, convergers and bypasses are unlimited; the input and each output are placed once. Belts carry marbles; splitters (one input on a marked side, up to 3 outputs,
 strict round robin) divide them evenly; convergers (one output on a marked side, up to 3 inputs, fair round robin)
-join them. The input, final outputs (F) and bypasses (O) each take or send on exactly one side. Each level asks for
-exact target fractions at its outputs; loops are allowed (they reach 1/5, 1/17, 1/30…). Check = exact rational solve
+join them. The input, final outputs (F) and bypasses (O) each take or send on exactly one side. Every rate is a share of a full belt (1 marble/tick): a level has up to 3 inputs, each with its rate, and asks for
+exact target rates at up to 3 outputs; loops are allowed (they reach 1/5, 1/17, 1/30…). Check = exact rational solve
 plus a 3000-tick simulation measured after 600 ticks warm-up. Score: parts (belts + splitters + convergers) and
 footprint area (bounding box incl. I/O). A splitter treats an output as jammed only after 4 blocked ticks in a row
 (JAM_TICKS), then skips it until it frees.
@@ -18,11 +18,11 @@ https://claude.ai/artifact/6psEUKVPFSUNveWVJdvd2g (read it with the Artifact too
 https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 
 ## Layout
-- `engine/` — pure Kotlin: rules, exact solver (BigInteger fractions), sim, judge/check, groups, text codes, 18 levels (players see only numbers; names are stable ids that saves and tests use; no hints). JUnit tests incl. every level's reference solution.
+- `engine/` — pure Kotlin: rules, exact solver (BigInteger fractions), sim, judge/check, groups, text codes (`I`/`I2`/`I3` inputs, `F`/`F2`/`F3` outputs), 20 levels (`Level(name, inputs, out)`; the `Level(name, t, shares)` constructor writes a one-input level in older terms; players see only numbers; names are stable ids that saves and tests use; no hints). JUnit tests incl. every level's reference solution.
 - `app/` — Compose app, minSdk 26, target/compile 36, no permissions.
   - `wood/` textures, `Painter` (android.graphics.Canvas), `Fonts` (Nunito for block labels)
   - `board/` `BoardState` (camera, frame clock, sim, Check run, sparkline history, wait heat, single step), `BoardRenderer`, `Board` composable, `Editor` (gesture state machine, undo), `Readout`
-  - `game/` `Game` (levels = numbered `LEVELS` + the player's custom levels + the level builder last; sheets, Check, builder draft / save / delete), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; per level: build, best = parts / smallest / largest area, solving build, last Check's score; custom levels = `LevelDef` + proving solution, and the builder's draft)
+  - `game/` `Game` (levels = numbered `LEVELS` + the player's custom levels + the level builder last; sheets, Check, builder draft / save / delete), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; per level: build, best = parts / smallest / largest area, solving build, last Check's score; custom levels = `LevelDef` (input rates, target rates; older `t`-based designs normalized on load) + proving solution, and the builder's draft)
   - `ui/` `GameScreen`, `TopStrip` (readouts + sparklines), `Sheets` (result, level cards with build previews, build as text), `Builder` (builder settings sheet), `Theme`, `Icons`
 - Font: `app/src/main/res/font/nunito.ttf` (variable, from github.com/googlefonts/nunito), OFL in `app/src/main/assets/licenses/`.
 

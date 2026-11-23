@@ -1,21 +1,35 @@
 package com.schwii.divvywood.engine
 
-/** A target fraction n/d of the input. */
+/** A fraction n/d: a rate as a share of one full belt (one marble per tick), or a share of something else. */
 data class Frac(val n: Int, val d: Int) {
     val q get() = Q.of(n.toLong(), d.toLong())
+    operator fun times(o: Frac) = (q * o.q).toFrac()
     override fun toString() = "$n/$d"
 }
 
+fun Q.toFrac() = Frac(n.toInt(), d.toInt())
+
 /**
- * One level: the input sends one item every [t] ticks; [out] holds each final output's target (null means no target);
- * bypasses, like splitters and convergers, are unlimited. [name] is a stable id for saves and tests; players see numbers.
+ * One level. Every rate is a share of one full belt: each input sends [inputs] marbles per tick, and each final
+ * output's target [out] is the rate it must receive (null means no target). Splitters, convergers, belts and
+ * bypasses are unlimited. [name] is a stable id for saves and tests; players see numbers.
  */
 data class Level(
     val name: String,
-    val t: Int,
+    val inputs: List<Frac>,
     val out: List<Frac?>,
     val no3: Boolean = false,
-)
+) {
+    /** A one-input level in the older terms: one marble every [t] ticks, each target a share of that input. */
+    constructor(name: String, t: Int, shares: List<Frac?>, no3: Boolean = false) :
+        this(name, listOf(Frac(1, t)), shares.map { it?.times(Frac(1, t)) }, no3)
+
+    /** All the inputs together, in marbles per tick. */
+    val totalInput: Q get() = inputs.fold(Q.ZERO) { a, f -> a + f.q }
+
+    /** Input [k]'s name on blocks and readouts: IN alone, IN1, IN2… when there are several. */
+    fun inputLabel(k: Int) = if (inputs.size == 1) "IN" else "IN${k + 1}"
+}
 
 const val LETTERS = "ABC"
 
@@ -28,15 +42,18 @@ val LEVELS = listOf(
     Level("Three ways", 2, listOf(Frac(1, 3), Frac(1, 3), Frac(1, 3))),
     Level("Sixth", 2, listOf(Frac(1, 6), Frac(5, 6))),
     Level("Eighths", 2, listOf(Frac(3, 8), Frac(5, 8))),
+    Level("Two streams", listOf(Frac(1, 2), Frac(1, 4)), listOf(Frac(3, 8), Frac(3, 8))),
     Level("Ninths", 2, listOf(Frac(1, 9), Frac(2, 9), Frac(2, 3))),
     Level("One two three", 2, listOf(Frac(1, 6), Frac(1, 3), Frac(1, 2))),
     Level("Twelfths", 2, listOf(Frac(5, 12), Frac(7, 12))),
+    Level("Swap", listOf(Frac(1, 3), Frac(2, 3)), listOf(Frac(1, 2), Frac(1, 2))),
     Level("Thirds by halves", 2, listOf(Frac(1, 3), Frac(2, 3)), no3 = true),
     Level("Fifth", 2, listOf(Frac(1, 5), Frac(4, 5))),
     Level("Seventh", 2, listOf(Frac(1, 7))),
     Level("One two four", 2, listOf(Frac(1, 7), Frac(2, 7), Frac(4, 7))),
     Level("Tenth", 2, listOf(Frac(3, 10), Frac(7, 10))),
     Level("Full belt", 1, listOf(Frac(2, 9), Frac(7, 9))),
+    Level("Too much to merge", listOf(Frac(3, 4), Frac(3, 4)), listOf(Frac(1, 2), Frac(1, 2), Frac(1, 2))),
     Level("Fifths by halves", 2, listOf(Frac(2, 5), Frac(3, 5)), no3 = true),
     Level("Seventeenth", 2, listOf(Frac(1, 17))),
     Level("Thirtieth", 2, listOf(Frac(1, 30))),
@@ -45,7 +62,8 @@ val LEVELS = listOf(
 /**
  * Every target "Surprise me" in the level builder can pick: p/q with 3 ≤ q ≤ [RANDOM_MAX_D], in lowest terms.
  * Each is solvable: split into N = 2^a·3^b ≥ q equal shares, send N − q back to a converger at the input,
- * p of the rest to A and the others to a bypass. The input splitter then carries N/2q ≤ 2/3 of a belt.
+ * p of the rest to A and the others to a bypass. With the input at half a belt, its splitter then carries N/2q ≤ 2/3
+ * of a belt. As a rate the target is half of p/q.
  */
 val RANDOM_TARGETS: List<Frac> = (3..RANDOM_MAX_D).flatMap { q -> (1 until q).filter { gcd(it, q) == 1 }.map { Frac(it, q) } }
 

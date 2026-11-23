@@ -3,6 +3,8 @@ package com.schwii.divvywood.game
 import com.schwii.divvywood.board.TrayItem
 import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.Frac
+import com.schwii.divvywood.engine.Q
+import com.schwii.divvywood.engine.toFrac
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.RANDOM_TARGETS
 import com.schwii.divvywood.engine.levelNamed
@@ -30,7 +32,7 @@ class GameTest {
         assertNull(g.buildFromText(halves))
         val r = check(g)
         assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
-        assertEquals(listOf("1/2", "1/2"), r.verdict.rows.map { it.exact.toString() })
+        assertEquals("rates: half of a half-belt input each", listOf("1/4", "1/4"), r.verdict.rows.map { it.exact.toString() })
         assertEquals(Best(1, 6, 6), r.best)
         assertTrue(r.next)
         assertEquals(Best(1, 6, 6), Saves(store).best("Halves"))
@@ -65,8 +67,8 @@ class GameTest {
         g.buildFromText(halves)
         val r = check(g)
         assertFalse(r.verdict.solved)
-        assertEquals("Output A gets 1/2 of the input. It needs 1/4.", r.verdict.reasons.first())
-        assertEquals(0.5, r.verdict.rows[0].measured, 0.01)
+        assertEquals("Output A gets 1/4 of a belt. It needs 1/8.", r.verdict.reasons.first())
+        assertEquals(0.25, r.verdict.rows[0].measured, 0.005)
     }
 
     @Test fun `builds and the current level survive a restart`() {
@@ -149,13 +151,13 @@ class GameTest {
         val g = Game(Saves(store))
         g.openBuilder()
         assertTrue(g.inBuilder)
-        g.updateDraft(LevelDef(t = 2, out = listOf("1/2", "1/2")))
+        g.updateDraft(LevelDef(listOf("1/2"), listOf("1/4", "1/4")))
         assertNull("nothing to save before a pass", g.saveCustom())
         g.buildFromText("IR SL FL\n.. FT2 ..")
         val r = check(g)
         assertTrue(r.verdict.reasons.toString(), r.save)
         val c = g.saveCustom()!!
-        assertEquals(LevelDef(2, listOf("1/2", "1/2")), c.def)
+        assertEquals(LevelDef(listOf("1/2"), listOf("1/4", "1/4")), c.def)
         assertEquals("IR SL FL\n.. FT2 ..", c.solution)
         assertEquals("Saved as C1", g.editor.notice)
         assertEquals(LEVELS.size + 1, g.levelCount)
@@ -165,25 +167,25 @@ class GameTest {
         val again = Game(Saves(store))
         again.loadLevel(LEVELS.size)
         assertTrue(again.board.tiles.isEmpty())
-        assertEquals(listOf(Frac(1, 2), Frac(1, 2)), again.level.out)
+        assertEquals(listOf(Frac(1, 4), Frac(1, 4)), again.level.out)
     }
 
     @Test fun `changing the design drops the pass and outputs it no longer has`() {
         val g = Game(Saves(MemoryStore()))
         g.openBuilder()
-        g.updateDraft(LevelDef(t = 2, out = listOf("1/2", "1/2")))
+        g.updateDraft(LevelDef(listOf("1/2"), listOf("1/4", "1/4")))
         g.buildFromText("IR SL FL\n.. FT2 .."); check(g)
-        g.updateDraft(LevelDef(t = 2, out = listOf("1/2")))
+        g.updateDraft(LevelDef(listOf("1/2"), listOf("1/4")))
         assertNull(g.saveCustom())
         assertEquals("output B left the board with its target", 3, g.board.tiles.size)
-        assertEquals("The targets add up to 5/4, more than the input sends.", LevelDef(2, listOf("1/2", "3/4")).problem())
-        assertNull(LevelDef(2, listOf("1/3")).problem())
+        assertEquals("The targets add up to 5/8 of a belt, more than the inputs send (1/2).", LevelDef(listOf("1/2"), listOf("1/4", "3/8")).problem())
+        assertNull(LevelDef(listOf("1/2", "1/4"), listOf("3/4")).problem())
     }
 
     @Test fun `deleting a custom level removes it and its saves`() {
         val store = MemoryStore()
         val g = Game(Saves(store))
-        g.openBuilder(); g.updateDraft(LevelDef(2, listOf("1/2", "1/2")))
+        g.openBuilder(); g.updateDraft(LevelDef(listOf("1/2"), listOf("1/4", "1/4")))
         g.buildFromText("IR SL FL\n.. FT2 .."); check(g); g.saveCustom()
         g.loadLevel(LEVELS.size); g.buildFromText("IR")
         g.deleteCustom(LEVELS.size)
@@ -197,8 +199,26 @@ class GameTest {
         val g = Game(Saves(MemoryStore()))
         g.openBuilder(); g.surpriseMe()
         assertEquals(1, g.draft.out.size)
-        assertTrue(g.draft.targets.single() in RANDOM_TARGETS)
+        assertEquals(listOf(Frac(1, 2)), g.draft.rates)
+        assertTrue("the target is half of a proved one", (g.draft.targets.single().q * Q.of(2)).toFrac() in RANDOM_TARGETS)
         assertNull(g.draft.problem())
+    }
+
+    @Test fun `builder designs saved before inputs had rates turn into rates`() {
+        val old = """{"draft":{"t":3,"out":["1/3","2/3"]},"custom":[{"id":1,"def":{"t":2,"out":["1/2","1/2"]},"solution":"IR SL FL\\n.. FT2 .."}],"nextCustom":2}"""
+        val saves = Saves(MemoryStore(old))
+        assertEquals(LevelDef(listOf("1/3"), listOf("1/9", "2/9")), saves.draft)
+        assertEquals(LevelDef(listOf("1/2"), listOf("1/4", "1/4")), saves.custom.single().def)
+    }
+
+    @Test fun `a two-input design saves and plays with both inputs in the tray`() {
+        val g = Game(Saves(MemoryStore()))
+        g.openBuilder(); g.updateDraft(LevelDef(listOf("1/2", "1/4"), listOf("3/8", "3/8")))
+        assertEquals(2, g.editor.trayItems().count { it.kind == Kind.SRC })
+        g.buildFromText(".. .. FB\nIR CR SL\n.. IT2 FT2")
+        assertTrue(check(g).save)
+        g.updateDraft(LevelDef(listOf("1/2"), listOf("3/8", "3/8")))
+        assertEquals("input 2 left the board", 1, g.board.tiles.values.count { it.kind == Kind.SRC })
     }
 
     @Test fun `level names are unique`() {

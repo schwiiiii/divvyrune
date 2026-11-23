@@ -348,12 +348,13 @@ private fun ColumnScope.TextSheet(game: Game) {
     val outs = level.out.size
     Text(
         legend(
-            "<b>I</b> input, <b>S</b> splitter, <b>C</b> converger, <b>O</b> bypass, <b>F</b> final output (<b>F</b>…<b>2</b>, <b>F</b>…<b>3</b> for outputs B, C), then a side: <b>T R B L</b>. " +
+            "<b>I</b> input, <b>S</b> splitter, <b>C</b> converger, <b>O</b> bypass, <b>F</b> final output, then a side: <b>T R B L</b>; " +
+                "<b>I</b>…<b>2</b> and <b>I</b>…<b>3</b> are inputs 2 and 3, <b>F</b>…<b>2</b> and <b>F</b>…<b>3</b> outputs B and C. " +
                 "I and C name the side they output to; S, O and F the one side their input comes from. " +
                 "A belt is two sides, fed from then feeding (<b>RT</b>: from the right, up). <b>..</b> is empty. " +
                 "One-line codes put commas between cells and <b>/</b> between rows (<b>..,IB/CL,ST</b>); either form builds. " +
                 "Building from text replaces this level's build; Undo brings it back. " +
-                "This level holds 1 input and $outs final output${if (outs > 1) "s" else ""}; splitters, convergers and bypasses are unlimited.",
+                "This level holds ${level.inputs.size} input${if (level.inputs.size > 1) "s" else ""} and $outs final output${if (outs > 1) "s" else ""}; splitters, convergers and bypasses are unlimited.",
         ),
         style = Body, color = Dim, fontSize = 12.sp, lineHeight = 1.6.em,
     )

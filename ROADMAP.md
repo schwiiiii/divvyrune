@@ -8,10 +8,8 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
       GitHub update each other.
 
 ## Soon
-- [ ] **Several inputs and outputs**, each input at its own rate. Every rate is a share of a full belt: inputs that
-      come pre-split to decompose and recombine, or that add up to more than one belt can carry.
-- [ ] **About 20 levels** for 1.0, then a level generator (a developer tool) to grow the set to about 100, from simple
-      to complex. Players see them as ordinary numbered levels.
+- [ ] **A level generator** (a developer tool) to grow the set from 20 to about 100, from simple to complex, with
+      more levels using several inputs. Players see them as ordinary numbered levels.
 - [ ] **Metrics with histograms**: pieces (cells besides the required inputs and outputs), footprint (the smallest
       square around the build) and I/O layout (ports on the build's edge, inputs grouped, outputs grouped, inputs and
       outputs on opposite sides). Each shows where your build sits among others, with averages; a solver supplies the

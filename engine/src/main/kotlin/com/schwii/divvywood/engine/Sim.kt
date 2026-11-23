@@ -28,12 +28,19 @@ class SimNode(val kind: Kind, val id: Int, val succ: List<Int>, val pred: List<I
 /** A marble dropping into an output or bypass this tick, for the fade-out animation. */
 class Ghost(val id: Int, val from: Int, val to: Int, val item: Item?)
 
-class Snapshot(val tick: Int, val emitted: Int, val blocked: Int, val skips: Int, val sunk: IntArray)
+/** Counters a measuring window is taken from: [emittedBy] and [blockedBy] per input. */
+class Snapshot(val tick: Int, val emitted: Int, val blocked: Int, val skips: Int, val sunk: IntArray, val emittedBy: IntArray = IntArray(0))
 
 /** The tick simulation. Every step moves each marble at most one cell; a cell holds at most one marble. */
-class Sim(g: Graph, val t: Int) {
-    val n = g.nodes.map { SimNode(it.kind, it.id, it.succ, it.pred) }
-    val src = n.indexOfFirst { it.kind == Kind.SRC }
+class Sim(g: Graph, val rates: List<Frac>) {
+    /** A single input sending one marble every [t] ticks. */
+    constructor(g: Graph, t: Int) : this(g, listOf(Frac(1, t)))
+    constructor(g: Graph, level: Level) : this(g, level.inputs)
+
+    val n = g.nodes.map { SimNode(it.kind, if (it.kind == Kind.SRC) it.inputId else it.id, it.succ, it.pred) }
+    /** The input nodes, in input order; [src] is the first, or -1. */
+    val srcs = n.indices.filter { n[it].kind == Kind.SRC }.sortedBy { n[it].id }
+    val src = srcs.firstOrNull() ?: -1
     /** Outputs first, then upstream: a cell empties before the one behind it tries to move in. */
     val order: List<Int>
     var tick = 0
@@ -49,8 +56,18 @@ class Sim(g: Graph, val t: Int) {
     /** Ticks each node spent waiting, and each converger spent turning marbles away, since the start. */
     val waits = IntArray(n.size)
     val turnAways = IntArray(n.size)
-    private var want = 0
+    /** Per input (by input number): marbles sent, ticks held up, the last tick it was held up. */
+    val emittedBy = IntArray(maxOf(rates.size, (srcs.maxOfOrNull { n[it].id } ?: -1) + 1))
+    val blockedBy = IntArray(emittedBy.size)
+    val lastBlockBy = IntArray(emittedBy.size) { -1_000_000_000 }
+    private val want = BooleanArray(emittedBy.size)
     private var nextId = 1
+
+    /** Input [k] is due a marble this tick when its running total, rate × ticks, passes a whole number. */
+    private fun due(k: Int, tk: Int): Boolean {
+        val r = rates.getOrNull(k) ?: return false
+        return (tk.toLong() * r.n) / r.d > ((tk - 1).toLong() * r.n) / r.d
+    }
 
     init {
         val seen = HashSet<Int>()
@@ -134,16 +151,17 @@ class Sim(g: Graph, val t: Int) {
                 }
             }
         }
-        if (src >= 0) {
-            val sn = n[src]
-            if (tk % t == 0) want = 1
-            if (want == 1 && sn.succ.isNotEmpty()) {
+        for (si in srcs) {
+            val sn = n[si]
+            val k = sn.id
+            if (due(k, tk)) want[k] = true
+            if (want[k] && sn.succ.isNotEmpty()) {
                 val j = sn.succ[0]
                 val m = n[j]
                 when {
-                    isSink(m.kind) -> { emitted++; want = 0; m.sunk++; m.pass++; gh += Ghost(nextId++, src, j, null) }
-                    m.item == null -> { m.item = Item(nextId++, src, tk); m.pass++; emitted++; want = 0 }
-                    else -> { blocked++; lastBlock = tk }
+                    isSink(m.kind) -> { emitted++; emittedBy[k]++; want[k] = false; m.sunk++; m.pass++; gh += Ghost(nextId++, si, j, null) }
+                    m.item == null -> { m.item = Item(nextId++, si, tk); m.pass++; emitted++; emittedBy[k]++; want[k] = false }
+                    else -> { blocked++; lastBlock = tk; blockedBy[k]++; lastBlockBy[k] = tk }
                 }
             }
         }
@@ -160,12 +178,12 @@ class Sim(g: Graph, val t: Int) {
             val to = if (s.kind == Kind.SPLIT) s.succ[s.rr % s.succ.size] else s.succ[0]
             if (n[to].kind == Kind.MERGE) turnedAway[to] = true
         }
-        if (src >= 0 && lastBlock == tk) {   // the input couldn't send: it waits too
-            waiting[src] = true; waits[src]++
-            n[src].succ.firstOrNull()?.let { if (n[it].kind == Kind.MERGE) turnedAway[it] = true }
+        for (si in srcs) if (lastBlockBy[n[si].id] == tk) {   // an input that couldn't send waits too
+            waiting[si] = true; waits[si]++
+            n[si].succ.firstOrNull()?.let { if (n[it].kind == Kind.MERGE) turnedAway[it] = true }
         }
         turnedAway.forEachIndexed { j, b -> if (b) turnAways[j]++ }
     }
 
-    fun snap() = Snapshot(tick, emitted, blocked, skips, IntArray(n.size) { n[it].sunk })
+    fun snap() = Snapshot(tick, emitted, blocked, skips, IntArray(n.size) { n[it].sunk }, emittedBy.copyOf())
 }
