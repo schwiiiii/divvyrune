@@ -101,6 +101,5 @@ fun fitsLevel(tiles: Map<Cell, Tile>, level: Level): String? {
     val dumps = tiles.values.count { it.kind == Kind.DUMP }
     fun plural(n: Int, w: String) = "$n $w${if (n == 1) "" else "s"}"
     if (outs.any { it.id >= level.out.size }) return "This level has ${plural(level.out.size, "final output")}; the text uses ${outs.maxOf { it.id } + 1}."
-    if (dumps > level.dump) return "This level has ${plural(level.dump, "bypass output")}; the text uses $dumps."
     return null
 }

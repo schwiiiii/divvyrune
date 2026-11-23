@@ -7,6 +7,7 @@
 <ul>
 <li>17 levels, from halves to one thirtieth</li>
 <li>See where marbles back up: waiting blocks glow red; pause and step one tick at a time</li>
+<li>A level builder: set the targets, prove your level solvable, and add it to your levels</li>
 <li>Tap any block for its exact share and measured load</li>
 <li>Share builds as short text codes</li>
 <li>Touch controls: drag from a piece to draw a belt, tap it to rotate or delete it, drag it once selected to move it, Select for groups</li>

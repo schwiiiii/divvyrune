@@ -18,11 +18,11 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
       first baselines. Improving one metric can cost another.
 
 ## Later
+- [ ] **Share custom levels**: send a level made in the builder as a short code or link, and play levels others made.
 - [ ] **Leaderboards** feeding the histograms with players' results. Needs a server and the network permission, so it
       should stay optional.
 - [ ] **Coloured marbles**: each input its own colour, with outputs asking for colours in set ratios.
 - [ ] **Colour sorter block**, to go with coloured marbles.
-- [ ] **Levels sheet opens at the current level** instead of the top.
 
 ## Open questions
 - **How splitters treat colours.** If round robin ignores colour, a red-blue-red-blue stream into a 2-way splitter

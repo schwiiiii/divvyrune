@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.schwii.divvywood.game.Game
 import com.schwii.divvywood.game.MemoryStore
+import com.schwii.divvywood.game.LevelDef
 import com.schwii.divvywood.game.Saves
 import com.schwii.divvywood.board.Editor
 import com.schwii.divvywood.board.TrayItem
@@ -139,13 +140,17 @@ class GameScreenshotTest {
         save("screen-text")
     }
 
-    @Test fun randomLevel() {
+    @Test fun builderAndCustomLevels() {
         val store = MemoryStore()
-        Saves(store).randomTarget = com.schwii.divvywood.engine.Frac(5, 13)
-        val g = Game(Saves(store), density = 3f, dev = true).apply { loadLevel(randomIndex); board.z = 64f * 3 }
+        Game(Saves(store)).apply {
+            openBuilder(); updateDraft(LevelDef(2, listOf("1/2", "1/2"))); buildFromText("IR SL FL\n.. FT2 .."); startCheck(); board.finishCheck(); saveCustom()
+        }
+        val g = Game(Saves(store), density = 3f).apply { board.z = 64f * 3 }
         compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.updateDraft(LevelDef(3, listOf("1/5", "2/5"), no3 = true)); g.showBuilder() }
+        save("screen-builder")
         compose.runOnIdle { g.showLevels() }
-        save("screen-random-levels")
+        save("screen-custom-levels")
     }
 
     @Test fun bottleneckWhilePaused() {

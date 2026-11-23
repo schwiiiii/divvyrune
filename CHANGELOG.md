@@ -8,10 +8,13 @@ release (`1.0.0.3`); before 1.0.0 they were `0.9.N`. Plans for later releases ar
 First release.
 
 - 17 levels, from halves to one thirtieth.
-- Walnut and maple blocks: belts, splitters and convergers, with loops allowed.
+- Walnut and maple blocks: belts, splitters, convergers and bypasses, as many as you like; loops allowed.
 - Check works out every block's exact share as a fraction, then runs the build for 3000 ticks and measures it.
 - Scores for parts and area, with each level's best kept.
 - Levels shown as numbered cards: solved ones outlined green with their solution, started ones with the build so far.
+  The sheet opens at the level you're on.
+- Level builder: set the input's rate, up to three targets and whether 3-way splits are allowed (or let Surprise me
+  pick a target), build a solution, and once it passes Check save it to Your levels to play again.
 - Live readouts: the input's rate and each output's measured share, with sparklines.
 - Bottlenecks show on the board: blocks where marbles wait glow red, convergers turning marbles away get a red ring,
   and a held-up input is outlined. Pause and Step one tick at a time; tap a piece for how often it waits.

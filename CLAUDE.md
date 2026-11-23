@@ -3,7 +3,7 @@
 Open-source (GPL-3.0-or-later) Android puzzle game for F-Droid. Package `com.schwii.divvywood` (final).
 
 ## The game
-Walnut and maple blocks on an open grid. Belts carry marbles; splitters (one input on a marked side, up to 3 outputs,
+Walnut and maple blocks on an open grid. Belts, splitters, convergers and bypasses are unlimited; the input and each output are placed once. Belts carry marbles; splitters (one input on a marked side, up to 3 outputs,
 strict round robin) divide them evenly; convergers (one output on a marked side, up to 3 inputs, fair round robin)
 join them. The input, final outputs (F) and bypasses (O) each take or send on exactly one side. Each level asks for
 exact target fractions at its outputs; loops are allowed (they reach 1/5, 1/17, 1/30…). Check = exact rational solve
@@ -22,8 +22,8 @@ https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 - `app/` — Compose app, minSdk 26, target/compile 36, no permissions.
   - `wood/` textures, `Painter` (android.graphics.Canvas), `Fonts` (Nunito for block labels)
   - `board/` `BoardState` (camera, frame clock, sim, Check run, sparkline history, wait heat, single step), `BoardRenderer`, `Board` composable, `Editor` (gesture state machine, undo), `Readout`
-  - `game/` `Game` (level, sheets, Check; `dev` adds the sandbox and random level: BuildConfig.DEV_TOOLS, true in debug builds and CI playtest builds, false in releases), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; per level: build, best = parts / smallest / largest area, solving build, last Check's score)
-  - `ui/` `GameScreen`, `TopStrip` (readouts + sparklines), `Sheets` (result, level cards with build previews, build as text), `Theme`, `Icons`
+  - `game/` `Game` (levels = numbered `LEVELS` + the player's custom levels + the level builder last; sheets, Check, builder draft / save / delete), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; per level: build, best = parts / smallest / largest area, solving build, last Check's score; custom levels = `LevelDef` + proving solution, and the builder's draft)
+  - `ui/` `GameScreen`, `TopStrip` (readouts + sparklines), `Sheets` (result, level cards with build previews, build as text), `Builder` (builder settings sheet), `Theme`, `Icons`
 - Font: `app/src/main/res/font/nunito.ttf` (variable, from github.com/googlefonts/nunito), OFL in `app/src/main/assets/licenses/`.
 
 ## Build

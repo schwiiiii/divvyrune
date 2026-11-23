@@ -1,1 +1,1 @@
-First release: 17 levels; Check with exact fractions and a measured run; bottlenecks shown on the board, with single-tick steps; best scores; level cards with your solutions; builds as text codes.
+First release: 17 levels and a level builder; Check with exact fractions and a measured run; bottlenecks shown on the board, with single-tick steps; best scores; level cards with your solutions; builds as text codes.

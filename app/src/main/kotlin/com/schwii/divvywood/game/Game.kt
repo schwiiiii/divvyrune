@@ -7,11 +7,9 @@ import androidx.compose.runtime.setValue
 import com.schwii.divvywood.board.BoardState
 import com.schwii.divvywood.board.Editor
 import com.schwii.divvywood.board.Haptic
+import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
-import com.schwii.divvywood.engine.RANDOM
-import com.schwii.divvywood.engine.SANDBOX
-import com.schwii.divvywood.engine.randomLevel
 import com.schwii.divvywood.engine.randomTarget
 import com.schwii.divvywood.engine.Score
 import com.schwii.divvywood.engine.Snapshot
@@ -23,27 +21,50 @@ import com.schwii.divvywood.engine.scoreOf
 
 /** The sheet over the game, if any. */
 sealed interface Sheet {
-    /** A Check's verdict with the build's score and the level's best (updated if this run solved it). */
-    class Result(val verdict: Verdict, val score: Score, val best: Best?, val next: Boolean) : Sheet
+    /**
+     * A Check's verdict with the build's score and the level's best (updated if this run solved it); [next] offers
+     * the next level, [save] (in the builder, once solved) saving the design as a custom level.
+     */
+    class Result(val verdict: Verdict, val score: Score, val best: Best?, val next: Boolean, val save: Boolean = false) : Sheet
     data object Levels : Sheet
     data object Text : Sheet
+    /** The builder's settings: input rate, targets, 3-way splits. */
+    data object Builder : Sheet
 }
 
 /**
- * The game around the board: which level is open, its saved build and best scores, Check, the sheets and the hint.
+ * The game around the board: which level is open, its saved build and best scores, Check, the sheets, and the
+ * level builder. The levels are the numbered ones, then the player's custom levels, then the builder.
  * Every change to the build is saved at once.
  */
-class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}, val dev: Boolean = false) {
-    /** The player's levels; [dev] builds add the sandbox and the random level after them. */
-    private val fixed = if (dev) LEVELS + SANDBOX else LEVELS
-    var randomLevel by mutableStateOf(randomLevel(saves.randomTarget ?: randomTarget().also { if (dev) saves.randomTarget = it })); private set
-    val levelCount get() = fixed.size + if (dev) 1 else 0
-    /** The random level's index, or -1 when it isn't offered. */
-    val randomIndex get() = if (dev) fixed.size else -1
-    fun levelAt(i: Int): Level = if (i < fixed.size) fixed[i] else randomLevel
+class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}) {
+    var customs by mutableStateOf(saves.custom); private set
+    var draft by mutableStateOf(saves.draft); private set
+    private val builderLevel get() = draft.toLevel(BUILDER)
+
+    /** Numbered and custom levels; the builder comes after them, at [builderIndex]. */
+    val levelCount get() = LEVELS.size + customs.size
+    val builderIndex get() = levelCount
+    fun levelAt(i: Int): Level = when {
+        i < LEVELS.size -> LEVELS[i]
+        i < levelCount -> customs[i - LEVELS.size].def.toLevel(customs[i - LEVELS.size].name)
+        else -> builderLevel
+    }
+    fun isCustom(i: Int) = i >= LEVELS.size && i < levelCount
+    val inBuilder get() = levelIndex == builderIndex
+
+    /** A level's label: 01–17, C1, C2… for custom levels. */
+    fun label(i: Int) = when {
+        i < LEVELS.size -> String.format(java.util.Locale.ROOT, "%02d", i + 1)
+        i < levelCount -> "C${i - LEVELS.size + 1}"
+        else -> "New level"
+    }
 
     var levelIndex by mutableIntStateOf(
-        if (dev && saves.cur == RANDOM) fixed.size else fixed.indexOfFirst { it.name == saves.cur }.coerceAtLeast(0),
+        when (saves.cur) {
+            BUILDER -> LEVELS.size + saves.custom.size
+            else -> (LEVELS.map { it.name } + saves.custom.map { it.name }).indexOf(saves.cur).coerceAtLeast(0)
+        },
     ); private set
     val level: Level get() = levelAt(levelIndex)
 
@@ -73,14 +94,51 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     }
 
 
-    /** Gives the random level a new target, keeping its build, and opens it. */
-    fun newTarget() {
-        if (board.checking || !dev) return
-        val f = randomTarget(not = randomLevel.out[0])
-        saves.randomTarget = f
-        saves.clearResults(RANDOM)
-        randomLevel = randomLevel(f)
-        loadLevel(randomIndex)
+    // ---------- builder ----------
+
+    fun openBuilder() = loadLevel(builderIndex)
+
+    /**
+     * Changes the builder's definition. The build stays, except outputs the new definition no longer
+     * has; any earlier pass no longer counts.
+     */
+    fun updateDraft(def: LevelDef) {
+        draft = def
+        saves.draft = def
+        saves.clearResults(BUILDER)
+        if (!inBuilder) return
+        board.tiles.entries.removeAll { (_, t) -> t.kind == Kind.OUT && t.id >= def.out.size }
+        board.setBuild(builderLevel, board.tiles)
+        saves.putBuild(BUILDER, board.tiles)
+    }
+
+    /** A random single target the builder can always meet, with bypasses taking the rest. */
+    fun surpriseMe() = updateDraft(LevelDef(t = 2, out = listOf(randomTarget(not = draft.targets.singleOrNull()).toString())))
+
+    /** Saves the builder's design as a custom level, once its current build has passed Check. */
+    fun saveCustom(): CustomLevel? {
+        if (!inBuilder || saves.level(BUILDER).solution == null) return null
+        val c = saves.addCustom(draft, saves.level(BUILDER).build)
+        customs = saves.custom
+        levelIndex = builderIndex   // the builder moves along one place as the list grows
+        sheet = null
+        editor.say("Saved as ${label(levelCount - 1)}")
+        return c
+    }
+
+    /** Deletes custom level [i]; if it was open, level 1 opens. */
+    fun deleteCustom(i: Int) {
+        if (!isCustom(i)) return
+        val wasOpen = i == levelIndex
+        val builder = inBuilder
+        saves.deleteCustom(customs[i - LEVELS.size].id)
+        customs = saves.custom
+        when {
+            wasOpen -> loadLevel(0)
+            builder -> levelIndex = builderIndex
+            levelIndex > i -> levelIndex--
+        }
+        sheet = if (sheet == Sheet.Levels) Sheet.Levels else sheet
     }
 
     // ---------- check ----------
@@ -99,13 +157,14 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     private fun showResult(v: Verdict) {
         val score = scoreOf(board.tiles)
         val best = saves.recordCheck(level.name, score, v.solved)
-        sheet = Sheet.Result(v, score, best, next = v.solved && levelIndex < LEVELS.lastIndex)   // Sandbox is never solved
+        sheet = Sheet.Result(v, score, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder)
     }
 
     // ---------- sheets ----------
 
     fun showLevels() { if (!board.checking) sheet = Sheet.Levels }
     fun showText() { sheet = Sheet.Text }
+    fun showBuilder() { if (inBuilder && !board.checking) sheet = Sheet.Builder }
     fun closeSheet() { sheet = null }
 
     /** Builds from a text code in place of this level's build; returns an error message, or null when built. */

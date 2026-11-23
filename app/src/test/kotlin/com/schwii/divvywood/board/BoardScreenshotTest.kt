@@ -51,7 +51,7 @@ class BoardScreenshotTest {
         val tiles = decodeGrid("IR SL OL\n.. CB BL\n.. ST LT\n.. FT ..").tiles!!
         tiles[Cell(4, 0)] = Tile(Kind.MERGE, out = 0)
         tiles[Cell(4, 2)] = Tile(Kind.OUT, id = 1, inSide = 3)
-        val level = Level("blocks", 2, listOf(Frac(1, 2), Frac(1, 2)), 1)
+        val level = Level("blocks", 2, listOf(Frac(1, 2), Frac(1, 2)))
         render(BoardState(level, tiles, density).apply { z = 72 * density }, 7, "board-every-block")
     }
 }

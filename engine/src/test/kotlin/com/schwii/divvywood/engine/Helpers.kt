@@ -51,7 +51,7 @@ fun fmt(v: Verdict) = v.rows.joinToString(" ") { "${LETTERS[it.id]}=${it.exact}~
 class Measured(val share: (Int) -> Double, val skips: Int, val throughput: Double)
 
 fun measure(tiles: Map<Cell, Tile>, t: Int, ticks: Int = 6000, warm: Int = 1000): Measured {
-    val g = buildGraph(tiles, Level("m", t, listOf(null, null, null), 9))
+    val g = buildGraph(tiles, Level("m", t, listOf(null, null, null)))
     val s = Sim(g, t)
     var w0: Snapshot? = null
     for (k in 1..ticks) { s.step(); if (k == warm) w0 = s.snap() }

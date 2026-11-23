@@ -62,7 +62,12 @@ import androidx.compose.ui.semantics.semantics
 import com.schwii.divvywood.board.BoardRenderer
 import com.schwii.divvywood.board.BoardState
 import com.schwii.divvywood.engine.Cell
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.LaunchedEffect
 import com.schwii.divvywood.engine.LETTERS
+import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.decodeGrid
@@ -91,6 +96,7 @@ fun SheetHost(game: Game) {
                 is Sheet.Result -> ResultSheet(game, sheet)
                 Sheet.Levels -> LevelsSheet(game)
                 Sheet.Text -> TextSheet(game)
+                Sheet.Builder -> BuilderSheet(game)
             }
         }
     }
@@ -117,7 +123,7 @@ private fun RowScope.SheetButton(label: String, go: Boolean = false, onClick: ()
 @Composable
 private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     val v = r.verdict
-    val title = if (game.level.sandbox) "Measured" else if (v.solved) "Solved" else "Not yet"
+    val title = if (v.solved) "Solved" else "Not yet"
     Title(title, if (v.solved) Out else Src)
     if (v.rows.isNotEmpty()) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -149,7 +155,7 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     Buttons {
         SheetButton("Keep building") { game.closeSheet() }
         if (r.next) SheetButton("Next level", go = true) { game.loadLevel(game.levelIndex + 1) }
-        if (v.solved && game.levelIndex == game.randomIndex) SheetButton("New target", go = true) { game.newTarget() }
+        if (r.save) SheetButton("Save level", go = true) { game.saveCustom() }
     }
 }
 
@@ -186,18 +192,58 @@ private fun RowScope.ScoreCard(label: String, value: String, note: String) {
 @Composable
 private fun ColumnScope.LevelsSheet(game: Game) {
     Title("Levels")
+    CardGrid((0 until LEVELS.size).toList()) { i, m -> LevelCard(game, i, m.current(i == game.levelIndex)) }
+    Text("Your levels", style = Body, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(top = 4.dp))
+    CardGrid((LEVELS.size..game.levelCount).toList()) { i, m ->
+        if (i < game.levelCount) LevelCard(game, i, m.current(i == game.levelIndex)) else NewLevelCard(game, m.current(game.inBuilder))
+    }
+    Buttons {
+        SheetButton("Build as text") { game.showText() }
+        if (game.isCustom(game.levelIndex)) SheetButton("Delete ${game.label(game.levelIndex)}") { game.deleteCustom(game.levelIndex) }
+        SheetButton("Close") { game.closeSheet() }
+    }
+}
+
+/** The sheet opens scrolled to the level that's open. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.current(isCurrent: Boolean): Modifier {
+    if (!isCurrent) return this
+    val requester = remember { BringIntoViewRequester() }
+    LaunchedEffect(Unit) { requester.bringIntoView() }
+    return bringIntoViewRequester(requester)
+}
+
+@Composable
+private fun CardGrid(items: List<Int>, card: @Composable (Int, Modifier) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (row in (0 until game.levelCount).chunked(3)) {
+        for (row in items.chunked(3)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (i in row) LevelCard(game, i, Modifier.weight(1f))
+                for (i in row) card(i, Modifier.weight(1f))
                 repeat(3 - row.size) { Box(Modifier.weight(1f)) }
             }
         }
     }
-    Buttons {
-        SheetButton("Build as text") { game.showText() }
-        if (game.dev) SheetButton("New target") { game.newTarget() }
-        SheetButton("Close") { game.closeSheet() }
+}
+
+/** The card that opens the level builder: a plus, and the builder's own build so far once there is one. */
+@Composable
+private fun NewLevelCard(game: Game, modifier: Modifier) {
+    val shape = RoundedCornerShape(10.dp)
+    Column(
+        modifier.background(Raise, shape).clip(shape).clickable { game.openBuilder() }.padding(6.dp)
+            .semantics { contentDescription = "Build a new level" },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(6.dp)).background(Page), contentAlignment = Alignment.Center) {
+            Text("+", style = Body, color = if (game.inBuilder) Src else Dim, fontWeight = FontWeight.Bold, fontSize = 40.sp)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("design one,", style = Body, color = Dim, fontSize = 11.sp, maxLines = 1)
+            Text("solve it, save it", style = Body, color = Dim, fontSize = 11.sp, maxLines = 1)
+        }
+        Text("New", style = Body, color = if (game.inBuilder) Src else Ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
     }
 }
 
@@ -214,7 +260,7 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
     Column(
         modifier.background(Raise, shape).then(if (best != null) Modifier.border(2.dp, Out, shape) else Modifier)
             .clip(shape).clickable { game.loadLevel(i) }.padding(6.dp)
-            .semantics { contentDescription = "Level ${i + 1}" + if (best != null) ", solved" else "" },
+            .semantics { contentDescription = "Level ${game.label(i)}" + if (best != null) ", solved" else "" },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -227,14 +273,14 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
         val checked = saved.checked
         val (line1, line2) = when {
             best != null -> parts(best.parts) to "area ${best.small}" + if (best.large != best.small) "–${best.large}" else ""
-            checked != null -> (if (level.sandbox) "" else "✗ ") + parts(checked.parts) to "area ${checked.area}"
+            checked != null -> "✗ " + parts(checked.parts) to "area ${checked.area}"
             else -> " " to " "
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(line1, style = BodyTnum, color = Dim, fontSize = 11.sp, maxLines = 1)
             Text(line2, style = BodyTnum, color = Dim, fontSize = 11.sp, maxLines = 1)
         }
-        Text(twoDigits(i), style = BodyTnum, color = if (i == game.levelIndex) Src else Ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        Text(game.label(i), style = BodyTnum, color = if (i == game.levelIndex) Src else Ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
     }
 }
 
@@ -307,7 +353,7 @@ private fun ColumnScope.TextSheet(game: Game) {
                 "A belt is two sides, fed from then feeding (<b>RT</b>: from the right, up). <b>..</b> is empty. " +
                 "One-line codes put commas between cells and <b>/</b> between rows (<b>..,IB/CL,ST</b>); either form builds. " +
                 "Building from text replaces this level's build; Undo brings it back. " +
-                "This level holds 1 input, $outs final output${if (outs > 1) "s" else ""} and ${level.dump} bypass${if (level.dump == 1) "" else "es"}.",
+                "This level holds 1 input and $outs final output${if (outs > 1) "s" else ""}; splitters, convergers and bypasses are unlimited.",
         ),
         style = Body, color = Dim, fontSize = 12.sp, lineHeight = 1.6.em,
     )
