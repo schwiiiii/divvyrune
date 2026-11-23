@@ -117,7 +117,7 @@ class DirectionTest {
     @Test fun `a splitter only feeds outputs and bypasses facing it`() {
         val t = tilesOf(Cell(0, 0) to Tile(Kind.SRC, out = 0), Cell(1, 0) to Tile(Kind.SPLIT, inSide = 2), Cell(2, 0) to Tile(Kind.OUT, inSide = 2, id = 0),
             Cell(1, 1) to Tile(Kind.OUT, inSide = 0, id = 1), Cell(1, -1) to Tile(Kind.DUMP, inSide = 1, id = 0))
-        val g = buildGraph(t, Level("t", 2, listOf(null, null), 1, ""))
+        val g = buildGraph(t, Level("t", 2, listOf(null, null), 1))
         assertEquals(2, g.nodes.first { it.kind == Kind.SPLIT }.succ.size)
         assertEquals(0, g.nodes[g.idx.getValue(Cell(1, 1))].pred.size)
     }
@@ -193,7 +193,7 @@ class TextCodeTest {
     @Test fun `the whiteboard 1-30 decodes, solves, and encodes back to the same text`() {
         val d = decodeGrid(SKETCH_1_30)
         assertNull(d.error)
-        val level = Level("1/30", 2, listOf(Frac(1, 30)), 3, "")
+        val level = Level("1/30", 2, listOf(Frac(1, 30)), 3)
         val g = buildGraph(d.tiles!!, level)
         assertEquals(0, g.errCount)
         val v = check(g, level)
@@ -247,7 +247,7 @@ class FairnessTest {
             assertTrue(abs(m.share(1) - 2.0 / 3) < 0.01 && abs(m.share(0) - 1.0 / 3) < 0.01 && m.skips == 0,
                 "rate $rate: B ${m.share(1)} A ${m.share(0)} skips ${m.skips}")
         }
-        val level = Level("2/3", 2, listOf(Frac(1, 3), Frac(2, 3)), 0, "")
+        val level = Level("2/3", 2, listOf(Frac(1, 3), Frac(2, 3)), 0)
         assertTrue(check(buildGraph(t, level), level).solved)
     }
 

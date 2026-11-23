@@ -59,7 +59,7 @@ class StoreAssets {
     /** The logo build on the board as the game draws it, [cell] pixels a cell, centred in [w] × [h], marbles rolling. */
     private fun board(w: Int, h: Int, cell: Float, dx: Float = 0f): Bitmap {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val level = com.schwii.divvywood.engine.Level("logo", 2, listOf(null, null, null), 0, "")
+        val level = com.schwii.divvywood.engine.Level("logo", 2, listOf(null, null, null), 0)
         val state = BoardState(level, decodeGrid(logo).tiles!!, 1f).apply { z = cell }
         state.fit(w.toFloat(), h.toFloat())
         state.ox += dx
@@ -113,12 +113,11 @@ class StoreAssets {
         bmp.saveTo(File(store, "phoneScreenshots/$n.png"))
     }
 
-    private fun game(level: String, build: String?, z: Float, hint: Boolean, saves: Saves = Saves(MemoryStore())): Game {
+    private fun game(level: String, build: String?, z: Float, saves: Saves = Saves(MemoryStore())): Game {
         val g = Game(saves, density = 3f)
         g.loadLevel(LEVELS.indexOf(levelNamed(level)))
         build?.let { g.buildFromText(it); g.editor.dismissNotice() }
         g.board.z = z * 3f
-        if (!hint) g.hideHint()
         return g
     }
 
@@ -137,21 +136,21 @@ class StoreAssets {
     private val thirtieth = "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT .."
 
     @Test fun screenshot1Running() {
-        val g = game("Ninths", ninths, 60f, hint = true).apply { run(900) }
+        val g = game("Ninths", ninths, 60f).apply { run(900) }
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.tap(3, 0) }
         shoot(1)
     }
 
     @Test fun screenshot2Solved() {
-        val g = game("One two four", oneTwoFour, 60f, hint = false)
+        val g = game("One two four", oneTwoFour, 60f)
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.startCheck(); g.board.finishCheck() }
         shoot(2)
     }
 
     @Test fun screenshot3Thirtieth() {
-        val g = game("Thirtieth", thirtieth, 62f, hint = true).apply { run(1200) }
+        val g = game("Thirtieth", thirtieth, 62f).apply { run(1200) }
         compose.setContent { GameScreen(g, animate = false) }
         shoot(3)
     }
@@ -163,14 +162,14 @@ class StoreAssets {
             "Three ways" to ".. FB ..\nIR SL FL2\n.. FT3 ..",
             "One two four" to oneTwoFour,
         )) Game(saves).apply { loadLevel(LEVELS.indexOf(levelNamed(name))); buildFromText(build); startCheck(); board.finishCheck() }
-        val g = game("Eighths", null, 60f, hint = true, saves = saves)
+        val g = game("Eighths", null, 60f, saves = saves)
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.showLevels() }
         shoot(4)
     }
 
     @Test fun screenshot5Text() {
-        val g = game("One two four", oneTwoFour, 60f, hint = false)
+        val g = game("One two four", oneTwoFour, 60f)
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.showText() }
         shoot(5)

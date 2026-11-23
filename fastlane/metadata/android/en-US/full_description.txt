@@ -5,7 +5,7 @@
 <p>Press <b>Check</b> and the exact flow through every block is worked out as fractions, then the build runs for 3000 ticks and the shares are measured. Solved? Chase fewer parts and a smaller footprint.</p>
 
 <ul>
-<li>19 levels, from Halves to Thirtieth, plus a sandbox</li>
+<li>17 levels, from halves to one thirtieth, plus a sandbox</li>
 <li>A random level with a new target whenever you like</li>
 <li>Tap any block for its exact share and measured load</li>
 <li>Share builds as short text codes</li>
