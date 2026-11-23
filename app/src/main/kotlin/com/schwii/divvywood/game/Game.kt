@@ -46,7 +46,6 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     val editor = Editor(board, haptic)
 
     var sheet by mutableStateOf<Sheet?>(null); private set
-    var hintHidden by mutableStateOf(false); private set
 
     init {
         editor.onChange = { saves.putBuild(level.name, board.tiles) }
@@ -56,24 +55,25 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     fun best(i: Int) = saves.best(levelAt(i).name)
 
+    /** Everything saved for level [i]. */
+    fun saved(i: Int) = saves.level(levelAt(i).name)
+
     fun loadLevel(i: Int) {
         levelIndex = i
         saves.cur = levelAt(i).name
-        hintHidden = false
         sheet = null
         editor.reset()
         board.setBuild(levelAt(i), saves.build(levelAt(i).name))
         board.refit()
     }
 
-    fun hideHint() { hintHidden = true }
 
     /** Gives the random level a new target, keeping its build, and opens it. */
     fun newTarget() {
         if (board.checking) return
         val f = randomTarget(not = randomLevel.out[0])
         saves.randomTarget = f
-        saves.clearBest(RANDOM)
+        saves.clearResults(RANDOM)
         randomLevel = randomLevel(f)
         loadLevel(randomIndex)
     }
@@ -93,7 +93,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     private fun showResult(v: Verdict) {
         val score = scoreOf(board.tiles)
-        val best = if (v.solved) saves.recordSolve(level.name, score) else saves.best(level.name)
+        val best = saves.recordCheck(level.name, score, v.solved)
         sheet = Sheet.Result(v, score, best, next = v.solved && levelIndex < LEVELS.lastIndex)   // Sandbox is never solved
     }
 

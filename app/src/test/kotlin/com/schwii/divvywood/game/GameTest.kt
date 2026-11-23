@@ -40,7 +40,6 @@ class GameTest {
         assertEquals(1, g.levelIndex)
         assertNull(g.sheet)
         assertTrue(g.board.tiles.isEmpty())
-        assertFalse(g.hintHidden)
     }
 
     @Test fun `best keeps the fewest parts and the smallest and largest area`() {
@@ -160,6 +159,31 @@ class GameTest {
         assertEquals(Best(1, 6, 6), g.best(g.randomIndex))
         g.newTarget()
         assertNull(g.best(g.randomIndex))
+    }
+
+    @Test fun `a Check records the score, and a solve records the solving build`() {
+        val store = MemoryStore()
+        val g = Game(Saves(store))
+        g.loadLevel(1)   // 1/4 and 3/4
+        g.buildFromText(halves); check(g)
+        assertEquals(Checked(1, 3, 2, solved = false), g.saved(1).checked)
+        assertNull(g.saved(1).solution)
+        g.loadLevel(0)
+        g.buildFromText(halves); check(g)
+        assertEquals(halves, g.saved(0).solution)
+        g.buildFromText("IR LR SL FL\n.. .. FT2 .."); g.editor.dismissNotice()
+        assertEquals("the solution stays until another solve", halves, Saves(store).level("Halves").solution)
+        assertEquals(Checked(1, 3, 2, solved = true), Saves(store).level("Halves").checked)
+    }
+
+    @Test fun `a new random target forgets the old target's results`() {
+        val store = MemoryStore()
+        Saves(store).randomTarget = Frac(1, 2)
+        val g = Game(Saves(store))
+        g.loadLevel(g.randomIndex); g.buildFromText("IR SL FL\n.. OT .."); check(g)
+        assertNotNull(g.saved(g.randomIndex).solution)
+        g.newTarget()
+        assertEquals(LevelSave(build = "IR SL FL\n.. OT .."), g.saved(g.randomIndex))
     }
 
     @Test fun `level names are unique`() {

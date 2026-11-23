@@ -51,7 +51,20 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import android.graphics.Bitmap
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.schwii.divvywood.board.BoardRenderer
+import com.schwii.divvywood.board.BoardState
+import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.LETTERS
+import com.schwii.divvywood.engine.Level
+import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.encodeGrid
 import com.schwii.divvywood.engine.encodeLine
@@ -166,43 +179,76 @@ private fun RowScope.ScoreCard(label: String, value: String, note: String) {
 
 // ---------- levels ----------
 
+/**
+ * The levels as cards, three to a row, each under its number: solved ones outlined green with the solving build and
+ * best scores; started ones with the build so far and the last Check's score; unstarted ones a question mark.
+ */
 @Composable
 private fun ColumnScope.LevelsSheet(game: Game) {
     Title("Levels")
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (i in 0 until game.levelCount) {
-            val l = game.levelAt(i)
-            val b = game.best(i)
-            val goal = if (l.sandbox) "free build" else l.out.joinToString(" + ") + if (l.dump > 0) " + dump" else ""
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 48.dp).background(Raise, RoundedCornerShape(8.dp))
-                    .then(if (i == game.levelIndex) Modifier.border(1.5.dp, Src, RoundedCornerShape(8.dp)) else Modifier)
-                    .clickable { game.loadLevel(i) }.padding(horizontal = 10.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(twoDigits(i), Modifier.width(30.dp), style = Body, color = Src, fontSize = 14.sp)
-                Column(Modifier.weight(1f)) {
-                    Text(l.name, style = Body, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(goal, style = Body, color = Dim, fontSize = 11.sp)
-                }
-                if (i == game.randomIndex) {
-                    Box(Modifier.heightIn(min = 36.dp).background(Page, RoundedCornerShape(50)).clickable { game.newTarget() }.padding(horizontal = 12.dp),
-                        contentAlignment = Alignment.Center) { Text("New target", style = Body, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-                } else if (b != null) Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        buildAnnotatedString { withStyle(SpanStyle(color = Out)) { append("✓") }; append(" ${b.parts} parts") },
-                        style = BodyTnum, color = Dim, fontSize = 11.sp,
-                    )
-                    Text("area ${b.small}–${b.large}", style = BodyTnum, color = Dim, fontSize = 11.sp)
-                }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (row in (0 until game.levelCount).chunked(3)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (i in row) LevelCard(game, i, Modifier.weight(1f))
+                repeat(3 - row.size) { Box(Modifier.weight(1f)) }
             }
         }
     }
     Buttons {
         SheetButton("Build as text") { game.showText() }
+        SheetButton("New target") { game.newTarget() }
         SheetButton("Close") { game.closeSheet() }
     }
+}
+
+@Composable
+private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
+    val level = game.levelAt(i)
+    val saved = game.saved(i)
+    val best = saved.best
+    val shown = (if (best != null) saved.solution else null) ?: saved.build
+    val tiles = remember(level, shown) { shown.takeIf { it.isNotBlank() }?.let { decodeGrid(it).tiles }?.takeIf { it.isNotEmpty() } }
+    val density = LocalDensity.current
+    val px = with(density) { 100.dp.roundToPx() }
+    val shape = RoundedCornerShape(10.dp)
+    Column(
+        modifier.background(Raise, shape).then(if (best != null) Modifier.border(2.dp, Out, shape) else Modifier)
+            .clip(shape).clickable { game.loadLevel(i) }.padding(6.dp)
+            .semantics { contentDescription = "Level ${i + 1}" + if (best != null) ", solved" else "" },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(6.dp)).background(Page), contentAlignment = Alignment.Center) {
+            if (tiles != null) {
+                val img = remember(level, shown, px) { buildPreview(level, tiles, px, density.density).asImageBitmap() }
+                Image(img, null, Modifier.fillMaxSize())
+            } else Text("?", style = Body, color = Dim, fontWeight = FontWeight.Bold, fontSize = 32.sp)
+        }
+        val checked = saved.checked
+        val (line1, line2) = when {
+            best != null -> parts(best.parts) to "area ${best.small}" + if (best.large != best.small) "–${best.large}" else ""
+            checked != null -> (if (level.sandbox) "" else "✗ ") + parts(checked.parts) to "area ${checked.area}"
+            else -> " " to " "
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(line1, style = BodyTnum, color = Dim, fontSize = 11.sp, maxLines = 1)
+            Text(line2, style = BodyTnum, color = Dim, fontSize = 11.sp, maxLines = 1)
+        }
+        Text(twoDigits(i), style = BodyTnum, color = if (i == game.levelIndex) Src else Ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+    }
+}
+
+private fun parts(n: Int) = if (n == 1) "1 part" else "$n parts"
+
+/** A still picture of [tiles] on the table, fitted into a [px]-pixel square. */
+private fun buildPreview(level: Level, tiles: Map<Cell, Tile>, px: Int, density: Float): Bitmap {
+    val w = tiles.keys.maxOf { it.x } - tiles.keys.minOf { it.x } + 1
+    val h = tiles.keys.maxOf { it.y } - tiles.keys.minOf { it.y } + 1
+    val state = BoardState(level, LinkedHashMap(tiles), density).apply { z = minOf(px * 0.88f / maxOf(w, h), px / 2.4f) }
+    state.fit(px.toFloat(), px.toFloat())
+    val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
+    BoardRenderer(state, reduceMotion = true).draw(android.graphics.Canvas(bmp), px, px)
+    return bmp
 }
 
 // ---------- build as text ----------

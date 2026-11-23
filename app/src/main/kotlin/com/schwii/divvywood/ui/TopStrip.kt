@@ -49,7 +49,7 @@ import java.util.Locale
 internal fun f3(x: Double) = String.format(Locale.ROOT, "%.3f", x)
 internal fun twoDigits(i: Int) = String.format(Locale.ROOT, "%02d", i + 1)
 
-/** The strip on top: level button, parts and area, then the live readouts and the level's hint. */
+/** The strip on top: the level number (it opens the levels), parts and area, then the live readouts. */
 @Composable
 fun TopStrip(game: Game) {
     val board = game.board
@@ -66,19 +66,16 @@ fun TopStrip(game: Game) {
             Text(
                 buildAnnotatedString {
                     withStyle(SpanStyle(color = Src)) { append(twoDigits(game.levelIndex)) }
-                    append("  ${level.name} ▾")
+                    append(" ▾")
                 },
                 Modifier.weight(1f).heightIn(min = 36.dp).clickable { game.showLevels() }.padding(top = 9.dp)
                     .semantics { contentDescription = "Levels" },
-                style = Body, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = Body, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
             Stat("parts", sc.parts.toString())
             Stat("area", if (sc.area > 0) "${sc.w}×${sc.h}" else "0")
         }
         Readouts(board)
-        if (!game.hintHidden) {
-            Text(level.hint, Modifier.fillMaxWidth().clickable { game.hideHint() }, style = Body, color = Dim, fontSize = 12.sp, lineHeight = 1.4.em)
-        }
     }
 }
 

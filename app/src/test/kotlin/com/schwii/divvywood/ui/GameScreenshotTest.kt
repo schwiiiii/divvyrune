@@ -38,12 +38,11 @@ class GameScreenshotTest {
         File("src/test/screenshots/$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    private fun gameFor(level: Int, grid: String?, z: Float, hint: Boolean = false): Game {
+    private fun gameFor(level: Int, grid: String?, z: Float): Game {
         val g = Game(Saves(MemoryStore()), density = 3f)
         g.loadLevel(level)
         grid?.let { g.buildFromText(it); g.editor.dismissNotice() }
         g.board.z = z * 3f
-        if (!hint) g.hideHint()
         return g
     }
 
@@ -92,8 +91,8 @@ class GameScreenshotTest {
         save("screen-tray-drag")
     }
 
-    @Test fun readoutsAndHint() {
-        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "IR SL FL\n.. ST ..\n.. FT2 ..", 64f, hint = true)
+    @Test fun readouts() {
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "IR SL FL\n.. ST ..\n.. FT2 ..", 64f)
         g.run(900)
         compose.setContent { GameScreen(g, animate = false) }
         save("screen-readouts")
@@ -124,9 +123,10 @@ class GameScreenshotTest {
         val store = MemoryStore()
         Game(Saves(store)).apply {
             buildFromText("IR SL FL\n.. FT2 .."); startCheck(); board.finishCheck()
+            loadLevel(LEVELS.indexOf(levelNamed("Quarter back"))); buildFromText("IR SL FL\n.. FT2 .."); startCheck(); board.finishCheck()
             loadLevel(LEVELS.indexOf(levelNamed("Eighths"))); buildFromText("IR SL FL\n.. ST ..\n.. FT2 ..")
         }
-        val g = Game(Saves(store), density = 3f).apply { board.z = 64f * 3; hideHint() }
+        val g = Game(Saves(store), density = 3f).apply { board.z = 64f * 3 }
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.showLevels() }
         save("screen-levels")

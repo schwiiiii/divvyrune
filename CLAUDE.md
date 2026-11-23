@@ -18,12 +18,12 @@ https://claude.ai/artifact/6psEUKVPFSUNveWVJdvd2g (read it with the Artifact too
 https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 
 ## Layout
-- `engine/` — pure Kotlin: rules, exact solver (BigInteger fractions), sim, judge/check, groups, text codes, 18 levels (saves and tests refer to them by name: names are stable). JUnit tests incl. every level's reference solution.
+- `engine/` — pure Kotlin: rules, exact solver (BigInteger fractions), sim, judge/check, groups, text codes, 18 levels (players see only numbers; names are stable ids that saves and tests use; no hints). JUnit tests incl. every level's reference solution.
 - `app/` — Compose app, minSdk 26, target/compile 36, no permissions.
   - `wood/` textures, `Painter` (android.graphics.Canvas), `Fonts` (Nunito for block labels)
   - `board/` `BoardState` (camera, frame clock, sim, Check run, sparkline history), `BoardRenderer`, `Board` composable, `Editor` (gesture state machine, undo), `Readout`
-  - `game/` `Game` (level, sheets, Check, hint), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; builds stored as text codes, best = parts / smallest / largest area)
-  - `ui/` `GameScreen`, `TopStrip` (readouts + sparklines), `Sheets` (result, levels, build as text), `Theme`, `Icons`
+  - `game/` `Game` (level, sheets, Check, hint), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; per level: build, best = parts / smallest / largest area, solving build, last Check's score)
+  - `ui/` `GameScreen`, `TopStrip` (readouts + sparklines), `Sheets` (result, level cards with build previews, build as text), `Theme`, `Icons`
 - Font: `app/src/main/res/font/nunito.ttf` (variable, from github.com/googlefonts/nunito), OFL in `app/src/main/assets/licenses/`.
 
 ## Build
