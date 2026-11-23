@@ -366,3 +366,33 @@ class MultiInputTest {
         assertEquals(200, s.emittedBy[0])
     }
 }
+
+class MetricsTest {
+    private fun m(text: String) = metricsOf(decodeGrid(text).tiles!!)
+
+    @Test fun `pieces and the footprint count every cell but inputs and outputs, bypasses included`() {
+        val x = m("IR SL LR OL\n.. FT2 .. ..")
+        assertEquals(3, x.pieces); assertEquals(1, x.bypasses)
+        assertEquals(3, x.side, "the machine is the splitter, belt and bypass in a row"); assertEquals(3, x.w); assertEquals(1, x.h)
+        assertEquals(0, m("IR FL").side)
+    }
+
+    @Test fun `a straight run in and out the far side scores full marks`() {
+        assertEquals(100, m("IR FL").io)
+        assertEquals(100, m("IB\nFT").io)
+    }
+
+    @Test fun `halves scores the edge in full, outputs half grouped, and opposite faces`() {
+        // all three ports face out; A and B are 2 apart (grouping (1 + 1/2) / 2); IN faces left, A right
+        val io = m("IR SL FL\n.. FT2 ..").layout
+        assertEquals(3, io.onEdge); assertEquals(0.75, io.grouping, 1e-9); assertEquals(1.0, io.opposition, 1e-9)
+        assertEquals(93, io.score)
+    }
+
+    @Test fun `a port facing into the build loses its edge and opposition`() {
+        val io = m("BR LR LB\nIT FR TL").layout   // output A's mouth faces left, straight at the input
+        assertEquals(1, io.onEdge); assertEquals(0.0, io.opposition, 1e-9)
+        assertEquals(50, io.score)
+        assertEquals(2, m("IR LR LB\n.. FR TL").layout.onEdge, "a clear line out counts even inside the bounding box")
+    }
+}

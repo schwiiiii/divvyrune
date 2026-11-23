@@ -6,7 +6,8 @@ import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Frac
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.Q
-import com.schwii.divvywood.engine.Score
+import com.schwii.divvywood.engine.Metrics
+import com.schwii.divvywood.engine.metricsOf
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.Tiles
 import com.schwii.divvywood.engine.decodeGrid
@@ -14,13 +15,16 @@ import com.schwii.divvywood.engine.encodeGrid
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** A level's best solved scores: fewest parts, and the smallest and largest area. */
-@Serializable data class Best(val parts: Int, val small: Int, val large: Int)
-
-/** The build's score at its last Check, solved or not. */
-@Serializable data class Checked(val parts: Int, val w: Int, val h: Int, val solved: Boolean) {
-    val area get() = w * h
+/**
+ * A level's best solves, each metric on its own (they can come from different builds): fewest [pieces], smallest
+ * footprint [side], highest [io] layout score. Saves from before these metrics hold -1 until migrated.
+ */
+@Serializable data class Best(val pieces: Int = -1, val side: Int = -1, val io: Int = -1) {
+    fun with(m: Metrics) = if (pieces < 0) Best(m.pieces, m.side, m.io) else Best(minOf(pieces, m.pieces), minOf(side, m.side), maxOf(io, m.io))
 }
+
+/** The build's metrics at its last Check, solved or not. */
+@Serializable data class Checked(val pieces: Int = -1, val side: Int = -1, val io: Int = -1, val solved: Boolean = false)
 
 /**
  * A level's build, as its text code; its best scores and the build that last solved it, once solved; and the
@@ -96,7 +100,17 @@ private val V1_ORDER = listOf(
 )
 
 private fun migrate(d: SaveData): SaveData = migrateIndex(d).let { m ->
-    m.copy(draft = m.draft.normalized(), custom = m.custom.map { it.copy(def = it.def.normalized()) })
+    m.copy(draft = m.draft.normalized(), custom = m.custom.map { it.copy(def = it.def.normalized()) }, levels = m.levels.mapValues { (_, l) -> migrateMetrics(l) })
+}
+
+/**
+ * Saves from before pieces, footprint and I/O layout kept parts and areas: a solved level gets its metrics from its
+ * solving build (or, without one, its current build); an older last-Check score is dropped.
+ */
+private fun migrateMetrics(l: LevelSave): LevelSave {
+    val best = l.best?.takeIf { it.pieces < 0 }?.let { (l.solution ?: l.build).let { code -> Best().with(metricsOf(decodeGrid(code).tiles ?: linkedMapOf())) } } ?: l.best
+    val checked = l.checked?.takeIf { it.pieces >= 0 }
+    return if (best === l.best && checked === l.checked) l else l.copy(best = best, checked = checked)
 }
 
 private fun migrateIndex(d: SaveData): SaveData =
@@ -140,15 +154,10 @@ class Saves(private val store: SaveStore) {
     fun level(name: String): LevelSave = data.levels[name] ?: LevelSave()
 
     /** Records a Check of the named level's current build; returns the level's best afterwards. */
-    fun recordCheck(name: String, score: Score, solved: Boolean): Best? {
+    fun recordCheck(name: String, m: Metrics, solved: Boolean): Best? {
         val l = level(name)
-        val checked = Checked(score.parts, score.w, score.h, solved)
-        val nl = if (!solved) l.copy(checked = checked) else {
-            val b = l.best
-            val nb = if (b == null) Best(score.parts, score.area, score.area)
-            else Best(minOf(b.parts, score.parts), minOf(b.small, score.area), maxOf(b.large, score.area))
-            l.copy(best = nb, solution = l.build, checked = checked)
-        }
+        val checked = Checked(m.pieces, m.side, m.io, solved)
+        val nl = if (!solved) l.copy(checked = checked) else l.copy(best = (l.best ?: Best()).with(m), solution = l.build, checked = checked)
         put(data.copy(levels = data.levels + (name to nl)))
         return nl.best
     }

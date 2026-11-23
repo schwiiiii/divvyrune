@@ -145,13 +145,16 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
         }
     }
     if (v.skips > 0) Text("Splitters skipped a jammed output ${v.skips} times during the run.", style = Body, color = Dim, fontSize = 14.sp)
-    val sc = r.score
-    val best = r.best
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ScoreCard("parts", sc.parts.toString(), "${sc.belts} belts · ${sc.splits} split · ${sc.merges} join")
-        ScoreCard("area", sc.area.toString(), "${sc.w}×${sc.h}")
-        ScoreCard("best", best?.parts?.toString() ?: "–", if (best != null) "area ${best.small} to ${best.large}" else "not solved yet")
-    }
+    val m = r.metrics
+    val best = r.best?.takeIf { it.pieces >= 0 }
+    val base = game.baseline(game.levelIndex)
+    val io = m.layout
+    MetricBlock("Pieces", m.pieces.toString(), "${m.belts} belts · ${m.splits} split · ${m.merges} join · ${m.bypasses} bypass",
+        best?.let { "best ${it.pieces}" }, base?.pieces, m.pieces)
+    MetricBlock("Footprint", if (m.side > 0) "${m.side}×${m.side}" else "–", "machine ${m.w}×${m.h}, inputs and outputs aside",
+        best?.let { "best ${it.side}×${it.side}" }, base?.side, m.side)
+    MetricBlock("I/O layout", "${m.io}", "${io.onEdge}/${io.ports} open to the outside · grouped ${pct(io.grouping)} · facing apart ${pct(io.opposition)}",
+        best?.let { "best ${it.io}" }, base?.io, m.io)
     Buttons {
         SheetButton("Keep building") { game.closeSheet() }
         if (r.next) SheetButton("Next level", go = true) { game.loadLevel(game.levelIndex + 1) }
@@ -174,12 +177,21 @@ private fun TableRow(cells: List<String>, ok: Boolean?, header: Boolean = false)
     }
 }
 
+private fun pct(x: Double) = "${(x * 100).toInt()}%"
+
+/** One metric: its value and what it's made of, the level's best, and where it sits among many solutions. */
 @Composable
-private fun RowScope.ScoreCard(label: String, value: String, note: String) {
-    Column(Modifier.weight(1f).background(Raise, RoundedCornerShape(8.dp)).padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(label, style = Body, color = Dim, fontSize = 11.sp)
-        Text(value, style = BodyTnum, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        Text(note, style = BodyTnum, color = Dim, fontSize = 11.sp)
+private fun MetricBlock(label: String, value: String, note: String, best: String?, baseline: List<Int>?, yours: Int) {
+    Row(Modifier.fillMaxWidth().background(Raise, RoundedCornerShape(8.dp)).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(label, style = Body, color = Dim, fontSize = 12.sp)
+                if (best != null) Text(best, style = BodyTnum, color = Out, fontSize = 12.sp)
+            }
+            Text(value, style = BodyTnum, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text(note, style = BodyTnum, color = Dim, fontSize = 11.sp)
+        }
+        if (baseline != null && baseline.size >= MIN_SAMPLES) Histogram(baseline, yours, Modifier.width(120.dp))
     }
 }
 
@@ -272,8 +284,8 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
         }
         val checked = saved.checked
         val (line1, line2) = when {
-            best != null -> parts(best.parts) to "area ${best.small}" + if (best.large != best.small) "–${best.large}" else ""
-            checked != null -> "✗ " + parts(checked.parts) to "area ${checked.area}"
+            best != null && best.pieces >= 0 -> parts(best.pieces) to "${best.side}×${best.side} · I/O ${best.io}"
+            checked != null -> "✗ " + parts(checked.pieces) to "${checked.side}×${checked.side} · I/O ${checked.io}"
             else -> " " to " "
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -284,7 +296,7 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
     }
 }
 
-private fun parts(n: Int) = if (n == 1) "1 part" else "$n parts"
+private fun parts(n: Int) = if (n == 1) "1 piece" else "$n pieces"
 
 /** A still picture of [tiles] on the table, fitted into a [px]-pixel square. */
 private fun buildPreview(level: Level, tiles: Map<Cell, Tile>, px: Int, density: Float): Bitmap {
