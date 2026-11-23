@@ -21,6 +21,10 @@ signed with the same key and numbered so that either kind updates the other; tur
 to follow development builds. F-Droid builds each release from source and, since the build is reproducible, ships the
 same signed APK, so copies from F-Droid and from GitHub update each other too.
 
+## Changes and plans
+
+[CHANGELOG.md](CHANGELOG.md) lists what each release brings; [ROADMAP.md](ROADMAP.md) lists what's planned.
+
 ## Building
 
 Requirements: JDK 17 or newer and the Android SDK (platform 36).

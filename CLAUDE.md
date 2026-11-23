@@ -44,4 +44,5 @@ https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 - One PR per milestone-sized chunk on a branch; Brett merges (merge = approval). Report verified results with real output and show screenshots of UI changes.
 - Ask before side effects (new hosts, secrets, anything outside the repo). Mobile first, touch only. Concise answers; no needless choices.
 - Commit messages and PR descriptions describe what IS, in the present tense.
+- Every user-visible change adds a line to `CHANGELOG.md` (under the unreleased version, concise, player's view); shipped roadmap items move from `ROADMAP.md` to the changelog. For a release, the changelog's entry is condensed into `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (≤ 500 chars).
 - Shallow clone: `git config --add remote.origin.fetch "+refs/heads/<branch>:refs/remotes/origin/<branch>"`, push with `git -c push.negotiate=true push`.
