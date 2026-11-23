@@ -185,5 +185,64 @@ class Sim(g: Graph, val rates: List<Frac>) {
         turnedAway.forEachIndexed { j, b -> if (b) turnAways[j]++ }
     }
 
+    /** The inputs' schedules repeat together every this many ticks. */
+    private val schedule: Long = rates.fold(1L) { a, r -> lcm(a, r.d.toLong()) }
+
+    /**
+     * A 64-bit fingerprint of everything that decides the next ticks: which cells hold marbles, each splitter's and
+     * converger's turn, each splitter's jam counts (capped where they stop mattering), each input's waiting marble,
+     * and where the inputs' schedules stand. Marble numbers and animation don't count.
+     */
+    fun stateKey(): Long {
+        var h = -0x340d631b7bdddcdbL
+        fun mix(v: Long) { h = (h xor v) * 0x100000001b3L; h = h xor (h ushr 29) }
+        mix(tick % schedule)
+        n.forEach { s ->
+            mix(if (s.item != null) 1 else 0)
+            val k = when (s.kind) { Kind.SPLIT -> s.succ.size; Kind.MERGE -> s.pred.size; else -> 0 }
+            if (k > 0) mix((s.rr % k).toLong())
+            if (s.kind == Kind.SPLIT) s.jam.forEach { mix(minOf(it, JAM_TICKS).toLong()) }
+        }
+        want.forEach { mix(if (it) 1 else 0) }
+        return h
+    }
+
     fun snap() = Snapshot(tick, emitted, blocked, skips, IntArray(n.size) { n[it].sunk }, emittedBy.copyOf())
 }
+
+/** A build's repeating loop: after settling for [start] ticks, the whole board repeats every [length] ticks. */
+data class Cycle(val start: Int, val length: Int) {
+    /** Where [tick] falls in the loop, from 1 to [length]; null while the build is still settling. */
+    fun step(tick: Int): Int? = if (tick < start) null else (tick - start) % length + 1
+}
+
+/**
+ * Watches a [Sim] tick by tick and finds its loop: the first time a whole board state comes round again. A state is
+ * everything that decides what happens next (see [Sim.stateKey]); watching stops after [maxTicks].
+ */
+class CycleFinder(private val sim: Sim, private val maxTicks: Int = MAX_CYCLE_TICKS) {
+    private val seen = HashMap<Long, Int>()
+    var cycle: Cycle? = null; private set
+
+    /** Call after each step (and once before the first). */
+    fun observe() {
+        if (cycle != null || sim.tick > maxTicks) return
+        val prev = seen.put(sim.stateKey(), sim.tick)
+        if (prev != null) { cycle = Cycle(prev, sim.tick - prev); seen.clear() }
+    }
+}
+
+/** How long cycle finding watches before giving up. */
+const val MAX_CYCLE_TICKS = 20_000
+
+/** Runs [level]'s build until its loop shows, or [maxTicks] pass. */
+fun findCycle(g: Graph, level: Level, maxTicks: Int = MAX_CYCLE_TICKS): Cycle? {
+    val s = Sim(g, level)
+    val f = CycleFinder(s, maxTicks)
+    f.observe()
+    while (f.cycle == null && s.tick <= maxTicks) { s.step(); f.observe() }
+    return f.cycle
+}
+
+private tailrec fun gcd(a: Long, b: Long): Long = if (b == 0L) a else gcd(b, a % b)
+private fun lcm(a: Long, b: Long) = a / gcd(a, b) * b

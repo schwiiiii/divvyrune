@@ -128,7 +128,7 @@ private fun Overlays(editor: Editor) {
     Box(Modifier.fillMaxSize()) {
         val banner = when {
             board.checking -> "Checking · tick ${board.sim.tick} / $CHECK_TICKS"
-            notice == null && !board.playing -> "Paused · tick ${board.sim.tick}"
+            notice == null && !board.playing -> "Paused · ${board.stepLabel()}"
             notice != null -> notice
             else -> null
         }

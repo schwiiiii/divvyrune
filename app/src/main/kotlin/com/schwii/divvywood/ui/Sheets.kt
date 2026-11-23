@@ -67,6 +67,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.LaunchedEffect
 import com.schwii.divvywood.engine.LETTERS
+import com.schwii.divvywood.engine.MAX_CYCLE_TICKS
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.Tile
@@ -153,6 +154,10 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
         best?.let { "best ${it.pieces}" }, base?.pieces, m.pieces)
     MetricBlock("Footprint", if (m.side > 0) "${m.side}×${m.side}" else "–", "machine ${m.w}×${m.h}, inputs and outputs aside",
         best?.let { "best ${it.side}×${it.side}" }, base?.side, m.side)
+    val c = r.cycle
+    MetricBlock("Cycle", c?.let { "${it.length} ticks" } ?: "–",
+        c?.let { "the board repeats every ${it.length} ticks, after settling for ${it.start}" } ?: "no repeat within $MAX_CYCLE_TICKS ticks",
+        best?.cycle?.takeIf { it > 0 }?.let { "best $it" }, base?.cycle, c?.length ?: 0)
     MetricBlock("I/O layout", "${m.io}", "${io.onEdge}/${io.ports} open to the outside · grouped ${pct(io.grouping)} · facing apart ${pct(io.opposition)}",
         best?.let { "best ${it.io}" }, base?.io, m.io)
     Buttons {

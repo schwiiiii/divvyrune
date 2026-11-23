@@ -8,7 +8,9 @@ import com.schwii.divvywood.board.BoardState
 import com.schwii.divvywood.board.Editor
 import com.schwii.divvywood.board.Haptic
 import com.schwii.divvywood.engine.Frac
+import com.schwii.divvywood.engine.Cycle
 import com.schwii.divvywood.engine.Kind
+import com.schwii.divvywood.engine.findCycle
 import com.schwii.divvywood.engine.toFrac
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
@@ -27,7 +29,7 @@ sealed interface Sheet {
      * A Check's verdict with the build's score and the level's best (updated if this run solved it); [next] offers
      * the next level, [save] (in the builder, once solved) saving the design as a custom level.
      */
-    class Result(val verdict: Verdict, val metrics: Metrics, val best: Best?, val next: Boolean, val save: Boolean = false) : Sheet
+    class Result(val verdict: Verdict, val metrics: Metrics, val cycle: Cycle?, val best: Best?, val next: Boolean, val save: Boolean = false) : Sheet
     data object Levels : Sheet
     data object Text : Sheet
     /** The builder's settings: input rate, targets, 3-way splits. */
@@ -165,8 +167,10 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     private fun showResult(v: Verdict) {
         val m = metricsOf(board.tiles)
-        val best = saves.recordCheck(level.name, m, v.solved)
-        sheet = Sheet.Result(v, m, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder)
+        // a build that runs gets its loop measured; one that can't run has none
+        val cycle = if (board.sol.ok && board.graph.errCount == 0) findCycle(board.graph, level) else null
+        val best = saves.recordCheck(level.name, m, cycle?.length, v.solved)
+        sheet = Sheet.Result(v, m, cycle, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder)
     }
 
     // ---------- sheets ----------
