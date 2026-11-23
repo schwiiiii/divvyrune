@@ -373,8 +373,8 @@ class MetricsTest {
     @Test fun `pieces and the footprint count every cell but inputs and outputs, bypasses included`() {
         val x = m("IR SL LR OL\n.. FT2 .. ..")
         assertEquals(3, x.pieces); assertEquals(1, x.bypasses)
-        assertEquals(3, x.side, "the machine is the splitter, belt and bypass in a row"); assertEquals(3, x.w); assertEquals(1, x.h)
-        assertEquals(0, m("IR FL").side)
+        assertEquals(3, x.area, "the machine is the splitter, belt and bypass in a row"); assertEquals(3, x.w); assertEquals(1, x.h)
+        assertEquals(0, m("IR FL").area)
     }
 
     @Test fun `a straight run in and out the far side scores full marks`() {
@@ -444,4 +444,21 @@ class CycleTest {
             assertEquals(first, check(buildGraph(shuffled, level), level).reasons)
         }
     }
+
+    @Test fun `flow is 100 when no marble waits`() {
+        val level = levelNamed("Halves")
+        val g = buildGraph(decodeGrid("FB ..\nSR IL\nFT ..").tiles!!, level)
+        val c = findCycle(g, level)!!
+        assertEquals(100, flowOf(g, level, c).score)
+    }
+
+    @Test fun `flow drops with how much marbles wait`() {
+        // two full belts into one converger: every other tick one of them waits for its turn
+        val level = Level("jam", listOf(Frac(1, 1), Frac(1, 1)), listOf(Frac(1, 1)), false)
+        val g = buildGraph(decodeGrid("IR CB IL2\n.. FT ..").tiles!!, level)
+        val c = findCycle(g, level)!!
+        val f = flowOf(g, level, c)
+        assertTrue(f.waiting > 0); assertTrue(f.score in 1..99, "${f.score}")
+    }
+
 }

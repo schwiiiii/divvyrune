@@ -7,11 +7,12 @@ import com.schwii.divvywood.engine.buildGraph
 import com.schwii.divvywood.engine.check
 import com.schwii.divvywood.engine.encodeGrid
 import com.schwii.divvywood.engine.findCycle
+import com.schwii.divvywood.engine.flowOf
 import com.schwii.divvywood.engine.metricsOf
 import kotlin.random.Random
 
-/** A build the solver found, proved by the game's own Check, with its metrics and loop length. */
-class Found(val tiles: Tiles, val code: String, val metrics: Metrics, val cycle: Int)
+/** A build the solver found, proved by the game's own Check, with its metrics and flow score. */
+class Found(val tiles: Tiles, val code: String, val metrics: Metrics, val flow: Int)
 
 /**
  * Up to [want] different solutions of [level] within [attempts] tries. Each try synthesizes a random machine and lays
@@ -31,7 +32,7 @@ fun solveLevel(level: Level, seed: Long, want: Int = 100, attempts: Int = 8000):
         val v = check(g, level)
         if (!v.solved || v.skips > 0) return@repeat
         val c = findCycle(g, level) ?: return@repeat
-        found[code] = Found(tiles, code, metricsOf(tiles), c.length)
+        found[code] = Found(tiles, code, metricsOf(tiles), flowOf(g, level, c).score)
     }
     return found.values.toList()
 }

@@ -81,7 +81,7 @@ fun TopStrip(game: Game) {
                 )
             }
             Stat("pieces", m.pieces.toString())
-            Stat("footprint", if (m.side > 0) "${m.side}×${m.side}" else "0")
+            Stat("footprint", if (m.area > 0) "${m.w}×${m.h}" else "0")
         }
         Readouts(board)
     }
