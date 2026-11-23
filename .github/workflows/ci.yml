@@ -15,6 +15,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      # Robolectric downloads its Android jar from Maven Central while the tests run, outside Gradle's cache;
+      # keeping it here spares that download, so a network hiccup can't fail the run
+      - uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
       - name: Test, lint and build
         run: ./gradlew --no-daemon :engine:test :solver:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
       - name: Upload debug APK
@@ -29,4 +35,5 @@ jobs:
           name: reports
           path: |
             engine/build/reports/tests
+            solver/build/reports/tests
             app/build/reports
