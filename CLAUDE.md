@@ -12,7 +12,7 @@ inputs/outputs aside), I/O layout 0–100 (40% ports with a clear line out from 
 outputs+bypasses grouped, 30% inputs and outputs facing opposite ways); cycle (`Sim.kt`: `CycleFinder` fingerprints the board state each tick
 — marbles' cells, splitter/converger turns, jam counts capped at JAM_TICKS, inputs' pending marbles, schedule phase —
 and the first repeat gives settling `start` and loop `length`; over one loop, output counts are exact rates). A splitter treats an output as jammed only after 4 blocked ticks in a row
-(JAM_TICKS), then skips it until it frees.
+(JAM_TICKS), then skips it until it frees. The sim takes pieces in board order (row by row, left to right; `buildGraph`), so results never depend on placement order.
 
 ## Source of truth
 The browser prototype Brett played is the spec for every rule, behaviour and piece of wording:
@@ -22,7 +22,7 @@ https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 
 ## Layout
 - `engine/` — pure Kotlin: rules, exact solver (BigInteger fractions), sim, judge/check, groups, text codes (`I`/`I2`/`I3` inputs, `F`/`F2`/`F3` outputs), 20 levels (`Level(name, inputs, out)`; the `Level(name, t, shares)` constructor writes a one-input level in older terms; players see only numbers; names are stable ids that saves and tests use; no hints). JUnit tests incl. every level's reference solution.
-- `solver/` — dev tool (JVM, on `engine/`): `synthesize` builds a random splitter/converger network meeting a level's shares exactly (2^a·3^b split trees, loops, bypass dumps), `layOut` places and routes it on the grid, `solveLevel` keeps the layouts that pass Check (proved as decoded from their text code: the sim runs pieces in board order). `gradle :solver:baselines` rewrites `app/src/main/assets/baselines.json` (100 solutions per level).
+- `solver/` — dev tool (JVM, on `engine/`): `synthesize` builds a random splitter/converger network meeting a level's shares exactly (2^a·3^b split trees, loops, bypass dumps), `layOut` places and routes it on the grid, `solveLevel` keeps the layouts that pass Check. `gradle :solver:baselines` rewrites `app/src/main/assets/baselines.json` (100 solutions per level).
 - `app/` — Compose app, minSdk 26, target/compile 36, no permissions.
   - `wood/` textures, `Painter` (android.graphics.Canvas), `Fonts` (Nunito for block labels)
   - `board/` `BoardState` (camera, frame clock, sim, Check run, sparkline history, wait heat, single step), `BoardRenderer`, `Board` composable, `Editor` (gesture state machine, undo), `Readout`

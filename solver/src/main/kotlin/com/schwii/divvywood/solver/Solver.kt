@@ -5,7 +5,6 @@ import com.schwii.divvywood.engine.Metrics
 import com.schwii.divvywood.engine.Tiles
 import com.schwii.divvywood.engine.buildGraph
 import com.schwii.divvywood.engine.check
-import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.encodeGrid
 import com.schwii.divvywood.engine.findCycle
 import com.schwii.divvywood.engine.metricsOf
@@ -24,11 +23,9 @@ fun solveLevel(level: Level, seed: Long, want: Int = 100, attempts: Int = 8000):
     repeat(attempts) {
         if (found.size >= want) return found.values.toList()
         val net = synthesize(level, rnd) ?: return@repeat
-        val laid = layOut(net, rnd, spread = 1 + rnd.nextInt(3)) ?: return@repeat
-        val code = encodeGrid(laid)
+        val tiles = layOut(net, rnd, spread = 1 + rnd.nextInt(3)) ?: return@repeat
+        val code = encodeGrid(tiles)
         if (code in found) return@repeat
-        // the sim runs pieces in board order, so prove the build as it comes back from its text code (as a save reloads it)
-        val tiles = decodeGrid(code).tiles ?: return@repeat
         val g = buildGraph(tiles, level)
         if (g.errCount > 0) return@repeat
         val v = check(g, level)
