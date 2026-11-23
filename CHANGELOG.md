@@ -14,12 +14,13 @@ First release.
 - Four metrics for every solve, each with its own best: pieces (every cell but inputs and outputs), footprint (the
   smallest square around the machine), cycle (how many ticks until the whole board repeats) and I/O layout (0–100:
   ports open to the outside, inputs grouped, outputs grouped, facing away from each other). Improving one can cost
-  another.
+  another. Each metric's histogram compares your build with 100 solutions the solver found for the level.
 - The step counter counts through the machine's cycle (step 3 of 18) once it settles, instead of growing forever.
 - Levels shown as numbered cards: solved ones outlined green with their solution, started ones with the build so far.
   The sheet opens at the level you're on.
 - Level builder: set up to three inputs' rates, up to three targets and whether 3-way splits are allowed (or let Surprise me
   pick a target), build a solution, and once it passes Check save it to Your levels to play again.
+- A build behaves the same however its pieces were placed, and the same after the app restarts.
 - Live readouts: the input's rate and each output's measured share, with sparklines.
 - Bottlenecks show on the board: blocks where marbles wait glow red, convergers turning marbles away get a red ring,
   and a held-up input is outlined. Pause and Step one tick at a time; tap a piece for how often it waits.

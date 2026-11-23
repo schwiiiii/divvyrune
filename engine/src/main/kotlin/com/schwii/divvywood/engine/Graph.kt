@@ -17,8 +17,12 @@ class Graph(val nodes: List<Node>, val idx: Map<Cell, Int>) {
     fun link(a: Int, b: Int) { nodes[a].succ += b; nodes[b].pred += a }
 }
 
+/**
+ * The board as a graph. Nodes run in board order (row by row, top to bottom, each row left to right), so the sim's
+ * turn order, and with it every result, depends only on the layout, never on the order pieces were placed in.
+ */
 fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
-    val cells = tiles.keys.toList()
+    val cells = tiles.keys.sortedWith(compareBy({ it.y }, { it.x }))
     val idx = cells.withIndex().associate { (i, c) -> c to i }
     val nodes = cells.map { Node(it, tiles.getValue(it)) }
     val g = Graph(nodes, idx)

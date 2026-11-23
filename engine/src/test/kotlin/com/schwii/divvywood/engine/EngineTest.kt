@@ -432,4 +432,16 @@ class CycleTest {
         val rates = outs.map { Q.of((after.sunk[it] - before.sunk[it]).toLong(), c.length.toLong()) }
         assertEquals(level.out.map { it!!.q }, rates)
     }
+
+    @Test fun `a build gives the same result however its pieces were placed`() {
+        // this layout once passed in the order it was built and jammed after a reload
+        val level = levelNamed("Full belt")
+        val tiles = decodeGrid("FB RB BL .. ..\nRT CL SR BL ..\n.. FR2 CL SR IL\n.. .. RT TL ..").tiles!!
+        val first = check(buildGraph(tiles, level), level).reasons
+        val rnd = kotlin.random.Random(5)
+        repeat(20) {
+            val shuffled = LinkedHashMap<Cell, Tile>().apply { tiles.entries.shuffled(rnd).forEach { (c, t) -> put(c, t) } }
+            assertEquals(first, check(buildGraph(shuffled, level), level).reasons)
+        }
+    }
 }

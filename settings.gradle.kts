@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "divvywood"
-include(":engine", ":app")
+include(":engine", ":app", ":solver")

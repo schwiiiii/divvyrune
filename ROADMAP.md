@@ -9,9 +9,8 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
 
 ## Soon
 - [ ] **A level generator** (a developer tool) to grow the set from 20 to about 100, from simple to complex, with
-      more levels using several inputs. Players see them as ordinary numbered levels.
-- [ ] **A solver** that finds many solutions per level: their metrics fill the histograms on the result sheet (ready,
-      waiting for data), and the level generator builds on it.
+      more levels using several inputs. Players see them as ordinary numbered levels. Builds on the solver, which
+      proves each new level solvable.
 
 ## Later
 - [ ] **Share custom levels**: send a level made in the builder as a short code or link, and play levels others made.
