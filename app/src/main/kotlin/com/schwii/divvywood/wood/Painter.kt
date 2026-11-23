@@ -222,7 +222,14 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     }
 
     /** A clear glass marble with its shadow; [alpha] fades it as it drops into a cup. */
-    fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float = 1f) {
+    /** A block where marbles are being held up: a red wash, stronger the more often lately ([heat], 0–1). */
+    fun heatGlow(c: Canvas, x: Float, y: Float, z: Float, heat: Float) {
+        val h = z * 0.475f
+        fill.color = rgba(192, 84, 74, (0.12 + 0.45 * heat.coerceIn(0f, 1f)))
+        rect.set(x - h, y - h, x + h, y + h); c.drawRoundRect(rect, z * 0.07f, z * 0.07f, fill)
+    }
+
+    fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float = 1f, waiting: Boolean = false) {
         val a = (alpha * 255).toInt().coerceIn(0, 255)
         fill.color = rgba(50, 30, 15, 0.25); fill.alpha = (fill.alpha * alpha).toInt()
         rect.set(x + r * 0.25f - r * 0.95f, y + r * 0.45f - r * 0.55f, x + r * 0.25f + r * 0.95f, y + r * 0.45f + r * 0.55f); c.drawOval(rect, fill)
@@ -230,6 +237,8 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
             floatArrayOf(0.04f, 0.25f, 0.75f), Shader.TileMode.CLAMP))
         fill.alpha = a
         c.drawCircle(x, y, r, fill); fill.shader = null; fill.alpha = 255
+        // a marble that couldn't move on this tick wears a red rim
+        if (waiting) { stroke.color = rgba(192, 84, 74, 0.95); stroke.strokeWidth = max(1.5f, r * 0.3f); c.drawCircle(x, y, r * 1.08f, stroke) }
     }
 
     /** The belt being drawn: a soft stroke through cell centres, [color] red when it can't be placed. */

@@ -68,6 +68,12 @@ class BoardRenderer(
         val a = s.alpha
         fun at(i: Int, from: Int, to: Int, t: Float) = routePoint(s.screenX(nodes[i].cell.x), s.screenY(nodes[i].cell.y), z, from, to, t)
         val r = max(3f, z * 0.12f)
+        // where marbles have been held up lately: a red glow, and a red ring on convergers turning them away
+        nodes.forEachIndexed { i, n ->
+            val x = s.screenX(n.cell.x); val y = s.screenY(n.cell.y)
+            s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
+            s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(2f, z * 0.06f) * (0.4f + it)) }
+        }
         // marbles: the first half of a tick finishes the old cell's curve, the second half starts the new one
         sim.n.forEachIndexed { i, sn ->
             val it = sn.item ?: return@forEachIndexed
@@ -76,7 +82,7 @@ class BoardRenderer(
                 a < 0.5f -> at(it.pf, it.prevIn, s.sideTo(it.pf, i), 0.5f + a)
                 else -> at(i, it.curIn, s.exitSide(i), a - 0.5f)
             }
-            painter.marble(c, p[0], p[1], r)
+            painter.marble(c, p[0], p[1], r, waiting = sim.waiting[i])
         }
         for (g in sim.ghosts) {
             val p = if (a < 0.5f) at(g.from, g.item?.curIn ?: NONE, s.sideTo(g.from, g.to), 0.5f + a)

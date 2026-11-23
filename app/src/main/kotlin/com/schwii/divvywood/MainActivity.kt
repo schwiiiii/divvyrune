@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val density = LocalDensity.current.density
             val haptics = rememberHaptics()
-            val game = remember { Game(Saves(PrefsStore(this)), density, haptics) }
+            val game = remember { Game(Saves(PrefsStore(this)), density, haptics, dev = BuildConfig.DEV_TOOLS) }
             GameScreen(game)
         }
     }

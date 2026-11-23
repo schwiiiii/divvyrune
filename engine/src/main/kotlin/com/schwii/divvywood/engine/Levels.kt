@@ -42,8 +42,10 @@ val LEVELS = listOf(
     Level("Fifths by halves", 2, listOf(Frac(2, 5), Frac(3, 5)), 0, no3 = true),
     Level("Seventeenth", 2, listOf(Frac(1, 17)), 2),
     Level("Thirtieth", 2, listOf(Frac(1, 30)), 3),
-    Level("Sandbox", 2, listOf(null, null, null), 4, sandbox = true),
 )
+
+/** A free build with no targets: a dev tool, not one of the player's levels. */
+val SANDBOX = Level("Sandbox", 2, listOf(null, null, null), 4, sandbox = true)
 
 /** The name of the generated level; its target changes, so it is not in [LEVELS]. */
 const val RANDOM = "Random"

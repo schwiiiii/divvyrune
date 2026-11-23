@@ -311,3 +311,22 @@ class RandomLevelTest {
         assertEquals((3..RANDOM_MAX_D).toSet(), ds)
     }
 }
+
+class WaitTest {
+    @Test fun `a clean split never waits`() {
+        val s = Sim(buildGraph(decodeGrid("IR SL FL\n.. FT2 ..").tiles!!, levelNamed("Halves")), 2)
+        repeat(500) { s.step() }
+        assertEquals(0, s.waits.sum()); assertEquals(0, s.turnAways.sum())
+    }
+
+    @Test fun `a loop into a full-belt input holds marbles up at the converger`() {
+        val tiles = decodeGrid("IR CR SL SL FL\n.. RT TL FT2 ..").tiles!!
+        val g = buildGraph(tiles, levelNamed("Full belt"))
+        val s = Sim(g, 1)
+        repeat(500) { s.step() }
+        val merge = g.idx.getValue(Cell(1, 0))
+        assertTrue(s.turnAways[merge] > 0)
+        assertTrue(s.blocked > 0)
+        assertEquals(s.blocked, s.waits[g.nodes.indexOfFirst { it.kind == Kind.SRC }], "the input waits whenever it's held up")
+    }
+}

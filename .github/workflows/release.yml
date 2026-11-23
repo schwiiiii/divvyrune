@@ -83,7 +83,8 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/divvywood.jks"
           # a release builds from the source's own version, exactly as F-Droid does
-          if [ "$KIND" = dev ]; then export DIVVYWOOD_VERSION_NAME="$NAME" DIVVYWOOD_VERSION_CODE="$CODE"; fi
+          # playtest builds carry the dev tools (sandbox, random level); releases don't
+          if [ "$KIND" = dev ]; then export DIVVYWOOD_VERSION_NAME="$NAME" DIVVYWOOD_VERSION_CODE="$CODE" DIVVYWOOD_DEV_TOOLS=1; fi
           DIVVYWOOD_KEYSTORE="$RUNNER_TEMP/divvywood.jks" ./gradlew --no-daemon :app:assembleRelease
           rm -f "$RUNNER_TEMP/divvywood.jks"
           cp app/build/outputs/apk/release/app-release.apk "divvywood-$NAME.apk"

@@ -10,6 +10,7 @@ import com.schwii.divvywood.board.Haptic
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.RANDOM
+import com.schwii.divvywood.engine.SANDBOX
 import com.schwii.divvywood.engine.randomLevel
 import com.schwii.divvywood.engine.randomTarget
 import com.schwii.divvywood.engine.Score
@@ -32,14 +33,18 @@ sealed interface Sheet {
  * The game around the board: which level is open, its saved build and best scores, Check, the sheets and the hint.
  * Every change to the build is saved at once.
  */
-class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}) {
-    /** The random level, last in the list after the fixed [LEVELS]. */
-    var randomLevel by mutableStateOf(randomLevel(saves.randomTarget ?: randomTarget().also { saves.randomTarget = it })); private set
-    val levelCount get() = LEVELS.size + 1
-    val randomIndex get() = LEVELS.size
-    fun levelAt(i: Int): Level = if (i < LEVELS.size) LEVELS[i] else randomLevel
+class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}, val dev: Boolean = false) {
+    /** The player's levels; [dev] builds add the sandbox and the random level after them. */
+    private val fixed = if (dev) LEVELS + SANDBOX else LEVELS
+    var randomLevel by mutableStateOf(randomLevel(saves.randomTarget ?: randomTarget().also { if (dev) saves.randomTarget = it })); private set
+    val levelCount get() = fixed.size + if (dev) 1 else 0
+    /** The random level's index, or -1 when it isn't offered. */
+    val randomIndex get() = if (dev) fixed.size else -1
+    fun levelAt(i: Int): Level = if (i < fixed.size) fixed[i] else randomLevel
 
-    var levelIndex by mutableIntStateOf(if (saves.cur == RANDOM) LEVELS.size else LEVELS.indexOfFirst { it.name == saves.cur }.coerceAtLeast(0)); private set
+    var levelIndex by mutableIntStateOf(
+        if (dev && saves.cur == RANDOM) fixed.size else fixed.indexOfFirst { it.name == saves.cur }.coerceAtLeast(0),
+    ); private set
     val level: Level get() = levelAt(levelIndex)
 
     val board = BoardState(level, saves.build(level.name), density)
@@ -70,7 +75,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     /** Gives the random level a new target, keeping its build, and opens it. */
     fun newTarget() {
-        if (board.checking) return
+        if (board.checking || !dev) return
         val f = randomTarget(not = randomLevel.out[0])
         saves.randomTarget = f
         saves.clearResults(RANDOM)
