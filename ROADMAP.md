@@ -7,8 +7,19 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
 - [ ] **F-Droid**: submit the recipe in `fdroid/`; F-Droid ships the same signed APK, so copies from F-Droid and
       GitHub update each other.
 
+## Soon
+- [ ] **Several inputs and outputs**, each input at its own rate. Every rate is a share of a full belt: inputs that
+      come pre-split to decompose and recombine, or that add up to more than one belt can carry.
+- [ ] **About 20 levels** for 1.0, then a level generator (a developer tool) to grow the set to about 100, from simple
+      to complex. Players see them as ordinary numbered levels.
+- [ ] **Metrics with histograms**: pieces (cells besides the required inputs and outputs), footprint (the smallest
+      square around the build) and I/O layout (ports on the build's edge, inputs grouped, outputs grouped, inputs and
+      outputs on opposite sides). Each shows where your build sits among others, with averages; a solver supplies the
+      first baselines. Improving one metric can cost another.
+
 ## Later
-- [ ] **Several inputs at different rates**: targets given as rates or shares of the total input.
+- [ ] **Leaderboards** feeding the histograms with players' results. Needs a server and the network permission, so it
+      should stay optional.
 - [ ] **Coloured marbles**: each input its own colour, with outputs asking for colours in set ratios.
 - [ ] **Colour sorter block**, to go with coloured marbles.
 - [ ] **Levels sheet opens at the current level** instead of the top.

@@ -196,7 +196,7 @@ private fun ColumnScope.LevelsSheet(game: Game) {
     }
     Buttons {
         SheetButton("Build as text") { game.showText() }
-        SheetButton("New target") { game.newTarget() }
+        if (game.dev) SheetButton("New target") { game.newTarget() }
         SheetButton("Close") { game.closeSheet() }
     }
 }

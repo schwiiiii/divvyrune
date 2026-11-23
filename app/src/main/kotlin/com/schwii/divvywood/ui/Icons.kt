@@ -55,3 +55,9 @@ fun DrawScope.deleteIcon(c: Color) {
     }
     drawPath(p, c, style = line(2.2f))
 }
+
+/** Step: a play triangle against a bar, one tick forward. */
+fun DrawScope.stepIcon(c: Color) {
+    drawPath(Path().apply { moveTo(6f, 5f); lineTo(15f, 12f); lineTo(6f, 19f); close() }, c)
+    drawRect(c, Offset(16f, 5f), Size(3f, 14f))
+}

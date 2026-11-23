@@ -128,6 +128,7 @@ private fun Overlays(editor: Editor) {
     Box(Modifier.fillMaxSize()) {
         val banner = when {
             board.checking -> "Checking · tick ${board.sim.tick} / $CHECK_TICKS"
+            notice == null && !board.playing -> "Paused · tick ${board.sim.tick}"
             notice != null -> notice
             else -> null
         }
@@ -305,17 +306,18 @@ private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect,
 private fun Toolbar(game: Game) {
     val editor = game.editor
     val board = game.board
-    var playing by remember { mutableStateOf(board.playing) }
+    val playing = board.playing
     var speed by remember { androidx.compose.runtime.mutableIntStateOf(board.speed) }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Tool("Select", Modifier.weight(1f), on = editor.selectMode, icon = { selectIcon(it) }) { editor.switchSelectMode(!editor.selectMode) }
         Tool("Undo", Modifier.weight(1f), enabled = editor.canUndo && !board.checking, icon = { undoIcon(it) }) { editor.undo() }
         Tool(if (playing) "Pause" else "Play", Modifier.weight(1f), icon = { if (playing) pauseIcon(it) else playIcon(it) }) {
-            board.playing = !board.playing; playing = board.playing
+            board.playing = !board.playing
         }
-        Tool("Speed", Modifier.weight(1f), text = "×$speed") {
+        // paused, the speed button steps one tick at a time instead
+        if (playing || board.checking) Tool("Speed", Modifier.weight(1f), text = "×$speed") {
             board.speed = when (board.speed) { 1 -> 4; 4 -> 16; else -> 1 }; speed = board.speed
-        }
+        } else Tool("Step", Modifier.weight(1f), icon = { stepIcon(it) }) { board.stepOnce() }
         Tool("Check", Modifier.weight(1f), check = true, enabled = !board.checking, icon = { checkIcon(it) }) { game.startCheck() }
     }
 }

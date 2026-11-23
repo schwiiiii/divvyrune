@@ -5,8 +5,8 @@
 <p>Press <b>Check</b> and the exact flow through every block is worked out as fractions, then the build runs for 3000 ticks and the shares are measured. Solved? Chase fewer parts and a smaller footprint.</p>
 
 <ul>
-<li>17 levels, from halves to one thirtieth, plus a sandbox</li>
-<li>A random level with a new target whenever you like</li>
+<li>17 levels, from halves to one thirtieth</li>
+<li>See where marbles back up: waiting blocks glow red; pause and step one tick at a time</li>
 <li>Tap any block for its exact share and measured load</li>
 <li>Share builds as short text codes</li>
 <li>Touch controls: drag from a piece to draw a belt, tap it to rotate or delete it, drag it once selected to move it, Select for groups</li>

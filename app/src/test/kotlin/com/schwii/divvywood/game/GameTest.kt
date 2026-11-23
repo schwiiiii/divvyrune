@@ -132,12 +132,12 @@ class GameTest {
 
     @Test fun `the random level keeps its target and build across restarts and picks a new target on request`() {
         val store = MemoryStore()
-        val g = Game(Saves(store))
+        val g = Game(Saves(store), dev = true)
         g.loadLevel(g.randomIndex)
         val first = g.level.out[0]!!
         assertTrue(first in RANDOM_TARGETS)
         assertNull(g.buildFromText("IR SL FL\n.. OT .."))
-        val again = Game(Saves(store))
+        val again = Game(Saves(store), dev = true)
         assertEquals(RANDOM, again.level.name)
         assertEquals(first, again.level.out[0])
         assertEquals("IR SL FL\n.. OT ..", encodeGrid(again.board.tiles))
@@ -150,7 +150,7 @@ class GameTest {
     @Test fun `solving the random level offers a new target and its best resets with the target`() {
         val store = MemoryStore()
         Saves(store).randomTarget = Frac(1, 2)   // as if picked: the halves build solves it
-        val g = Game(Saves(store))
+        val g = Game(Saves(store), dev = true)
         g.loadLevel(g.randomIndex)
         g.buildFromText("IR SL FL\n.. OT ..")
         val r = check(g)
@@ -179,11 +179,24 @@ class GameTest {
     @Test fun `a new random target forgets the old target's results`() {
         val store = MemoryStore()
         Saves(store).randomTarget = Frac(1, 2)
-        val g = Game(Saves(store))
+        val g = Game(Saves(store), dev = true)
         g.loadLevel(g.randomIndex); g.buildFromText("IR SL FL\n.. OT .."); check(g)
         assertNotNull(g.saved(g.randomIndex).solution)
         g.newTarget()
         assertEquals(LevelSave(build = "IR SL FL\n.. OT .."), g.saved(g.randomIndex))
+    }
+
+    @Test fun `players get the puzzle levels, and the sandbox and random level are dev tools`() {
+        val store = MemoryStore("""{"level":"Sandbox"}""")
+        val g = Game(Saves(store))
+        assertEquals(LEVELS.size, g.levelCount)
+        assertEquals(-1, g.randomIndex)
+        assertEquals("a saved dev level opens the first level instead", 0, g.levelIndex)
+        assertTrue((0 until g.levelCount).none { g.levelAt(it).sandbox })
+        val dev = Game(Saves(MemoryStore()), dev = true)
+        assertEquals(LEVELS.size + 2, dev.levelCount)
+        assertTrue(dev.levelAt(LEVELS.size).sandbox)
+        assertEquals(RANDOM, dev.levelAt(dev.randomIndex).name)
     }
 
     @Test fun `level names are unique`() {

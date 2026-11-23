@@ -142,9 +142,20 @@ class GameScreenshotTest {
     @Test fun randomLevel() {
         val store = MemoryStore()
         Saves(store).randomTarget = com.schwii.divvywood.engine.Frac(5, 13)
-        val g = Game(Saves(store), density = 3f).apply { loadLevel(randomIndex); board.z = 64f * 3 }
+        val g = Game(Saves(store), density = 3f, dev = true).apply { loadLevel(randomIndex); board.z = 64f * 3 }
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.showLevels() }
         save("screen-random-levels")
+    }
+
+    @Test fun bottleneckWhilePaused() {
+        // a loop into the converger at the input: at full belt there's no room, so marbles wait and the input is held up
+        val g = gameFor(LEVELS.indexOf(levelNamed("Full belt")), "IR CR SL SL FL\n.. RT TL FT2 ..", 64f)
+        g.run(240)
+        g.board.playing = false
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.board.stepOnce(); repeat(30) { g.board.advance(16f) } }
+        compose.runOnIdle { g.editor.tapCell(Cell(1, 0)) }
+        save("screen-bottleneck")
     }
 }

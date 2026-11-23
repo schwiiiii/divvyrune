@@ -42,6 +42,13 @@ class Sim(g: Graph, val t: Int) {
     var skips = 0
     var lastBlock = -1_000_000_000
     var ghosts = listOf<Ghost>()
+    /** This tick: nodes whose marble wanted to move on but couldn't, and the input if it couldn't send. */
+    val waiting = BooleanArray(n.size)
+    /** This tick: convergers that turned away a marble headed their way (busy with another input, or full). */
+    val turnedAway = BooleanArray(n.size)
+    /** Ticks each node spent waiting, and each converger spent turning marbles away, since the start. */
+    val waits = IntArray(n.size)
+    val turnAways = IntArray(n.size)
     private var want = 0
     private var nextId = 1
 
@@ -141,6 +148,23 @@ class Sim(g: Graph, val t: Int) {
             }
         }
         ghosts = gh
+        noteWaits(tk)
+    }
+
+    private fun noteWaits(tk: Int) {
+        waiting.fill(false); turnedAway.fill(false)
+        n.forEachIndexed { i, s ->
+            val it = s.item ?: return@forEachIndexed
+            if (it.mt == tk || it.pf != i || s.succ.isEmpty()) return@forEachIndexed
+            waiting[i] = true; waits[i]++
+            val to = if (s.kind == Kind.SPLIT) s.succ[s.rr % s.succ.size] else s.succ[0]
+            if (n[to].kind == Kind.MERGE) turnedAway[to] = true
+        }
+        if (src >= 0 && lastBlock == tk) {   // the input couldn't send: it waits too
+            waiting[src] = true; waits[src]++
+            n[src].succ.firstOrNull()?.let { if (n[it].kind == Kind.MERGE) turnedAway[it] = true }
+        }
+        turnedAway.forEachIndexed { j, b -> if (b) turnAways[j]++ }
     }
 
     fun snap() = Snapshot(tick, emitted, blocked, skips, IntArray(n.size) { n[it].sunk })

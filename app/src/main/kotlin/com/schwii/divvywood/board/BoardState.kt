@@ -42,12 +42,18 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     var camVersion by mutableIntStateOf(0); private set
 
     /** Animation: ticks per second at speed 1, the speed multiplier, and how far between ticks this frame is. */
-    var playing = true
+    var playing by mutableStateOf(true)
     var speed = 1
     var alpha = 1f; private set
     private var acc = 0f
     /** Each flipper's current angle, easing toward the channel it points at next. */
     val flipperAngles = HashMap<Int, Float>()
+
+    /** How much each node has been holding marbles up lately (0–1, decaying), and each converger turning them away. */
+    var heat = FloatArray(0); private set
+    var turnHeat = FloatArray(0); private set
+    /** Milliseconds into the animation of a single step, while paused. */
+    private var stepMs = STEP_MS
 
     /** Node index of each final output A, B, C, or -1 when it isn't placed. */
     var outNode = IntArray(0); private set
@@ -81,6 +87,8 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
         acc = 0f
         outNode = IntArray(level.out.size) { id -> graph.nodes.indexOfFirst { it.kind == Kind.OUT && it.id == id } }
         hist = List(level.out.size) { ArrayDeque() }
+        heat = FloatArray(graph.nodes.size); turnHeat = FloatArray(graph.nodes.size)
+        stepMs = STEP_MS
     }
 
     fun startCheck() {
@@ -155,13 +163,29 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
             acc += dtMs.coerceAtMost(100f)
             while (acc >= tickMs) { acc -= tickMs; step(); if (sim.tick % 8 == 0) sampleHist() }
             alpha = acc / tickMs
+        } else if (stepMs < STEP_MS) {
+            stepMs += dtMs.coerceAtMost(100f)
+            alpha = (stepMs / STEP_MS).coerceAtMost(1f)
         }
+        frame++
+    }
+
+    /** While paused: one tick on, animated. */
+    fun stepOnce() {
+        if (checking || playing) return
+        step()
+        if (sim.tick % 8 == 0) sampleHist()
+        acc = 0f; stepMs = 0f; alpha = 0f
         frame++
     }
 
     /** One tick, then note the side each marble entered its cell from, so it can follow the right curve. */
     fun step() {
         sim.step()
+        for (i in heat.indices) {
+            heat[i] = heat[i] * 0.92f + if (sim.waiting[i]) 0.08f else 0f
+            turnHeat[i] = turnHeat[i] * 0.92f + if (sim.turnedAway[i]) 0.08f else 0f
+        }
         sim.n.forEachIndexed { i, sn ->
             val it = sn.item ?: return@forEachIndexed
             if (it.pf == i || it.at == i) return@forEachIndexed
@@ -207,5 +231,7 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     companion object {
         /** How many samples a sparkline holds. */
         const val HIST = 120
+        /** How long a single step takes to play out. */
+        const val STEP_MS = 280f
     }
 }
