@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.schwii.divvywood.board.BoardState
 import com.schwii.divvywood.engine.LETTERS
-import com.schwii.divvywood.engine.scoreOf
+import com.schwii.divvywood.engine.metricsOf
 import com.schwii.divvywood.game.Game
 import java.util.Locale
 
@@ -55,7 +55,7 @@ fun TopStrip(game: Game) {
     val board = game.board
     board.version   // parts and area follow the build
     val level = game.level
-    val sc = scoreOf(board.tiles)
+    val m = metricsOf(board.tiles)
     Column(
         Modifier.fillMaxWidth().background(Panel)
             .drawBehind { drawLine(Line, Offset(0f, size.height - 0.5f), Offset(size.width, size.height - 0.5f), 1.dp.toPx()) }
@@ -80,8 +80,8 @@ fun TopStrip(game: Game) {
                     style = Body, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                 )
             }
-            Stat("parts", sc.parts.toString())
-            Stat("area", if (sc.area > 0) "${sc.w}×${sc.h}" else "0")
+            Stat("pieces", m.pieces.toString())
+            Stat("footprint", if (m.side > 0) "${m.side}×${m.side}" else "0")
         }
         Readouts(board)
     }

@@ -68,17 +68,3 @@ fun check(g: Graph, level: Level): Verdict {
     for (t in 1..CHECK_TICKS) { s.step(); if (t == WARM_TICKS) w0 = s.snap() }
     return judge(g, level, sol, w0, s.snap())
 }
-
-class Score(val parts: Int, val belts: Int, val splits: Int, val merges: Int, val w: Int, val h: Int) {
-    val area get() = w * h
-}
-
-fun scoreOf(tiles: Map<Cell, Tile>): Score {
-    if (tiles.isEmpty()) return Score(0, 0, 0, 0, 0, 0)
-    val belts = tiles.values.count { it.kind == Kind.BELT }
-    val splits = tiles.values.count { it.kind == Kind.SPLIT }
-    val merges = tiles.values.count { it.kind == Kind.MERGE }
-    val xs = tiles.keys.map { it.x }
-    val ys = tiles.keys.map { it.y }
-    return Score(belts + splits + merges, belts, splits, merges, xs.max() - xs.min() + 1, ys.max() - ys.min() + 1)
-}

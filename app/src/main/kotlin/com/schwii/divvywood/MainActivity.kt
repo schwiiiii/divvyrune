@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
+import com.schwii.divvywood.game.Baselines
 import com.schwii.divvywood.game.Game
 import com.schwii.divvywood.game.PrefsStore
 import com.schwii.divvywood.game.Saves
@@ -20,7 +21,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val density = LocalDensity.current.density
             val haptics = rememberHaptics()
-            val game = remember { Game(Saves(PrefsStore(this)), density, haptics) }
+            val game = remember { Game(Saves(PrefsStore(this)), density, haptics, Baselines.load(this)) }
             GameScreen(game)
         }
     }

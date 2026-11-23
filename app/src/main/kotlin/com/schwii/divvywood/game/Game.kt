@@ -13,13 +13,13 @@ import com.schwii.divvywood.engine.toFrac
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.randomTarget
-import com.schwii.divvywood.engine.Score
+import com.schwii.divvywood.engine.Metrics
 import com.schwii.divvywood.engine.Snapshot
 import com.schwii.divvywood.engine.Verdict
 import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.fitsLevel
 import com.schwii.divvywood.engine.judge
-import com.schwii.divvywood.engine.scoreOf
+import com.schwii.divvywood.engine.metricsOf
 
 /** The sheet over the game, if any. */
 sealed interface Sheet {
@@ -27,7 +27,7 @@ sealed interface Sheet {
      * A Check's verdict with the build's score and the level's best (updated if this run solved it); [next] offers
      * the next level, [save] (in the builder, once solved) saving the design as a custom level.
      */
-    class Result(val verdict: Verdict, val score: Score, val best: Best?, val next: Boolean, val save: Boolean = false) : Sheet
+    class Result(val verdict: Verdict, val metrics: Metrics, val best: Best?, val next: Boolean, val save: Boolean = false) : Sheet
     data object Levels : Sheet
     data object Text : Sheet
     /** The builder's settings: input rate, targets, 3-way splits. */
@@ -39,7 +39,7 @@ sealed interface Sheet {
  * level builder. The levels are the numbered ones, then the player's custom levels, then the builder.
  * Every change to the build is saved at once.
  */
-class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}) {
+class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}, private val baselines: Baselines = Baselines()) {
     var customs by mutableStateOf(saves.custom); private set
     var draft by mutableStateOf(saves.draft); private set
     private val builderLevel get() = draft.toLevel(BUILDER)
@@ -82,6 +82,9 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     }
 
     fun best(i: Int) = saves.best(levelAt(i).name)
+
+    /** Many solutions' metrics for level [i], if the solver has measured it. */
+    fun baseline(i: Int): LevelBaseline? = baselines[levelAt(i).name]
 
     /** Everything saved for level [i]. */
     fun saved(i: Int) = saves.level(levelAt(i).name)
@@ -161,9 +164,9 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     private fun finishCheck(w0: Snapshot?, w1: Snapshot) = showResult(judge(board.graph, level, board.sol, w0, w1))
 
     private fun showResult(v: Verdict) {
-        val score = scoreOf(board.tiles)
-        val best = saves.recordCheck(level.name, score, v.solved)
-        sheet = Sheet.Result(v, score, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder)
+        val m = metricsOf(board.tiles)
+        val best = saves.recordCheck(level.name, m, v.solved)
+        sheet = Sheet.Result(v, m, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder)
     }
 
     // ---------- sheets ----------

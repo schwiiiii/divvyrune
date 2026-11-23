@@ -11,7 +11,9 @@ First release.
 - Every rate is a share of a full belt (one marble a tick): inputs, targets, readouts and Check all use it.
 - Walnut and maple blocks: belts, splitters, convergers and bypasses, as many as you like; loops allowed.
 - Check works out every block's exact share as a fraction, then runs the build for 3000 ticks and measures it.
-- Scores for parts and area, with each level's best kept.
+- Three metrics for every solve, each with its own best: pieces (every cell but inputs and outputs), footprint (the
+  smallest square around the machine) and I/O layout (0–100: ports open to the outside, inputs grouped, outputs
+  grouped, facing away from each other). Improving one can cost another.
 - Levels shown as numbered cards: solved ones outlined green with their solution, started ones with the build so far.
   The sheet opens at the level you're on.
 - Level builder: set up to three inputs' rates, up to three targets and whether 3-way splits are allowed (or let Surprise me

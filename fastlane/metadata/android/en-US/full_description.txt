@@ -2,7 +2,7 @@
 
 <p>Lay walnut and maple blocks on an open table. Belts carry marbles; <b>splitters</b> deal them out to up to three exits in strict turn; <b>convergers</b> join up to three lines into one. Each level asks for exact rates at its outputs, as shares of a full belt: a quarter, three sixteenths, one sixtieth. Loops are allowed, and they are how you reach fractions that halves and thirds alone can't.</p>
 
-<p>Press <b>Check</b> and the exact flow through every block is worked out as fractions, then the build runs for 3000 ticks and the shares are measured. Solved? Chase fewer parts and a smaller footprint.</p>
+<p>Press <b>Check</b> and the exact flow through every block is worked out as fractions, then the build runs for 3000 ticks and the shares are measured. Solved? Chase fewer pieces, a smaller footprint and a tidier layout of inputs and outputs: improving one can cost another.</p>
 
 <ul>
 <li>20 levels, from halves to one thirtieth, some with two inputs to split apart and recombine</li>

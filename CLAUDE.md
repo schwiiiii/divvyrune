@@ -7,8 +7,9 @@ Walnut and maple blocks on an open grid. Belts, splitters, convergers and bypass
 strict round robin) divide them evenly; convergers (one output on a marked side, up to 3 inputs, fair round robin)
 join them. The input, final outputs (F) and bypasses (O) each take or send on exactly one side. Every rate is a share of a full belt (1 marble/tick): a level has up to 3 inputs, each with its rate, and asks for
 exact target rates at up to 3 outputs; loops are allowed (they reach 1/5, 1/17, 1/30…). Check = exact rational solve
-plus a 3000-tick simulation measured after 600 ticks warm-up. Score: parts (belts + splitters + convergers) and
-footprint area (bounding box incl. I/O). A splitter treats an output as jammed only after 4 blocked ticks in a row
+plus a 3000-tick simulation measured after 600 ticks warm-up. Metrics (`Metrics.kt`): pieces (every cell but inputs/outputs), footprint side (smallest square around the machine,
+inputs/outputs aside), I/O layout 0–100 (40% ports with a clear line out from their open face, 30% inputs grouped and
+outputs+bypasses grouped, 30% inputs and outputs facing opposite ways). A splitter treats an output as jammed only after 4 blocked ticks in a row
 (JAM_TICKS), then skips it until it frees.
 
 ## Source of truth
@@ -22,8 +23,8 @@ https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 - `app/` — Compose app, minSdk 26, target/compile 36, no permissions.
   - `wood/` textures, `Painter` (android.graphics.Canvas), `Fonts` (Nunito for block labels)
   - `board/` `BoardState` (camera, frame clock, sim, Check run, sparkline history, wait heat, single step), `BoardRenderer`, `Board` composable, `Editor` (gesture state machine, undo), `Readout`
-  - `game/` `Game` (levels = numbered `LEVELS` + the player's custom levels + the level builder last; sheets, Check, builder draft / save / delete), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; per level: build, best = parts / smallest / largest area, solving build, last Check's score; custom levels = `LevelDef` (input rates, target rates; older `t`-based designs normalized on load) + proving solution, and the builder's draft)
-  - `ui/` `GameScreen`, `TopStrip` (readouts + sparklines), `Sheets` (result, level cards with build previews, build as text), `Builder` (builder settings sheet), `Theme`, `Icons`
+  - `game/` `Baselines` (`assets/baselines.json`: many solutions' metrics per level, for the histograms; shown from 5 solutions), `Game` (levels = numbered `LEVELS` + the player's custom levels + the level builder last; sheets, Check, builder draft / save / delete), `Saves` (SharedPreferences + kotlinx-serialization JSON, keyed by level name; per level: build, best = fewest pieces / smallest side / highest I/O (each on its own), solving build, last Check's metrics; custom levels = `LevelDef` (input rates, target rates; older `t`-based designs normalized on load) + proving solution, and the builder's draft)
+  - `ui/` `GameScreen`, `TopStrip` (readouts + sparklines), `Sheets` (result with metric blocks and histograms, level cards with build previews, build as text), `Histogram`, `Builder` (builder settings sheet), `Theme`, `Icons`
 - Font: `app/src/main/res/font/nunito.ttf` (variable, from github.com/googlefonts/nunito), OFL in `app/src/main/assets/licenses/`.
 
 ## Build

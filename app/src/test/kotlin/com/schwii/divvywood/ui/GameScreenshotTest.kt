@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import com.schwii.divvywood.game.Baselines
 import com.schwii.divvywood.game.Game
+import com.schwii.divvywood.game.LevelBaseline
 import com.schwii.divvywood.game.MemoryStore
 import com.schwii.divvywood.game.LevelDef
 import com.schwii.divvywood.game.Saves
@@ -100,7 +102,13 @@ class GameScreenshotTest {
     }
 
     @Test fun solvedResult() {
-        val g = gameFor(0, "IR SL FL\n.. FT2 ..", 64f)
+        // sample baselines, as the solver will provide, to show the histograms
+        val base = Baselines(mapOf("Halves" to LevelBaseline(
+            pieces = listOf(1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, 8),
+            side = listOf(1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5),
+            io = listOf(40, 55, 60, 70, 70, 75, 80, 85, 85, 90, 100),
+        )))
+        val g = Game(Saves(MemoryStore()), density = 3f, baselines = base).apply { buildFromText("IR SL FL\n.. FT2 .."); editor.dismissNotice(); board.z = 64f * 3 }
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.startCheck(); g.board.finishCheck() }
         save("screen-result-solved")
