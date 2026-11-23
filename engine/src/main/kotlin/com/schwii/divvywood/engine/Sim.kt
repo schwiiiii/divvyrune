@@ -244,5 +244,28 @@ fun findCycle(g: Graph, level: Level, maxTicks: Int = MAX_CYCLE_TICKS): Cycle? {
     return f.cycle
 }
 
+/**
+ * How freely marbles run, over one loop of the build: the share of marble-ticks spent waiting (a marble that can't
+ * move on, or an input that can't send). [score] is 100 when no marble ever waits, and drops with the share; any
+ * waiting at all keeps it below 100.
+ */
+class Flow(val waiting: Int, val marbleTicks: Int) {
+    val share get() = if (marbleTicks == 0) 0.0 else waiting.toDouble() / marbleTicks
+    val score get() = if (waiting == 0) 100 else minOf(99, (100 * (1 - share)).toInt())
+}
+
+/** [Flow] over one loop of [cycle], as found by [findCycle] for this build. */
+fun flowOf(g: Graph, level: Level, cycle: Cycle): Flow {
+    val s = Sim(g, level)
+    while (s.tick < cycle.start) s.step()
+    var waiting = 0; var marbles = 0
+    repeat(cycle.length) {
+        s.step()
+        s.n.forEachIndexed { i, nd -> if (nd.item != null) marbles++; if (s.waiting[i]) waiting++ }
+        marbles += s.srcs.count { s.waiting[it] }   // an input's held marble isn't on the board yet
+    }
+    return Flow(waiting, marbles)
+}
+
 private tailrec fun gcd(a: Long, b: Long): Long = if (b == 0L) a else gcd(b, a % b)
 private fun lcm(a: Long, b: Long) = a / gcd(a, b) * b

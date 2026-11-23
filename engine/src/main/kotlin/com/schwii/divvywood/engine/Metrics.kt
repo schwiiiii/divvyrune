@@ -4,17 +4,17 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * How a build measures up, three ways that pull against each other:
+ * How a build measures by its layout, ways that pull against each other (with [Flow], measured by running it):
  * - [pieces]: every cell but the inputs and outputs (belts, splitters, convergers, bypasses). Fewer is better.
- * - [side]: the side of the smallest square around the machine: every cell but the inputs and outputs. Smaller is
- *   better. [w] × [h] is the machine's own bounding box.
+ * - [area]: of the rectangle [w] × [h] around the machine: every cell but the inputs and outputs. Smaller is better,
+ *   so 3×5 beats 4×4.
  * - [io]: how easy the build is to slot into a bigger machine, 0–100. Higher is better. See [ioLayout].
  */
 class Metrics(
     val pieces: Int, val belts: Int, val splits: Int, val merges: Int, val bypasses: Int,
     val w: Int, val h: Int, val layout: IoLayout,
 ) {
-    val side get() = maxOf(w, h)
+    val area get() = w * h
     val io get() = layout.score
 }
 

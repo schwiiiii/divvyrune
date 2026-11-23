@@ -12,8 +12,9 @@ First release.
 - Walnut and maple blocks: belts, splitters, convergers and bypasses, as many as you like; loops allowed.
 - Check works out every block's exact share as a fraction, then runs the build for 3000 ticks and measures it.
 - Four metrics for every solve, each with its own best: pieces (every cell but inputs and outputs), footprint (the
-  smallest square around the machine), cycle (how many ticks until the whole board repeats) and I/O layout (0–100:
-  ports open to the outside, inputs grouped, outputs grouped, facing away from each other). Improving one can cost
+  area of the rectangle around the machine, so 3×5 beats 4×4), flow (100 when no marble ever waits; backups and
+  bottlenecks lower it, by how much time marbles spend stuck) and I/O layout (0–100: ports open to the outside,
+  inputs grouped, outputs grouped, facing away from each other). Improving one can cost
   another. Each metric's histogram compares your build with 100 solutions the solver found for the level.
 - The step counter counts through the machine's cycle (step 3 of 18) once it settles, instead of growing forever.
 - Levels shown as numbered cards: solved ones outlined green with their solution, started ones with the build so far.

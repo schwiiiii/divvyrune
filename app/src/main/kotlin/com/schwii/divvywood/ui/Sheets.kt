@@ -67,7 +67,6 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.LaunchedEffect
 import com.schwii.divvywood.engine.LETTERS
-import com.schwii.divvywood.engine.MAX_CYCLE_TICKS
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.Level
 import com.schwii.divvywood.engine.Tile
@@ -152,12 +151,16 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     val io = m.layout
     MetricBlock("Pieces", m.pieces.toString(), "${m.belts} belts · ${m.splits} split · ${m.merges} join · ${m.bypasses} bypass",
         best?.let { "best ${it.pieces}" }, base?.pieces, m.pieces)
-    MetricBlock("Footprint", if (m.side > 0) "${m.side}×${m.side}" else "–", "machine ${m.w}×${m.h}, inputs and outputs aside",
-        best?.let { "best ${it.side}×${it.side}" }, base?.side, m.side)
-    val c = r.cycle
-    MetricBlock("Cycle", c?.let { "${it.length} ticks" } ?: "–",
-        c?.let { "the board repeats every ${it.length} ticks, after settling for ${it.start}" } ?: "no repeat within $MAX_CYCLE_TICKS ticks",
-        best?.cycle?.takeIf { it > 0 }?.let { "best $it" }, base?.cycle, c?.length ?: 0)
+    MetricBlock("Footprint", if (m.area > 0) "${m.w}×${m.h}" else "–", "area ${m.area}: the machine's rectangle, inputs and outputs aside",
+        best?.let { "best area ${it.area}" }, base?.area, m.area)
+    val f = r.flow
+    MetricBlock("Flow", f?.score?.toString() ?: "–",
+        when {
+            f == null -> "the build doesn't run yet"
+            f.waiting == 0 -> "no marble ever waits"
+            else -> "marbles spend ${if (f.share < 0.01) "under 1%" else pct(f.share)} of their time waiting"
+        },
+        best?.flow?.takeIf { it >= 0 }?.let { "best $it" }, base?.flow, f?.score ?: 0)
     MetricBlock("I/O layout", "${m.io}", "${io.onEdge}/${io.ports} open to the outside · grouped ${pct(io.grouping)} · facing apart ${pct(io.opposition)}",
         best?.let { "best ${it.io}" }, base?.io, m.io)
     Buttons {
@@ -289,8 +292,8 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
         }
         val checked = saved.checked
         val (line1, line2) = when {
-            best != null && best.pieces >= 0 -> parts(best.pieces) to "${best.side}×${best.side} · I/O ${best.io}"
-            checked != null -> "✗ " + parts(checked.pieces) to "${checked.side}×${checked.side} · I/O ${checked.io}"
+            best != null && best.pieces >= 0 -> "${parts(best.pieces)} · area ${best.area}" to scores(best.flow, best.io)
+            checked != null -> "✗ ${parts(checked.pieces)} · area ${checked.area}" to scores(checked.flow, checked.io)
             else -> " " to " "
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -302,6 +305,7 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
 }
 
 private fun parts(n: Int) = if (n == 1) "1 piece" else "$n pieces"
+private fun scores(flow: Int, io: Int) = "flow ${if (flow >= 0) flow else "–"} · I/O $io"
 
 /** A still picture of [tiles] on the table, fitted into a [px]-pixel square. */
 private fun buildPreview(level: Level, tiles: Map<Cell, Tile>, px: Int, density: Float): Bitmap {
