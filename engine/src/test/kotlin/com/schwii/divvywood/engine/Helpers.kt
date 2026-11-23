@@ -126,6 +126,9 @@ val textRefs: Map<String, String> = mapOf(
     "Tenth" to ".. .. .. FB .. ..\nIR SL CR SL .. ..\n.. TB RT ST LB ..\n.. TB .. TB TB ..\n.. TR LR CR CR FL2",
     "Fifths by halves" to ".. RB SB LR CR FL2\nIR CR SL .. BT ..\n.. SR ST FL BT ..\n.. TR LR LR LT ..",
     "Thirtieth" to SKETCH_1_30,
+    "Two streams" to ".. .. FB\nIR CR SL\n.. IT2 FT2",
+    "Swap" to "IR CR FL ..\n.. SB CR FL2\n.. SB LT ..\n.. IT2 .. ..",
+    "Too much to merge" to ".. IB .. FB .. IB2 ..\nRB ST LR CT RL ST LB\nTB TB .. .. .. TB TB\nTB TR LR CB RL TL TB\nTB .. .. FT2 .. .. TB\nTR LR LR CB RL RL TL\n.. .. .. FT3 .. .. ..",
 )
 
 const val SKETCH_1_30 = "OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT .."

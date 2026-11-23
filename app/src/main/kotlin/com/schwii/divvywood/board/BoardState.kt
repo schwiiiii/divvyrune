@@ -76,13 +76,13 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
 
     fun rebuild() {
         graph = buildGraph(tiles, level)
-        sol = solve(graph)
+        sol = solve(graph, level)
         restartSim()
         version++
     }
 
     private fun restartSim() {
-        sim = Sim(graph, level.t)
+        sim = Sim(graph, level)
         flipperAngles.clear()
         acc = 0f
         outNode = IntArray(level.out.size) { id -> graph.nodes.indexOfFirst { it.kind == Kind.OUT && it.id == id } }
@@ -109,10 +109,10 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     fun finishCheck() { while (checking) checkStep(); frame++ }
 
     private fun sampleHist() {
-        if (sim.emitted == 0) return
+        if (sim.tick == 0) return
         hist.forEachIndexed { id, h ->
             val i = outNode[id]
-            h.addLast(if (i >= 0) sim.n[i].sunk.toFloat() / sim.emitted else 0f)
+            h.addLast(if (i >= 0) sim.n[i].sunk.toFloat() / sim.tick else 0f)
             if (h.size > HIST) h.removeFirst()
         }
     }
@@ -209,17 +209,26 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     /** The input has been blocked within the last 30 ticks. */
     val inputBlocked get() = sim.tick - sim.lastBlock < 30
 
-    /** Final output [id]'s measured share so far, or null before anything is measured. */
+    /** Input [k] has been held up within the last 30 ticks. */
+    fun inputBlocked(k: Int) = sim.tick - sim.lastBlockBy.getOrElse(k) { -1_000_000_000 } < 30
+
+    /** Input [k]'s measured rate so far (marbles per tick), or null before the first tick. */
+    fun inputRate(k: Int): Double? = if (sim.tick > 0) sim.emittedBy.getOrElse(k) { 0 }.toDouble() / sim.tick else null
+
+    /** Final output [id]'s measured rate so far (marbles per tick), or null before anything is measured. */
     fun measured(id: Int): Double? {
         val i = outNode.getOrElse(id) { -1 }
-        return if (i >= 0 && sim.emitted > 0) sim.n[i].sunk.toDouble() / sim.emitted else null
+        return if (i >= 0 && sim.tick > 0) sim.n[i].sunk.toDouble() / sim.tick else null
     }
 
     /** The label burned onto an input or output block. */
     fun labelOf(i: Int): String? {
         val n = graph.nodes[i]
         return when (n.kind) {
-            Kind.SRC -> "IN"
+            Kind.SRC -> {
+                val r = level.inputs.getOrNull(n.inputId)
+                level.inputLabel(n.inputId) + if (r != null && z >= 34f * density) " $r" else ""
+            }
             Kind.OUT -> {
                 val tg = level.out.getOrNull(n.id)
                 LETTERS[n.id] + if (tg != null && z >= 34f * density) " $tg" else ""

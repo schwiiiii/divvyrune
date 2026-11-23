@@ -45,7 +45,7 @@ class BrokenLayoutTest {
             path(0 to 0, 2 to 0); path(2 to 0, 2 to -2); path(2 to 0, 3 to 0)
         }
         val g = buildGraph(t, levelNamed("Halves"))
-        val v = judge(g, levelNamed("Halves"), solve(g))
+        val v = judge(g, levelNamed("Halves"), solve(g, levelNamed("Halves")))
         assertTrue(!v.solved && v.reasons.any { "fixing" in it }, v.reasons.toString())
     }
 
@@ -53,13 +53,13 @@ class BrokenLayoutTest {
         val g = Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
             link(s, m); link(m, a); link(a, A); link(a, B); link(a, m); g }
         val v = check(g, levelNamed("Full belt"))
-        assertTrue(!v.solved && v.reasons.any { "more than one item" in it }, v.reasons.toString())
+        assertTrue(!v.solved && v.reasons.any { "more than a full belt" in it }, v.reasons.toString())
     }
 
     @Test fun `closed loop is flagged`() {
         val g = Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); add(Kind.OUT, 0); add(Kind.OUT, 1)
             link(s, m); link(m, a); link(a, m); link(a, m); g }
-        val sol = solve(g)
+        val sol = solve(g, levelNamed("Halves"))
         assertTrue(!sol.ok && "no way out" in sol.why, sol.why)
     }
 
@@ -225,7 +225,7 @@ class TextCodeTest {
     @Test fun `bad text is reported with its row and cell`() {
         assertTrue("isn't a cell code" in decodeGrid("IR XX").error!!)
         assertTrue("same side" in decodeGrid("RR").error!!)
-        assertTrue("already a main input" in decodeGrid("IR IL").error!!)
+        assertTrue("same number" in decodeGrid("IR2 IL2").error!!)
         assertTrue("Row 2, cell 3" in decodeGrid("IR,SL/..,..,ZZ").error!!)
     }
 
@@ -328,5 +328,41 @@ class WaitTest {
         assertTrue(s.turnAways[merge] > 0)
         assertTrue(s.blocked > 0)
         assertEquals(s.blocked, s.waits[g.nodes.indexOfFirst { it.kind == Kind.SRC }], "the input waits whenever it's held up")
+    }
+}
+
+class MultiInputTest {
+    @Test fun `two inputs solve as rates and each is measured`() {
+        val level = levelNamed("Two streams")
+        val g = buildGraph(decodeGrid(textRefs.getValue("Two streams")).tiles!!, level)
+        val sol = solve(g, level)
+        val conv = g.nodes.indexOfFirst { it.kind == Kind.MERGE }
+        assertEquals(Q.of(3, 4), sol.flow[conv])
+        val s = Sim(g, level)
+        repeat(1200) { s.step() }
+        assertEquals(600, s.emittedBy[0])
+        assertTrue(s.emittedBy[1] in 299..300, "the slower input can be a marble behind at the converger")
+    }
+
+    @Test fun `a missing input is named, and inputs past the level's count don't fit`() {
+        val level = levelNamed("Two streams")
+        val g = buildGraph(decodeGrid("IR SL FL\n.. FT2 ..").tiles!!, level)
+        assertTrue("Place input 2." in judge(g, level, solve(g, level)).reasons)
+        assertEquals("This level has 1 input; the text uses 2.", fitsLevel(decodeGrid("IR FL\nIR2 FL2").tiles!!, levelNamed("Halves")))
+    }
+
+    @Test fun `numbered inputs round-trip through text`() {
+        val text = "IR CR SL\n.. IT2 FT2"
+        val d = decodeGrid(text)
+        assertEquals(setOf(0, 1), d.tiles!!.values.filter { it.kind == Kind.SRC }.map { it.id }.toSet())
+        assertEquals(text, encodeGrid(d.tiles!!))
+        assertEquals("Two inputs have the same number.", decodeGrid("IR2 IR2").error)
+    }
+
+    @Test fun `a rate of two thirds sends two marbles every three ticks`() {
+        val g = buildGraph(decodeGrid("IR FL").tiles!!, Level("r", listOf(Frac(2, 3)), listOf(null)))
+        val s = Sim(g, listOf(Frac(2, 3)))
+        repeat(300) { s.step() }
+        assertEquals(200, s.emittedBy[0])
     }
 }

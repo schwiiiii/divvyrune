@@ -257,11 +257,14 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     /** The unlimited pieces first (they are used most and must never scroll out of reach), then the input and outputs. */
     fun trayItems(): List<TrayItem> = buildList {
-        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.DUMP, 0)); add(TrayItem(Kind.SRC))
+        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.DUMP, 0))
+        board.level.inputs.indices.forEach { add(TrayItem(Kind.SRC, it)) }
         board.level.out.indices.forEach { add(TrayItem(Kind.OUT, it)) }
     }
 
-    fun isPlaced(item: TrayItem) = item.limited && tiles.values.any { it.kind == item.kind && (item.kind == Kind.SRC || it.id == item.id) }
+    fun isPlaced(item: TrayItem) = item.limited && tiles.values.any {
+        it.kind == item.kind && (if (it.kind == Kind.SRC) maxOf(it.id, 0) == maxOf(item.id, 0) else it.id == item.id)
+    }
 
     /** What a chip would put on the board at [c], facing the way it will be placed (a belt there lends its direction). */
     fun chipTile(item: TrayItem, c: Cell): Tile {
@@ -269,7 +272,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         return when (item.kind) {
             Kind.SPLIT -> Tile(Kind.SPLIT, inSide = belt?.from ?: inferDir(tiles, c, Kind.SPLIT))
             Kind.MERGE -> Tile(Kind.MERGE, out = belt?.out ?: inferDir(tiles, c, Kind.MERGE))
-            Kind.SRC -> Tile(Kind.SRC, out = belt?.out ?: inferDir(tiles, c, Kind.SRC))
+            Kind.SRC -> Tile(Kind.SRC, out = belt?.out ?: inferDir(tiles, c, Kind.SRC), id = maxOf(item.id, 0))
             else -> Tile(item.kind, id = item.id, inSide = belt?.from ?: inferDir(tiles, c, item.kind))
         }
     }
@@ -302,7 +305,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     fun chipLabel(item: TrayItem): String = when (item.kind) {
         Kind.SPLIT -> "splitter"
         Kind.MERGE -> "converger"
-        Kind.SRC -> "input"
+        Kind.SRC -> if (board.level.inputs.size == 1) "input" else "input ${item.id + 1}"
         Kind.OUT -> "output ${LETTERS[item.id]}"
         else -> "bypass"
     }

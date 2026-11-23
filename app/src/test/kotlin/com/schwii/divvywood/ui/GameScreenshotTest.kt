@@ -143,11 +143,11 @@ class GameScreenshotTest {
     @Test fun builderAndCustomLevels() {
         val store = MemoryStore()
         Game(Saves(store)).apply {
-            openBuilder(); updateDraft(LevelDef(2, listOf("1/2", "1/2"))); buildFromText("IR SL FL\n.. FT2 .."); startCheck(); board.finishCheck(); saveCustom()
+            openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/4", "1/4"))); buildFromText("IR SL FL\n.. FT2 .."); startCheck(); board.finishCheck(); saveCustom()
         }
         val g = Game(Saves(store), density = 3f).apply { board.z = 64f * 3 }
         compose.setContent { GameScreen(g, animate = false) }
-        compose.runOnIdle { g.updateDraft(LevelDef(3, listOf("1/5", "2/5"), no3 = true)); g.showBuilder() }
+        compose.runOnIdle { g.updateDraft(LevelDef(listOf("1/3", "1/4"), listOf("1/5", "2/5"), no3 = true)); g.showBuilder() }
         save("screen-builder")
         compose.runOnIdle { g.showLevels() }
         save("screen-custom-levels")
@@ -162,5 +162,12 @@ class GameScreenshotTest {
         compose.runOnIdle { g.board.stepOnce(); repeat(30) { g.board.advance(16f) } }
         compose.runOnIdle { g.editor.tapCell(Cell(1, 0)) }
         save("screen-bottleneck")
+    }
+
+    @Test fun twoInputs() {
+        val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), "IR CR FL ..\n.. SB CR FL2\n.. SB LT ..\n.. IT2 .. ..", 60f)
+        g.run(600)
+        compose.setContent { GameScreen(g, animate = false) }
+        save("screen-two-inputs")
     }
 }

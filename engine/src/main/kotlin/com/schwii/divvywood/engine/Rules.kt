@@ -28,7 +28,7 @@ enum class Kind { BELT, SPLIT, MERGE, SRC, OUT, DUMP }
  * - belt: fed from [from], feeds [out]
  * - splitter: input on [inSide], outputs on every other side
  * - converger: output on [out], inputs on every other side
- * - input (src): sends out of [out]
+ * - input (src): sends out of [out]; [id] numbers inputs IN1, IN2… (NONE reads as the first)
  * - output / bypass (dump): takes items on [inSide] only; [id] numbers outputs A, B, C and bypasses
  */
 data class Tile(

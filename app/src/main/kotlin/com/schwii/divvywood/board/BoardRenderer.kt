@@ -143,7 +143,7 @@ class BoardRenderer(
             c.saveLayerAlpha(null, (0.9f * 255).toInt())
             painter.blockShadow(c, x + z * 0.04f, y + z * 0.06f, z)
             painter.tile(c, x, y, z, e.chipTile(gh.item, gh.cell), emptyList(), emptyList(), 77,
-                label = if (gh.item.kind == com.schwii.divvywood.engine.Kind.SRC) "IN" else if (gh.item.kind == com.schwii.divvywood.engine.Kind.OUT) com.schwii.divvywood.engine.LETTERS[gh.item.id].toString() else null)
+                label = if (gh.item.kind == com.schwii.divvywood.engine.Kind.SRC) s.level.inputLabel(maxOf(gh.item.id, 0)) else if (gh.item.kind == com.schwii.divvywood.engine.Kind.OUT) com.schwii.divvywood.engine.LETTERS[gh.item.id].toString() else null)
             c.restore()
             painter.outline(c, x, y, z, if (fits) Palette.ink else Palette.bad, if (fits) outlineW else outlineW * 1.5f)
         }

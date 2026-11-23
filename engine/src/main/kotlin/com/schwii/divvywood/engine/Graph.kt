@@ -3,6 +3,8 @@ package com.schwii.divvywood.engine
 class Node(val cell: Cell, val tile: Tile) {
     val kind get() = tile.kind
     val id get() = tile.id
+    /** An input's number (an unnumbered input is the first). */
+    val inputId get() = if (tile.id >= 0) tile.id else 0
     val succ = mutableListOf<Int>()
     val pred = mutableListOf<Int>()
     val errs = mutableListOf<String>()

@@ -95,16 +95,19 @@ private fun Stat(label: String, value: String) {
     )
 }
 
-/** The input's rate and each output's measured share against its target, with a sparkline. Refreshed every 6 frames. */
+/**
+ * Each input's measured rate and each output's measured rate against its target, with a sparkline; every rate is a
+ * share of one full belt. Refreshed every 6 frames.
+ */
 @Composable
 private fun Readouts(board: BoardState) {
     val refresh by remember(board) { derivedStateOf { if (board.checking) board.frame else board.frame / 6 } }
     refresh
     board.version
     val level = board.level
-    val sim = board.sim
+    val top = level.totalInput.toDouble().toFloat().coerceAtLeast(0.01f)   // sparklines run up to everything the inputs send
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val n = 1 + level.out.size
+        val n = level.inputs.size + level.out.size
         val gap = 6.dp
         val fits = maxWidth >= MIN_CARD * n + gap * (n - 1)
         Row(
@@ -112,13 +115,15 @@ private fun Readouts(board: BoardState) {
             horizontalArrangement = Arrangement.spacedBy(gap),
         ) {
             val m = if (fits) Modifier.weight(1f) else Modifier.width(MIN_CARD)
-            ReadCard(
-                m,
-                tag = "IN", tagColor = Src,
-                value = f3(if (sim.tick > 0) sim.emitted.toDouble() / sim.tick else 0.0),
-                note = "items/tick · 1/${level.t}",
-                blocked = board.inputBlocked,
-            )
+            level.inputs.forEachIndexed { k, r ->
+                ReadCard(
+                    m,
+                    tag = level.inputLabel(k), tagColor = Src,
+                    value = f3(board.inputRate(k) ?: 0.0),
+                    note = "rate $r",
+                    blocked = board.inputBlocked(k),
+                )
+            }
             level.out.forEachIndexed { id, tg ->
                 ReadCard(
                     m,
@@ -127,6 +132,7 @@ private fun Readouts(board: BoardState) {
                     note = if (tg != null) "target $tg" else "free",
                     spark = board.hist.getOrNull(id)?.toList() ?: emptyList(),
                     target = tg?.let { it.n.toFloat() / it.d },
+                    top = top,
                 )
             }
         }
@@ -138,7 +144,7 @@ private val MIN_CARD: Dp = 84.dp
 @Composable
 private fun ReadCard(
     modifier: Modifier, tag: String, tagColor: Color, value: String, note: String,
-    blocked: Boolean = false, spark: List<Float>? = null, target: Float? = null,
+    blocked: Boolean = false, spark: List<Float>? = null, target: Float? = null, top: Float = 1f,
 ) {
     val shape = RoundedCornerShape(6.dp)
     Column(
@@ -152,16 +158,16 @@ private fun ReadCard(
                 Text(note, style = BodyTnum, color = Dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (spark != null) Sparkline(spark, target, Modifier.fillMaxWidth().padding(top = 2.dp).height(14.dp))
+        if (spark != null) Sparkline(spark, target, top, Modifier.fillMaxWidth().padding(top = 2.dp).height(14.dp))
     }
 }
 
-/** A measured share over time, against a faint line at its target. */
+/** A measured rate over time, against a faint line at its target, scaled so [top] reaches the card's top. */
 @Composable
-private fun Sparkline(values: List<Float>, target: Float?, modifier: Modifier) {
+private fun Sparkline(values: List<Float>, target: Float?, top: Float, modifier: Modifier) {
     Canvas(modifier) {
         val w = size.width; val h = size.height
-        fun yOf(v: Float) = h - 1 - v * (h - 2)
+        fun yOf(v: Float) = h - 1 - (v / top).coerceIn(0f, 1f) * (h - 2)
         if (target != null) drawLine(Line, Offset(0f, yOf(target)), Offset(w, yOf(target)), 1.dp.toPx())
         if (values.size > 1) {
             val p = Path()
