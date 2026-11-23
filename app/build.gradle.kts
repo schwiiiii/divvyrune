@@ -17,8 +17,6 @@ android {
         // CI's development builds of main pass the last release's values plus the commits since its tag (1.0.0.3).
         versionCode = System.getenv("DIVVYWOOD_VERSION_CODE")?.toInt() ?: 1_000_000
         versionName = System.getenv("DIVVYWOOD_VERSION_NAME") ?: "1.0.0"
-        // dev tools (the sandbox, the random level) are in debug builds and CI's playtest builds, never in releases
-        buildConfigField("boolean", "DEV_TOOLS", (System.getenv("DIVVYWOOD_DEV_TOOLS") == "1").toString())
     }
 
     // Release builds are signed only when CI provides the key; without it they build unsigned, as F-Droid expects.
@@ -33,7 +31,6 @@ android {
     }
 
     buildTypes {
-        debug { buildConfigField("boolean", "DEV_TOOLS", "true") }
         release {
             if (keystore != null) signingConfig = signingConfigs.getByName("release")
             // reproducible builds: no git commit baked into the APK, so any checkout of a tag builds the same bytes
@@ -47,7 +44,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true; buildConfig = true }
+    buildFeatures { compose = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
     // F-Droid builds from source; keep the APK free of Google's dependency metadata blob
     dependenciesInfo {

@@ -63,15 +63,23 @@ fun TopStrip(game: Game) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                buildAnnotatedString {
-                    withStyle(SpanStyle(color = Src)) { append(twoDigits(game.levelIndex)) }
-                    append(" ▾")
-                },
-                Modifier.weight(1f).heightIn(min = 36.dp).clickable { game.showLevels() }.padding(top = 9.dp)
-                    .semantics { contentDescription = "Levels" },
-                style = Body, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = Src)) { append(game.label(game.levelIndex)) }
+                        append(" ▾")
+                    },
+                    Modifier.heightIn(min = 36.dp).clickable { game.showLevels() }.padding(top = 9.dp, end = 4.dp)
+                        .semantics { contentDescription = "Levels" },
+                    style = Body, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                // in the builder: the level's settings
+                if (game.inBuilder) Text(
+                    "Settings", Modifier.heightIn(min = 36.dp).background(Raise, RoundedCornerShape(50)).clickable { game.showBuilder() }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = Body, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                )
+            }
             Stat("parts", sc.parts.toString())
             Stat("area", if (sc.area > 0) "${sc.w}×${sc.h}" else "0")
         }

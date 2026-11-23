@@ -32,7 +32,7 @@ fun judge(g: Graph, level: Level, sol: Solution, w0: Snapshot? = null, w1: Snaps
     val em = if (w1 != null && w0 != null) w1.emitted - w0.emitted else 0
     level.out.forEachIndexed { id, tg ->
         val i = n.indexOfFirst { it.kind == Kind.OUT && it.id == id }
-        if (i < 0) return@forEachIndexed   // an output without a target (sandbox) may stay in the tray
+        if (i < 0) return@forEachIndexed   // an output without a target may stay in the tray
         val exact = sol.flow[i]
         val target = tg?.q
         val measured = if (em > 0) (w1!!.sunk[i] - w0!!.sunk[i]).toDouble() / em else Double.NaN
@@ -49,7 +49,7 @@ fun judge(g: Graph, level: Level, sol: Solution, w0: Snapshot? = null, w1: Snaps
         val thr = em / nominal
         if (thr < 0.99) reasons += "The input backed up and sent only ${(thr * 100).roundToInt()}% of its items."
     }
-    return Verdict(!level.sandbox && reasons.isEmpty(), reasons, rows, if (w1 != null && w0 != null) w1.skips - w0.skips else 0)
+    return Verdict(reasons.isEmpty(), reasons, rows, if (w1 != null && w0 != null) w1.skips - w0.skips else 0)
 }
 
 /** Runs the full Check: exact solve plus CHECK_TICKS of simulation measured after WARM_TICKS. */

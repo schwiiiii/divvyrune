@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.core.content.edit
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Frac
+import com.schwii.divvywood.engine.Level
+import com.schwii.divvywood.engine.Q
 import com.schwii.divvywood.engine.Score
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.Tiles
@@ -32,16 +34,49 @@ import kotlinx.serialization.json.Json
 )
 
 /**
- * Everything saved: the name of the level last played and each level's save, by level name.
+ * A level a player designs in the builder: the input sends one marble every [t] ticks; [out] holds each final
+ * output's target as "p/q", a share of the input; [no3] turns 3-way splits off.
+ */
+@Serializable data class LevelDef(
+    val t: Int = 2,
+    val out: List<String> = listOf("1/2", "1/2"),
+    val no3: Boolean = false,
+) {
+    val targets: List<Frac> get() = out.mapNotNull { parseFrac(it) }
+    fun toLevel(name: String) = Level(name, t, targets, no3)
+
+    /** Why these targets can't be met, if they can't: together they can't ask for more than the input sends. */
+    fun problem(): String? {
+        val sum = targets.fold(Q.ZERO) { a, f -> a + f.q }
+        return if (sum > Q.ONE) "The targets add up to $sum, more than the input sends." else null
+    }
+}
+
+fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNull() }
+    .takeIf { it.size == 2 && it[1] > 0 && it[0] > 0 && it[0] <= it[1] }?.let { Frac(it[0], it[1]) }
+
+/** A saved custom level: its definition and the build that proved it solvable. */
+@Serializable data class CustomLevel(val id: Int, val def: LevelDef, val solution: String) {
+    val name get() = "custom-$id"
+}
+
+/**
+ * Everything saved: the name of the level last played and each level's save, by level name; the player's custom
+ * levels and the builder's draft definition (the builder's build is saved like any level's, under [BUILDER]).
+ * Saves from 0.1.x keyed levels by their index in the first 12-level list and kept the current one in [cur].
  * Saves from 0.1.x keyed levels by their index in the first 12-level list and kept the current one in [cur].
  */
 @Serializable data class SaveData(
     val level: String? = null,
     val levels: Map<String, LevelSave> = emptyMap(),
     val cur: Int = 0,
-    /** The random level's target, as "p/q". */
-    val random: String? = null,
+    val custom: List<CustomLevel> = emptyList(),
+    val nextCustom: Int = 1,
+    val draft: LevelDef = LevelDef(),
 )
+
+/** The save name of the level builder. */
+const val BUILDER = "builder"
 
 /** The level order of saves that keyed levels by index. */
 private val V1_ORDER = listOf(
@@ -103,14 +138,29 @@ class Saves(private val store: SaveStore) {
         return nl.best
     }
 
-    /** The random level's current target, if one was picked. */
-    var randomTarget: Frac?
-        get() = data.random?.split('/')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 && it[1] > 0 }?.let { Frac(it[0], it[1]) }
-        set(v) { put(data.copy(random = v?.toString())) }
-
-    /** Forgets the named level's results, keeping its build (the random level's, when its target changes). */
+    /** Forgets the named level's results, keeping its build (the builder's, when its definition changes). */
     fun clearResults(name: String) {
         data.levels[name]?.let { put(data.copy(levels = data.levels + (name to it.copy(best = null, solution = null, checked = null)))) }
+    }
+
+    /** The builder's draft definition. */
+    var draft: LevelDef
+        get() = data.draft
+        set(v) { put(data.copy(draft = v)) }
+
+    val custom: List<CustomLevel> get() = data.custom
+
+    /** Saves [def] as a custom level, proved by [solution]; returns it. */
+    fun addCustom(def: LevelDef, solution: String): CustomLevel {
+        val c = CustomLevel(data.nextCustom, def, solution)
+        put(data.copy(custom = data.custom + c, nextCustom = data.nextCustom + 1))
+        return c
+    }
+
+    /** Deletes a custom level with everything saved for it. */
+    fun deleteCustom(id: Int) {
+        val c = data.custom.firstOrNull { it.id == id } ?: return
+        put(data.copy(custom = data.custom - c, levels = data.levels - c.name))
     }
 
     /** The named level's saved build; empty when there is none or it no longer decodes. */

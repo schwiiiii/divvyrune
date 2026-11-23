@@ -4,7 +4,6 @@ import com.schwii.divvywood.board.TrayItem
 import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.Frac
 import com.schwii.divvywood.engine.LEVELS
-import com.schwii.divvywood.engine.RANDOM
 import com.schwii.divvywood.engine.RANDOM_TARGETS
 import com.schwii.divvywood.engine.levelNamed
 import com.schwii.divvywood.engine.encodeGrid
@@ -110,7 +109,7 @@ class GameTest {
         g.loadLevel(LEVELS.indexOf(levelNamed("Seventh")))   // one output, one bypass
         assertEquals("This level has 1 final output; the text uses 2.", g.buildFromText(halves))
         assertTrue(g.board.tiles.isEmpty())
-        assertNull(g.buildFromText("IR SL FL\n.. OT .."))
+        assertNull("bypasses are unlimited", g.buildFromText("IR SL FL\n.. OT .."))
         assertEquals("Built from text", g.editor.notice)
         g.editor.undo()
         assertTrue(g.board.tiles.isEmpty())
@@ -130,37 +129,6 @@ class GameTest {
         assertEquals("Halves", Saves(store).cur)
     }
 
-    @Test fun `the random level keeps its target and build across restarts and picks a new target on request`() {
-        val store = MemoryStore()
-        val g = Game(Saves(store), dev = true)
-        g.loadLevel(g.randomIndex)
-        val first = g.level.out[0]!!
-        assertTrue(first in RANDOM_TARGETS)
-        assertNull(g.buildFromText("IR SL FL\n.. OT .."))
-        val again = Game(Saves(store), dev = true)
-        assertEquals(RANDOM, again.level.name)
-        assertEquals(first, again.level.out[0])
-        assertEquals("IR SL FL\n.. OT ..", encodeGrid(again.board.tiles))
-        again.newTarget()
-        assertTrue(again.level.out[0] != first)
-        assertEquals("IR SL FL\n.. OT ..", encodeGrid(again.board.tiles))
-        assertEquals(again.level.out[0], Saves(store).randomTarget)
-    }
-
-    @Test fun `solving the random level offers a new target and its best resets with the target`() {
-        val store = MemoryStore()
-        Saves(store).randomTarget = Frac(1, 2)   // as if picked: the halves build solves it
-        val g = Game(Saves(store), dev = true)
-        g.loadLevel(g.randomIndex)
-        g.buildFromText("IR SL FL\n.. OT ..")
-        val r = check(g)
-        assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
-        assertFalse(r.next)
-        assertEquals(Best(1, 6, 6), g.best(g.randomIndex))
-        g.newTarget()
-        assertNull(g.best(g.randomIndex))
-    }
-
     @Test fun `a Check records the score, and a solve records the solving build`() {
         val store = MemoryStore()
         val g = Game(Saves(store))
@@ -176,27 +144,61 @@ class GameTest {
         assertEquals(Checked(1, 3, 2, solved = true), Saves(store).level("Halves").checked)
     }
 
-    @Test fun `a new random target forgets the old target's results`() {
+    @Test fun `a builder design can only be saved once its build passes Check`() {
         val store = MemoryStore()
-        Saves(store).randomTarget = Frac(1, 2)
-        val g = Game(Saves(store), dev = true)
-        g.loadLevel(g.randomIndex); g.buildFromText("IR SL FL\n.. OT .."); check(g)
-        assertNotNull(g.saved(g.randomIndex).solution)
-        g.newTarget()
-        assertEquals(LevelSave(build = "IR SL FL\n.. OT .."), g.saved(g.randomIndex))
+        val g = Game(Saves(store))
+        g.openBuilder()
+        assertTrue(g.inBuilder)
+        g.updateDraft(LevelDef(t = 2, out = listOf("1/2", "1/2")))
+        assertNull("nothing to save before a pass", g.saveCustom())
+        g.buildFromText("IR SL FL\n.. FT2 ..")
+        val r = check(g)
+        assertTrue(r.verdict.reasons.toString(), r.save)
+        val c = g.saveCustom()!!
+        assertEquals(LevelDef(2, listOf("1/2", "1/2")), c.def)
+        assertEquals("IR SL FL\n.. FT2 ..", c.solution)
+        assertEquals("Saved as C1", g.editor.notice)
+        assertEquals(LEVELS.size + 1, g.levelCount)
+        assertTrue("the builder is still open", g.inBuilder)
+        assertEquals("C1", g.label(LEVELS.size))
+        // the custom level plays like any other, from an empty board, and survives a restart
+        val again = Game(Saves(store))
+        again.loadLevel(LEVELS.size)
+        assertTrue(again.board.tiles.isEmpty())
+        assertEquals(listOf(Frac(1, 2), Frac(1, 2)), again.level.out)
     }
 
-    @Test fun `players get the puzzle levels, and the sandbox and random level are dev tools`() {
-        val store = MemoryStore("""{"level":"Sandbox"}""")
+    @Test fun `changing the design drops the pass and outputs it no longer has`() {
+        val g = Game(Saves(MemoryStore()))
+        g.openBuilder()
+        g.updateDraft(LevelDef(t = 2, out = listOf("1/2", "1/2")))
+        g.buildFromText("IR SL FL\n.. FT2 .."); check(g)
+        g.updateDraft(LevelDef(t = 2, out = listOf("1/2")))
+        assertNull(g.saveCustom())
+        assertEquals("output B left the board with its target", 3, g.board.tiles.size)
+        assertEquals("The targets add up to 5/4, more than the input sends.", LevelDef(2, listOf("1/2", "3/4")).problem())
+        assertNull(LevelDef(2, listOf("1/3")).problem())
+    }
+
+    @Test fun `deleting a custom level removes it and its saves`() {
+        val store = MemoryStore()
         val g = Game(Saves(store))
+        g.openBuilder(); g.updateDraft(LevelDef(2, listOf("1/2", "1/2")))
+        g.buildFromText("IR SL FL\n.. FT2 .."); check(g); g.saveCustom()
+        g.loadLevel(LEVELS.size); g.buildFromText("IR")
+        g.deleteCustom(LEVELS.size)
         assertEquals(LEVELS.size, g.levelCount)
-        assertEquals(-1, g.randomIndex)
-        assertEquals("a saved dev level opens the first level instead", 0, g.levelIndex)
-        assertTrue((0 until g.levelCount).none { g.levelAt(it).sandbox })
-        val dev = Game(Saves(MemoryStore()), dev = true)
-        assertEquals(LEVELS.size + 2, dev.levelCount)
-        assertTrue(dev.levelAt(LEVELS.size).sandbox)
-        assertEquals(RANDOM, dev.levelAt(dev.randomIndex).name)
+        assertEquals(0, g.levelIndex)
+        assertTrue(Saves(store).custom.isEmpty())
+        assertNull(Saves(store).data.levels["custom-1"])
+    }
+
+    @Test fun `surprise me picks a target the builder can always meet`() {
+        val g = Game(Saves(MemoryStore()))
+        g.openBuilder(); g.surpriseMe()
+        assertEquals(1, g.draft.out.size)
+        assertTrue(g.draft.targets.single() in RANDOM_TARGETS)
+        assertNull(g.draft.problem())
     }
 
     @Test fun `level names are unique`() {

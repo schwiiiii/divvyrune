@@ -23,9 +23,9 @@ import kotlin.math.sign
 
 enum class Haptic { PICK, DROP, CONFIRM }
 
-/** Something in the tray: a splitter or converger (unlimited), or the level's input, outputs and bypasses (one each). */
+/** Something in the tray: a splitter, converger or bypass (unlimited), or the level's input and outputs (one each). */
 data class TrayItem(val kind: Kind, val id: Int = -1) {
-    val limited get() = kind == Kind.SRC || kind == Kind.OUT || kind == Kind.DUMP
+    val limited get() = kind == Kind.SRC || kind == Kind.OUT
 }
 
 /** Selected pieces being dragged, shifted by (dx, dy) cells from where they sit. */
@@ -255,11 +255,10 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     // ---------- tray ----------
 
-    /** Splitters and convergers first: they are used most and must never scroll out of reach. */
+    /** The unlimited pieces first (they are used most and must never scroll out of reach), then the input and outputs. */
     fun trayItems(): List<TrayItem> = buildList {
-        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.SRC))
+        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.DUMP, 0)); add(TrayItem(Kind.SRC))
         board.level.out.indices.forEach { add(TrayItem(Kind.OUT, it)) }
-        repeat(board.level.dump) { add(TrayItem(Kind.DUMP, it)) }
     }
 
     fun isPlaced(item: TrayItem) = item.limited && tiles.values.any { it.kind == item.kind && (item.kind == Kind.SRC || it.id == item.id) }

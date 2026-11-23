@@ -59,7 +59,7 @@ class StoreAssets {
     /** The logo build on the board as the game draws it, [cell] pixels a cell, centred in [w] × [h], marbles rolling. */
     private fun board(w: Int, h: Int, cell: Float, dx: Float = 0f): Bitmap {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val level = com.schwii.divvywood.engine.Level("logo", 2, listOf(null, null, null), 0)
+        val level = com.schwii.divvywood.engine.Level("logo", 2, listOf(null, null, null))
         val state = BoardState(level, decodeGrid(logo).tiles!!, 1f).apply { z = cell }
         state.fit(w.toFloat(), h.toFloat())
         state.ox += dx
