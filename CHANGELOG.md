@@ -14,7 +14,7 @@ First release.
 - Four metrics for every solve, each with its own best: pieces (every cell but inputs and outputs), footprint (the
   smallest square around the machine), cycle (how many ticks until the whole board repeats) and I/O layout (0–100:
   ports open to the outside, inputs grouped, outputs grouped, facing away from each other). Improving one can cost
-  another.
+  another. Each metric's histogram compares your build with 100 solutions the solver found for the level.
 - The step counter counts through the machine's cycle (step 3 of 18) once it settles, instead of growing forever.
 - Levels shown as numbered cards: solved ones outlined green with their solution, started ones with the build so far.
   The sheet opens at the level you're on.
