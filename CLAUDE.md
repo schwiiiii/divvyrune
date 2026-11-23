@@ -9,7 +9,9 @@ join them. The input, final outputs (F) and bypasses (O) each take or send on ex
 exact target rates at up to 3 outputs; loops are allowed (they reach 1/5, 1/17, 1/30…). Check = exact rational solve
 plus a 3000-tick simulation measured after 600 ticks warm-up. Metrics (`Metrics.kt`): pieces (every cell but inputs/outputs), footprint side (smallest square around the machine,
 inputs/outputs aside), I/O layout 0–100 (40% ports with a clear line out from their open face, 30% inputs grouped and
-outputs+bypasses grouped, 30% inputs and outputs facing opposite ways). A splitter treats an output as jammed only after 4 blocked ticks in a row
+outputs+bypasses grouped, 30% inputs and outputs facing opposite ways); cycle (`Sim.kt`: `CycleFinder` fingerprints the board state each tick
+— marbles' cells, splitter/converger turns, jam counts capped at JAM_TICKS, inputs' pending marbles, schedule phase —
+and the first repeat gives settling `start` and loop `length`; over one loop, output counts are exact rates). A splitter treats an output as jammed only after 4 blocked ticks in a row
 (JAM_TICKS), then skips it until it frees.
 
 ## Source of truth

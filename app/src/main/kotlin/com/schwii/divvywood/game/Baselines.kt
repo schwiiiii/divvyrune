@@ -5,7 +5,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /** Many solutions' metrics for one level: the histograms a player's build is shown against. */
-@Serializable data class LevelBaseline(val pieces: List<Int> = emptyList(), val side: List<Int> = emptyList(), val io: List<Int> = emptyList())
+@Serializable data class LevelBaseline(
+    val pieces: List<Int> = emptyList(),
+    val side: List<Int> = emptyList(),
+    val io: List<Int> = emptyList(),
+    val cycle: List<Int> = emptyList(),
+)
 
 /** Baselines by level name, from `assets/baselines.json` (written by the solver). */
 class Baselines(val levels: Map<String, LevelBaseline> = emptyMap()) {

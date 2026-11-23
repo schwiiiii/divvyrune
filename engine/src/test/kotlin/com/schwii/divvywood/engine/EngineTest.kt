@@ -396,3 +396,40 @@ class MetricsTest {
         assertEquals(2, m("IR LR LB\n.. FR TL").layout.onEdge, "a clear line out counts even inside the bounding box")
     }
 }
+
+class CycleTest {
+    private fun cycleOf(level: String, text: String) = findCycle(buildGraph(decodeGrid(text).tiles!!, levelNamed(level)), levelNamed(level))
+
+    @Test fun `halves repeats every four ticks`() {
+        // a marble every other tick, the splitter alternating: two marbles, four ticks, then all again
+        assertEquals(4, cycleOf("Halves", "IR SL FL\n.. FT2 ..")!!.length)
+    }
+
+    @Test fun `every level's reference solution settles into a loop`() {
+        for ((name, text) in textRefs) {
+            val c = cycleOf(name, text)
+            assertNotNull(c, name)
+            assertTrue(c!!.length in 1..MAX_CYCLE_TICKS, "$name: $c")
+        }
+    }
+
+    @Test fun `steps count from the start of the loop`() {
+        val c = Cycle(start = 10, length = 4)
+        assertNull(c.step(9)); assertEquals(1, c.step(10)); assertEquals(4, c.step(13)); assertEquals(1, c.step(14))
+    }
+
+    @Test fun `the loop's output counts are exact`() {
+        // over one loop the marbles counted at each output give its rate exactly
+        val level = levelNamed("One two four")
+        val g = buildGraph(decodeGrid(textRefs.getValue("One two four")).tiles!!, level)
+        val c = findCycle(g, level)!!
+        val s = Sim(g, level)
+        repeat(c.start) { s.step() }
+        val before = s.snap()
+        repeat(c.length) { s.step() }
+        val after = s.snap()
+        val outs = g.nodes.indices.filter { g.nodes[it].kind == Kind.OUT }.sortedBy { g.nodes[it].id }
+        val rates = outs.map { Q.of((after.sunk[it] - before.sunk[it]).toLong(), c.length.toLong()) }
+        assertEquals(level.out.map { it!!.q }, rates)
+    }
+}

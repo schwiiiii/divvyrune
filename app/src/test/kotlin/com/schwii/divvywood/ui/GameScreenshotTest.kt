@@ -107,11 +107,14 @@ class GameScreenshotTest {
             pieces = listOf(1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5, 6, 8),
             side = listOf(1, 2, 2, 2, 3, 3, 3, 3, 4, 4, 5),
             io = listOf(40, 55, 60, 70, 70, 75, 80, 85, 85, 90, 100),
+            cycle = listOf(4, 4, 4, 4, 8, 8, 8, 12, 16, 24),
         )))
         val g = Game(Saves(MemoryStore()), density = 3f, baselines = base).apply { buildFromText("IR SL FL\n.. FT2 .."); editor.dismissNotice(); board.z = 64f * 3 }
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.startCheck(); g.board.finishCheck() }
         save("screen-result-solved")
+        compose.runOnIdle { g.closeSheet(); g.board.playing = false; repeat(13) { g.board.step() } }
+        save("screen-paused-step")
     }
 
     @Test fun notYetResult() {

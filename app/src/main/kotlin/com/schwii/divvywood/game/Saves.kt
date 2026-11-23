@@ -19,12 +19,17 @@ import kotlinx.serialization.json.Json
  * A level's best solves, each metric on its own (they can come from different builds): fewest [pieces], smallest
  * footprint [side], highest [io] layout score. Saves from before these metrics hold -1 until migrated.
  */
-@Serializable data class Best(val pieces: Int = -1, val side: Int = -1, val io: Int = -1) {
-    fun with(m: Metrics) = if (pieces < 0) Best(m.pieces, m.side, m.io) else Best(minOf(pieces, m.pieces), minOf(side, m.side), maxOf(io, m.io))
+@Serializable data class Best(val pieces: Int = -1, val side: Int = -1, val io: Int = -1, val cycle: Int = -1) {
+    fun with(m: Metrics, c: Int?) = Best(
+        if (pieces < 0) m.pieces else minOf(pieces, m.pieces),
+        if (side < 0) m.side else minOf(side, m.side),
+        if (pieces < 0) m.io else maxOf(io, m.io),
+        when { c == null -> cycle; cycle < 0 -> c; else -> minOf(cycle, c) },
+    )
 }
 
 /** The build's metrics at its last Check, solved or not. */
-@Serializable data class Checked(val pieces: Int = -1, val side: Int = -1, val io: Int = -1, val solved: Boolean = false)
+@Serializable data class Checked(val pieces: Int = -1, val side: Int = -1, val io: Int = -1, val solved: Boolean = false, val cycle: Int = -1)
 
 /**
  * A level's build, as its text code; its best scores and the build that last solved it, once solved; and the
@@ -108,7 +113,7 @@ private fun migrate(d: SaveData): SaveData = migrateIndex(d).let { m ->
  * solving build (or, without one, its current build); an older last-Check score is dropped.
  */
 private fun migrateMetrics(l: LevelSave): LevelSave {
-    val best = l.best?.takeIf { it.pieces < 0 }?.let { (l.solution ?: l.build).let { code -> Best().with(metricsOf(decodeGrid(code).tiles ?: linkedMapOf())) } } ?: l.best
+    val best = l.best?.takeIf { it.pieces < 0 }?.let { (l.solution ?: l.build).let { code -> Best().with(metricsOf(decodeGrid(code).tiles ?: linkedMapOf()), null) } } ?: l.best
     val checked = l.checked?.takeIf { it.pieces >= 0 }
     return if (best === l.best && checked === l.checked) l else l.copy(best = best, checked = checked)
 }
@@ -154,10 +159,10 @@ class Saves(private val store: SaveStore) {
     fun level(name: String): LevelSave = data.levels[name] ?: LevelSave()
 
     /** Records a Check of the named level's current build; returns the level's best afterwards. */
-    fun recordCheck(name: String, m: Metrics, solved: Boolean): Best? {
+    fun recordCheck(name: String, m: Metrics, cycle: Int?, solved: Boolean): Best? {
         val l = level(name)
-        val checked = Checked(m.pieces, m.side, m.io, solved)
-        val nl = if (!solved) l.copy(checked = checked) else l.copy(best = (l.best ?: Best()).with(m), solution = l.build, checked = checked)
+        val checked = Checked(m.pieces, m.side, m.io, solved, cycle ?: -1)
+        val nl = if (!solved) l.copy(checked = checked) else l.copy(best = (l.best ?: Best()).with(m, cycle), solution = l.build, checked = checked)
         put(data.copy(levels = data.levels + (name to nl)))
         return nl.best
     }

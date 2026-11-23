@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.schwii.divvywood.engine.CHECK_TICKS
 import com.schwii.divvywood.engine.Cell
+import com.schwii.divvywood.engine.CycleFinder
 import com.schwii.divvywood.engine.Graph
 import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.LETTERS
@@ -81,8 +82,12 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
         version++
     }
 
+    /** Watches the live simulation for its loop, so steps can be counted from the loop's start. */
+    lateinit var cycles: CycleFinder; private set
+
     private fun restartSim() {
         sim = Sim(graph, level)
+        cycles = CycleFinder(sim).also { it.observe() }
         flipperAngles.clear()
         acc = 0f
         outNode = IntArray(level.out.size) { id -> graph.nodes.indexOfFirst { it.kind == Kind.OUT && it.id == id } }
@@ -182,6 +187,7 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     /** One tick, then note the side each marble entered its cell from, so it can follow the right curve. */
     fun step() {
         sim.step()
+        cycles.observe()
         for (i in heat.indices) {
             heat[i] = heat[i] * 0.92f + if (sim.waiting[i]) 0.08f else 0f
             turnHeat[i] = turnHeat[i] * 0.92f + if (sim.turnedAway[i]) 0.08f else 0f
@@ -205,6 +211,13 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     }
 
     fun isOverloaded(i: Int) = overloaded(graph, sol, level, i)
+
+    /** The live step as players read it: "step 3 of 18" once the loop has shown, the tick until then. */
+    fun stepLabel(): String {
+        val c = cycles.cycle ?: return "tick ${sim.tick}"
+        val k = c.step(sim.tick) ?: return "tick ${sim.tick}"
+        return "step $k of ${c.length}"
+    }
 
     /** The input has been blocked within the last 30 ticks. */
     val inputBlocked get() = sim.tick - sim.lastBlock < 30

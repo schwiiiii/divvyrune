@@ -33,9 +33,9 @@ class GameTest {
         val r = check(g)
         assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
         assertEquals("rates: half of a half-belt input each", listOf("1/4", "1/4"), r.verdict.rows.map { it.exact.toString() })
-        assertEquals(Best(pieces = 1, side = 1, io = 93), r.best)
+        assertEquals(Best(pieces = 1, side = 1, io = 93, cycle = 4), r.best)
         assertTrue(r.next)
-        assertEquals(Best(1, 1, 93), Saves(store).best("Halves"))
+        assertEquals(Best(1, 1, 93, 4), Saves(store).best("Halves"))
 
         g.loadLevel(1)
         assertEquals(1, g.levelIndex)
@@ -47,7 +47,7 @@ class GameTest {
         val g = Game(Saves(MemoryStore()))
         g.buildFromText(halves); check(g)                         // 1 piece, 1×1, I/O 93
         g.buildFromText("IR SL FL\n.. TR FL2"); val r = check(g)  // a belt more, 2×2, both outputs side by side facing away: I/O 100
-        assertEquals(Best(pieces = 1, side = 1, io = 100), r.best)
+        assertEquals(Best(pieces = 1, side = 1, io = 100, cycle = 4), r.best)
     }
 
     @Test fun `a build with no input is judged at once without running`() {
@@ -136,14 +136,14 @@ class GameTest {
         val g = Game(Saves(store))
         g.loadLevel(1)   // 1/4 and 3/4
         g.buildFromText(halves); check(g)
-        assertEquals(Checked(1, 1, 93, solved = false), g.saved(1).checked)
+        assertEquals(Checked(1, 1, 93, solved = false, cycle = 4), g.saved(1).checked)
         assertNull(g.saved(1).solution)
         g.loadLevel(0)
         g.buildFromText(halves); check(g)
         assertEquals(halves, g.saved(0).solution)
         g.buildFromText("IR LR SL FL\n.. .. FT2 .."); g.editor.dismissNotice()
         assertEquals("the solution stays until another solve", halves, Saves(store).level("Halves").solution)
-        assertEquals(Checked(1, 1, 93, solved = true), Saves(store).level("Halves").checked)
+        assertEquals(Checked(1, 1, 93, solved = true, cycle = 4), Saves(store).level("Halves").checked)
     }
 
     @Test fun `a builder design can only be saved once its build passes Check`() {
