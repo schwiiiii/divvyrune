@@ -105,6 +105,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
         while (box != null && c in box && c !in tiles) { line += c; c = c.step(d) }
         val j = if (box != null && c in box) nodeAt(c, opp(d)) else null
         when {
+            j == null && box == null -> Unit   // nothing built yet: nothing to complain about
             j == null -> n.errs += "This input has nothing in its ${if (d % 2 == 0) "row" else "column"} to feed. Move it, or build in its way."
             !accepts(nodes[j].tile, opp(d)) -> n.errs += "The first piece in this input's way doesn't take marbles from this side."
             else -> { g.link(i, j); ports += Port(i, i, opp(d), line, n.cell) }

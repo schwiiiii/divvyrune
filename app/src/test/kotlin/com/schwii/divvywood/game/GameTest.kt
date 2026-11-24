@@ -91,7 +91,7 @@ class GameTest {
         val store = MemoryStore()
         val g = Game(Saves(store))
         g.board.apply { ox = 0f; oy = 0f; z = 10f }
-        assertTrue(g.editor.chipDrop(TrayItem(Kind.SRC), 5f, 5f))
+        assertTrue(g.editor.chipDrop(TrayItem(Kind.SRC), -15f, 5f))   // left of the start cell
         assertEquals("IR", Saves(store).data.levels["Quarter back"]?.build)
         g.editor.undo()
         assertEquals("", Saves(store).data.levels["Quarter back"]?.build)

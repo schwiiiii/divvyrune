@@ -43,7 +43,9 @@ class BoardRenderer(
         val nodes = s.graph.nodes
         // one block per cell: ways out have none, and a bridge's two lanes share one
         val order = nodes.indices.filter { s.graph.idx[nodes[it].cell] == it }.sortedWith(compareBy({ nodes[it].cell.y }, { nodes[it].cell.x }))
-        s.graph.box?.let { b -> painter.machineBox(c, s.ox + b.x0 * s.z, s.oy + b.y0 * s.z, s.ox + (b.x1 + 1) * s.z, s.oy + (b.y1 + 1) * s.z, s.z) }
+        // the machine's box, or the start cell while there's no machine: inputs sit around it
+        val b = com.schwii.divvywood.engine.portBox(s.tiles)
+        painter.machineBox(c, s.ox + b.x0 * s.z, s.oy + b.y0 * s.z, s.ox + (b.x1 + 1) * s.z, s.oy + (b.y1 + 1) * s.z, s.z)
         for (i in order) {
             if (lifted != null && nodes[i].cell in lifted) continue
             painter.blockShadow(c, s.screenX(nodes[i].cell.x), s.screenY(nodes[i].cell.y), s.z)

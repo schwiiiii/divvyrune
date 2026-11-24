@@ -12,6 +12,7 @@ First release.
   or column, and whatever points out of the build with a clear line to the edge leaves there. Each side takes one
   input or one way out, so a build has at most four; what no output needs leaves on a side of its own. Outputs ask
   for rates and Check matches them to the ways out.
+- An empty board shows a dashed start cell: an input dropped beside it faces into it, ready for the first piece.
 - Splitters and convergers can close sides: drag along a join or belt again to undo it, and drag a splitter's side
   out to the edge to open or close it.
 - Bridges: draw a belt straight across another and they cross without meeting.

@@ -53,6 +53,14 @@ class GameScreenshotTest {
 
     private fun Editor.tapCell(c: Cell) { down(board.screenX(c.x), board.screenY(c.y)); up(board.screenX(c.x), board.screenY(c.y)) }
 
+    @Test fun startCell() {
+        // an empty board: the dashed start cell, with the input dropped above it facing down into it
+        val g = gameFor(0, null, 64f)
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.board.refit(); g.editor.chipDrop(TrayItem(Kind.SRC), g.board.screenX(0), g.board.screenY(-3)) }
+        save("screen-start-cell")
+    }
+
     @Test fun selectedPiece() {
         val g = gameFor(LEVELS.lastIndex, ".. .. .. .. IB ..\n.. BR CB5 RL TL ..\nRB SR6 ST7 SL6 LB ..\nTB .. CB6 TL TB ..\nTR CB5 CL3 SR3 TL ..\n.. CB6 RL ST7 LR LR\n.. CB6 RL TL .. ..", 56f)
         val e = g.editor

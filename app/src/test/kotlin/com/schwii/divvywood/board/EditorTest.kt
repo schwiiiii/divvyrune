@@ -45,6 +45,14 @@ class EditorTest {
         assertFalse("each input is placed once", drop(Kind.SRC, 3, 3, 0))
     }
 
+    @Test fun `on an empty board an input faces the start cell, so a splitter there takes its marbles`() {
+        assertTrue(drop(Kind.SRC, 0, -3))
+        assertEquals(Tile(Kind.SRC, out = 1, id = 0), at(0, -1))
+        assertTrue(drop(Kind.SPLIT, 0, 0))
+        assertEquals(3, at(0, 0)!!.inSide)
+        assertEquals(Kind.SRC, at(0, -1)?.kind)
+    }
+
     @Test fun `a chip dropped on a belt replaces it and takes its direction`() {
         drop(Kind.SPLIT, 0, 0)
         drag(0, 0, 0, 3)   // belts down from the splitter
