@@ -4,6 +4,9 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
 
 ## Next
 - [ ] **1.0.0 release** on GitHub, after the current round of playtesting.
+      Before tagging: redraw the store screenshots with `StoreAssets` (the metrics and levels changed since they
+      were drawn), and fill `AllowedAPKSigningKeys` in `fdroid/com.schwii.divvywood.yml` with the SHA-256 of the
+      release signing certificate (Brett supplies it from his keystore).
 - [ ] **F-Droid**: submit the recipe in `fdroid/`; F-Droid ships the same signed APK, so copies from F-Droid and
       GitHub update each other.
 
