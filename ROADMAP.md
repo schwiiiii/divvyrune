@@ -27,7 +27,8 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
         can move ports and break the parent outright. Editing and checking the parent switches it to the current
         machine.
       - **Text codes:** a machine is written by its level, e.g. `#001`, and reads in as that level's current
-        solving build. Custom levels need an id of their own here.
+        solving build. A custom level's machine is written by a short stable hash of its rates (e.g. `#c7f3a1`),
+        so the same design gets the same id on every device.
       - To be tried in the browser prototype first.
 - [ ] **1.0.0 release** on GitHub, after the current round of playtesting.
       Before tagging: redraw the store screenshots with `StoreAssets` (the metrics and levels changed since they
