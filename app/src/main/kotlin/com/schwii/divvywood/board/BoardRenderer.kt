@@ -42,38 +42,55 @@ class Layout(val g: Graph, val ox: Float, val oy: Float, val z: Float) {
     fun size(i: Int) = (g.nodes[i].frame.s * z).toFloat()
     fun side(i: Int, j: Int) = sideBetween(g, i, j)
 
-    /** Where the line of machine port [i] meets its machine's edge. */
-    private fun portEdge(i: Int): FloatArray {
+    /** The middle of the side of its machine that port [i] is on: where the parent's line meets it. */
+    private fun portMid(i: Int): FloatArray {
         val n = g.nodes[i]; val v = n.portView!!
         val cx = ox + ((v.x + v.size / 2) * z).toFloat(); val cy = oy + ((v.y + v.size / 2) * z).toFloat()
         val h = (v.size * z / 2).toFloat()
         return floatArrayOf(cx + DX[n.portSide] * h, cy + DY[n.portSide] * h)
     }
 
+    /** Where port [i]'s own line, in its row or column, meets its machine's edge. */
+    private fun portLane(i: Int): FloatArray {
+        val n = g.nodes[i]; val m = portMid(i)
+        return if (n.portSide % 2 == 0) floatArrayOf(m[0], y(i)) else floatArrayOf(x(i), m[1])
+    }
+
+    /** The edge of the piece port [i] joins inside its machine, facing it. */
+    private fun portInner(i: Int): FloatArray {
+        val n = g.nodes[i]
+        val j = (n.succ + n.pred).firstOrNull { g.nodes[it].frame == n.frame } ?: return portLane(i)
+        return edge(x(j), y(j), size(j), side(j, i), 0.5f)
+    }
+
     /**
-     * Point [t] along node [i]'s route from side [from] to side [to] (NONE: the centre). A machine's input or way out
-     * runs straight from its machine's edge to its own cell, so marbles cross into machines without a jump.
+     * Point [t] along node [i]'s route from side [from] to side [to] (NONE: the centre). A machine's input runs from
+     * the middle of its side (where the parent's line ends) along the edge to its own row or column, then straight in
+     * to the piece it feeds; a way out the same in reverse. So marbles cross into machines without a jump.
      */
     fun at(i: Int, from: Int, to: Int, t: Float): FloatArray {
         val n = g.nodes[i]
-        val x = x(i); val y = y(i); val s = size(i)
         if (n.portView != null && n.portSide != NONE && (from == n.portSide || to == n.portSide)) {
-            val e = portEdge(i)
-            val (p0, p2) = if (from == n.portSide) e to (if (to == NONE) floatArrayOf(x, y) else edge(x, y, s, to, 0.5f))
-            else (if (from == NONE) floatArrayOf(x, y) else edge(x, y, s, from, 0.5f)) to e
-            val (a, b, u) = if (t < 0.5f) Triple(p0, floatArrayOf(x, y), t * 2) else Triple(floatArrayOf(x, y), p2, t * 2 - 1)
+            val pts = if (from == n.portSide) listOf(portMid(i), portLane(i), portInner(i)) else listOf(portInner(i), portLane(i), portMid(i))
+            val (a, b, u) = if (t < 0.5f) Triple(pts[0], pts[1], t * 2) else Triple(pts[1], pts[2], t * 2 - 1)
             return floatArrayOf(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u)
         }
-        return routePoint(x, y, s, from, to, t)
+        return routePoint(x(i), y(i), size(i), from, to, t)
     }
 
-    /** The connector of machine port [i]: from its machine's edge to its cell and on to the piece it joins. */
-    fun connector(i: Int): FloatArray {
-        val n = g.nodes[i]
-        val e = portEdge(i)
-        val other = (n.succ + n.pred).firstOrNull { g.nodes[it].frame == n.frame }
-        val far = other?.let { edge(x(i), y(i), size(i), side(i, it), 0.5f) } ?: floatArrayOf(x(i), y(i))
-        return floatArrayOf(e[0], e[1], x(i), y(i), far[0], far[1])
+    /** Port [i]'s line: from its machine's edge straight to the piece it joins. */
+    fun connector(i: Int): FloatArray { val a = portLane(i); val b = portInner(i); return floatArrayOf(a[0], a[1], b[0], b[1]) }
+
+    /**
+     * The taper outside port [i]'s side: from a point just past the middle of the side, where the parent's line
+     * comes in, widening to the whole side. The side is the port, not the one line.
+     */
+    fun taper(i: Int): FloatArray {
+        val n = g.nodes[i]; val v = n.portView!!; val m = portMid(i)
+        val h = (v.size * z / 2).toFloat(); val d = n.portSide
+        val apex = floatArrayOf(m[0] + DX[d] * h * 0.35f, m[1] + DY[d] * h * 0.35f)
+        val ax = DY[d].toFloat(); val ay = DX[d].toFloat()   // along the side
+        return floatArrayOf(apex[0], apex[1], m[0] + ax * h, m[1] + ay * h, m[0] - ax * h, m[1] - ay * h)
     }
 }
 
@@ -116,7 +133,8 @@ fun paintBuild(
     for (i in nodes.indices) {
         val n = nodes[i]
         if (!n.inside || n.kind == Kind.MACHINE || n.cell in skip || !seen.add(n.frame to n.local)) continue
-        if (n.portView != null) {   // a machine's input or way out
+        if (n.portView != null) {   // a machine's input or way out: its taper outside, its line inside
+            painter.taper(c, lay.taper(i), (n.portView!!.size * lay.z).toFloat())
             painter.connector(c, lay.connector(i), lay.size(i))
             continue
         }

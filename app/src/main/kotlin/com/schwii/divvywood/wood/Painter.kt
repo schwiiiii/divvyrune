@@ -233,6 +233,13 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         carve(c, z, q, false)
     }
 
+    /** A taper into a machine's side: the triangle [tri] (apex, then the side's two ends), for a machine of size [z]. */
+    open fun taper(c: Canvas, tri: FloatArray, z: Float) {
+        val q = Path(); q.moveTo(tri[0], tri[1]); q.lineTo(tri[2], tri[3]); q.lineTo(tri[4], tri[5]); q.close()
+        fill.color = rgba(95, 62, 32, 0.22); c.drawPath(q, fill)
+        stroke.color = rgba(95, 62, 32, 0.45); stroke.strokeWidth = max(1f, z * 0.015f); stroke.pathEffect = null; c.drawPath(q, stroke)
+    }
+
     /**
      * Where a splitter or converger sends or takes its next marble: [active] is that side, [angle] its direction
      * eased for animation. Wood shows a flipper.

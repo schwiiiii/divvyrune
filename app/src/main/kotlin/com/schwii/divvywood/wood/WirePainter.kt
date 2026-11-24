@@ -138,6 +138,12 @@ class WirePainter : Painter() {
         stroke(c, p, z, white)
     }
 
+    override fun taper(c: Canvas, tri: FloatArray, z: Float) {
+        val q = Path(); q.moveTo(tri[0], tri[1]); q.lineTo(tri[2], tri[3]); q.lineTo(tri[4], tri[5]); q.close()
+        fill.color = rgba(237, 239, 242, 0.14); c.drawPath(q, fill)
+        line.color = rgba(237, 239, 242, 0.6); line.strokeWidth = max(1f, z * 0.015f); line.pathEffect = null; c.drawPath(q, line)
+    }
+
     override fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {
         line.color = grey; line.strokeWidth = max(1.2f, z * 0.04f)
         line.pathEffect = android.graphics.DashPathEffect(floatArrayOf(z * 0.04f, z * 0.1f), 0f)

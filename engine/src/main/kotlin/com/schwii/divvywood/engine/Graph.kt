@@ -205,8 +205,8 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
 
 /**
  * Lays machine [t] at [c] into [nodes]: its build turned its way, each node on [c], links inside it added to [links],
- * itself and any machines inside it to [views]. Its build is drawn within [c]: its box with a ring of cells around
- * it, for its inputs and ways out, fitted to the cell. Its inputs become belts taking marbles in on their sides, its
+ * itself and any machines inside it to [views]. Its build is drawn within [c]: the square around its box fills the
+ * cell, and its inputs and ways out run straight to the cell's edges. Its inputs become belts taking marbles in on their sides, its
  * ways out belts sending them out of theirs. Returns why it can't be laid (unknown, itself inside itself, its own
  * level's machine, or broken here), or null.
  */
@@ -223,11 +223,11 @@ private fun layMachine(
     val tiles = turned(inner, t.out)
     val cg = buildGraph(tiles, Level(level.name, List(ins) { Frac(1, 1) }, emptyList(), level.no3), lib, stack + h)
     cg.nodes.firstOrNull { it.errs.isNotEmpty() }?.let { return "This machine doesn't work here: ${it.errs.first()}" }
-    // the machine's box and a ring around it, fitted to the cell
+    // the square around the machine's box fills the cell, the box centred in it; inputs and ways out reach its edges
     val b = machineBox(tiles) ?: return "This machine is empty."
-    val w = b.x1 - b.x0 + 3; val hh = b.y1 - b.y0 + 3; val n = maxOf(w, hh)
+    val w = b.x1 - b.x0 + 1; val hh = b.y1 - b.y0 + 1; val n = maxOf(w, hh)
     val s = 1.0 / n
-    val fit = Frame(c.x + (n - w) / 2.0 * s - (b.x0 - 1) * s, c.y + (n - hh) / 2.0 * s - (b.y0 - 1) * s, s)
+    val fit = Frame(c.x + (n - w) / 2.0 * s - b.x0 * s, c.y + (n - hh) / 2.0 * s - b.y0 * s, s)
     val me = MachineView(t, c.x.toDouble(), c.y.toDouble(), 1.0)
     views += me
     val inside = cg.machines.associateWith { v -> MachineView(v.tile, fit.ox + v.x * s, fit.oy + v.y * s, v.size * s) }
