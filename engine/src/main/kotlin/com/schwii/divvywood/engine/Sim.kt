@@ -25,7 +25,7 @@ class SimNode(val kind: Kind, val id: Int, val succ: List<Int>, val pred: List<I
     val jam = IntArray(succ.size)
 }
 
-/** A marble dropping into an output or bypass this tick, for the fade-out animation. */
+/** A marble leaving the build this tick, for the fade-out animation. */
 class Ghost(val id: Int, val from: Int, val to: Int, val item: Item?)
 
 /** Counters a measuring window is taken from: [emittedBy] and [blockedBy] per input. */
@@ -72,7 +72,7 @@ class Sim(g: Graph, val rates: List<Frac>) {
     init {
         val seen = HashSet<Int>()
         val q = ArrayList<Int>()
-        n.indices.filter { n[it].kind == Kind.OUT || n[it].kind == Kind.DUMP }.forEach { seen += it; q += it }
+        n.indices.filter { n[it].kind == Kind.OUT }.forEach { seen += it; q += it }
         val out = ArrayList<Int>()
         var h = 0
         while (h < q.size) {
@@ -84,7 +84,7 @@ class Sim(g: Graph, val rates: List<Frac>) {
         order = out
     }
 
-    private fun isSink(k: Kind) = k == Kind.OUT || k == Kind.DUMP
+    private fun isSink(k: Kind) = k == Kind.OUT
 
     fun step() {
         val tk = ++tick

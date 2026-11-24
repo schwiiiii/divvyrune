@@ -2,19 +2,15 @@ package com.schwii.divvywood.engine
 
 /*
  * Text grid: one code per cell, rows top to bottom.
- * I/C + the side it outputs to · S/O/F + the one side its input comes from (I may end in 2 or 3 for inputs 2, 3;
- * F for outputs B, C)
+ * I/C + the side it outputs to (I may end in 2 or 3 for inputs 2, 3) · S + the side its input comes from
  * a belt is two sides: fed from, feeding · ".." is an empty cell. Sides: T R B L.
  * One-line form: commas between cells, "/" between rows.
+ * Codes from before outputs were the build's sides may hold O (bypass) and F (final output) cells: they read as empty,
+ * so the belts that fed them lead out of the build.
  */
 
 private const val SIDE = "RBLT"
 private val SIDE_OF = mapOf('R' to 0, 'B' to 1, 'L' to 2, 'T' to 3)
-
-private fun feederSide(tiles: Map<Cell, Tile>, c: Cell): Int {
-    for (d in 0..3) if (sends(tiles[c.step(d)], opp(d))) return d
-    return 0
-}
 
 private fun gridRows(tiles: Map<Cell, Tile>): List<List<String>> {
     val x0 = tiles.keys.minOf { it.x }; val x1 = tiles.keys.maxOf { it.x }
@@ -29,8 +25,7 @@ private fun gridRows(tiles: Map<Cell, Tile>): List<List<String>> {
                 Kind.SRC -> "I${SIDE[t.out]}${if (t.id > 0) t.id + 1 else ""}"
                 Kind.SPLIT -> "S${SIDE[t.inSide]}"
                 Kind.MERGE -> "C${SIDE[t.out]}"
-                Kind.DUMP -> "O${SIDE[if (t.inSide != NONE) t.inSide else feederSide(tiles, c)]}"
-                Kind.OUT -> "F${SIDE[if (t.inSide != NONE) t.inSide else feederSide(tiles, c)]}${if (t.id > 0) t.id + 1 else ""}"
+                Kind.OUT -> ".."
             }
         }
     }
@@ -49,9 +44,7 @@ private val PIECE_CODE = Regex("^([ISCOF])([TRBL])([1-3]?)$")
 
 fun decodeGrid(text: String): Decoded {
     val tiles: Tiles = linkedMapOf()
-    val pending = mutableListOf<Pair<Cell, Int>>()
     val pendingIn = mutableListOf<Pair<Cell, Int>>()
-    var dumps = 0
     val rows = text.split(Regex("\r?\n|/")).map { it.trim() }.filter { it.isNotEmpty() }
     if (rows.isEmpty()) return Decoded(null, "The text is empty.")
     for ((y, row) in rows.withIndex()) {
@@ -74,22 +67,12 @@ fun decodeGrid(text: String): Decoded {
                     "I" -> if (num.isNotEmpty()) tiles[at] = Tile(Kind.SRC, out = d, id = num.toInt() - 1) else pendingIn += at to d
                     "S" -> tiles[at] = Tile(Kind.SPLIT, inSide = d)
                     "C" -> tiles[at] = Tile(Kind.MERGE, out = d)
-                    "O" -> tiles[at] = Tile(Kind.DUMP, inSide = d, id = dumps++)
-                    else -> if (num.isNotEmpty()) tiles[at] = Tile(Kind.OUT, inSide = d, id = num.toInt() - 1) else pending += at to d
+                    else -> Unit   // an old bypass or final output: the build's sides take their place
                 }
             } else {
                 return Decoded(null, "$where: \"$raw\" isn't a cell code.")
             }
         }
-    }
-    val outs = tiles.values.filter { it.kind == Kind.OUT }
-    val used = outs.map { it.id }.toMutableSet()
-    if (used.size != outs.size) return Decoded(null, "Two final outputs have the same number.")
-    for ((at, d) in pending) {
-        var id = 0
-        while (id in used) id++
-        used += id
-        tiles[at] = Tile(Kind.OUT, inSide = d, id = id)
     }
     // inputs number the same way: an unnumbered I takes the first free number
     val ins = tiles.values.filter { it.kind == Kind.SRC }
@@ -106,10 +89,8 @@ fun decodeGrid(text: String): Decoded {
 
 /** Can [level] hold these tiles? Returns an error message, or null. */
 fun fitsLevel(tiles: Map<Cell, Tile>, level: Level): String? {
-    val outs = tiles.values.filter { it.kind == Kind.OUT }
     val ins = tiles.values.filter { it.kind == Kind.SRC }
     fun plural(n: Int, w: String) = "$n $w${if (n == 1) "" else "s"}"
     if (ins.any { it.id >= level.inputs.size }) return "This level has ${plural(level.inputs.size, "input")}; the text uses ${ins.maxOf { it.id } + 1}."
-    if (outs.any { it.id >= level.out.size }) return "This level has ${plural(level.out.size, "final output")}; the text uses ${outs.maxOf { it.id } + 1}."
     return null
 }

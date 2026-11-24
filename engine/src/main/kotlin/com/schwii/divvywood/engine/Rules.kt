@@ -21,7 +21,8 @@ fun dirTo(a: Cell, b: Cell) = when {
     else -> 3
 }
 
-enum class Kind { BELT, SPLIT, MERGE, SRC, OUT, DUMP }
+/** [OUT] is never placed: it marks a way out of the build in the graph (see [Port]). */
+enum class Kind { BELT, SPLIT, MERGE, SRC, OUT }
 
 /**
  * One placed block.
@@ -29,7 +30,7 @@ enum class Kind { BELT, SPLIT, MERGE, SRC, OUT, DUMP }
  * - splitter: input on [inSide], outputs on every other side
  * - converger: output on [out], inputs on every other side
  * - input (src): sends out of [out]; [id] numbers inputs IN1, IN2… (NONE reads as the first)
- * - output / bypass (dump): takes items on [inSide] only; [id] numbers outputs A, B, C and bypasses
+ * - way out (graph only): takes marbles on [inSide]; [id] numbers the build's ways out
  */
 data class Tile(
     val kind: Kind,
@@ -53,13 +54,13 @@ fun accepts(t: Tile?, s: Int): Boolean = when (t?.kind) {
     Kind.BELT -> t.from == s
     Kind.SPLIT -> t.inSide == s
     Kind.MERGE -> t.out != s
-    Kind.OUT, Kind.DUMP -> t.inSide == s   // outputs and bypasses take items from one side only
+    Kind.OUT -> t.inSide == s
     else -> false
 }
 
 /** Best guess for a new piece's direction from what touches it. */
 fun inferDir(tiles: Map<Cell, Tile>, at: Cell, kind: Kind): Int {
-    if (kind == Kind.SPLIT || kind == Kind.OUT || kind == Kind.DUMP) {   // face whatever is sending into this cell
+    if (kind == Kind.SPLIT) {   // face whatever is sending into this cell
         for (pass in 0..1) for (d in 0..3) {
             val n = tiles[at.step(d)] ?: continue
             if (pass == 0 && n.kind == Kind.SPLIT) continue
@@ -67,11 +68,9 @@ fun inferDir(tiles: Map<Cell, Tile>, at: Cell, kind: Kind): Int {
         }
         return 2
     }
-    for (pass in 0..1) for (d in 0..3) {
+    for (d in 0..3) {
         val n = tiles[at.step(d)] ?: continue
-        val hit = if (pass == 0) (n.kind == Kind.BELT || n.kind == Kind.SPLIT) && accepts(n, opp(d))
-        else n.kind == Kind.OUT || n.kind == Kind.DUMP
-        if (hit) return d
+        if ((n.kind == Kind.BELT || n.kind == Kind.SPLIT) && accepts(n, opp(d))) return d
     }
     return 0
 }
@@ -83,7 +82,6 @@ fun orientMissing(tiles: Tiles) {
         val fixed = when {
             t.kind == Kind.SPLIT && t.inSide == NONE -> t.copy(inSide = inferDir(tiles, c, t.kind))
             (t.kind == Kind.MERGE || t.kind == Kind.SRC) && t.out == NONE -> t.copy(out = inferDir(tiles, c, t.kind))
-            (t.kind == Kind.OUT || t.kind == Kind.DUMP) && t.inSide == NONE -> t.copy(inSide = inferDir(tiles, c, t.kind))
             else -> t
         }
         tiles[c] = fixed
@@ -92,15 +90,14 @@ fun orientMissing(tiles: Tiles) {
 
 /**
  * Lays a belt along [path]. Pieces on the path are endpoints and never overwritten. A drag from piece to piece
- * sets their direction: a converger or input points out toward the drag; a splitter, output or bypass takes its
- * input from it.
+ * sets their direction: a converger or input points out toward the drag; a splitter takes its input from it.
  */
 fun commitPath(tiles: Tiles, path: List<Cell>) {
     val n = path.size
     for (i in 0 until n - 1) {
         tiles[path[i]]?.let { a -> if (a.kind == Kind.MERGE || a.kind == Kind.SRC) tiles[path[i]] = a.copy(out = dirTo(path[i], path[i + 1])) }
         tiles[path[i + 1]]?.let { b ->
-            if (b.kind == Kind.SPLIT || b.kind == Kind.OUT || b.kind == Kind.DUMP) tiles[path[i + 1]] = b.copy(inSide = dirTo(path[i + 1], path[i]))
+            if (b.kind == Kind.SPLIT) tiles[path[i + 1]] = b.copy(inSide = dirTo(path[i + 1], path[i]))
         }
     }
     for (i in 0 until n) {
@@ -123,14 +120,14 @@ fun pathValid(tiles: Map<Cell, Tile>, path: List<Cell>): Boolean {
     return path.size > 1
 }
 
-/** Rotate on one piece: a belt's exit, a splitter's, output's or bypass's input side, a converger's or input's output side. */
+/** Rotate on one piece: a belt's exit, a splitter's input side, a converger's or input's output side. */
 fun turnPiece(t: Tile): Tile = when (t.kind) {
     Kind.BELT -> {
         var o = (t.out + 1) % 4
         if (o == t.from) o = (o + 1) % 4
         t.copy(out = o)
     }
-    Kind.SPLIT, Kind.OUT, Kind.DUMP -> t.copy(inSide = (t.inSide + 1) % 4)
+    Kind.SPLIT, Kind.OUT -> t.copy(inSide = (t.inSide + 1) % 4)
     Kind.MERGE, Kind.SRC -> t.copy(out = (t.out + 1) % 4)
 }
 
