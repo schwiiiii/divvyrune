@@ -28,6 +28,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -73,15 +75,20 @@ fun TopStrip(game: Game) {
                         .semantics { contentDescription = "Levels" },
                     style = Body, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                // in the builder: the level's settings
+                // in the builder: the level's design
                 if (game.inBuilder) Text(
-                    "Settings", Modifier.heightIn(min = 36.dp).background(Raise, RoundedCornerShape(50)).clickable { game.showBuilder() }
+                    "Design", Modifier.heightIn(min = 36.dp).background(Raise, RoundedCornerShape(50)).clickable { game.showBuilder() }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     style = Body, fontWeight = FontWeight.Bold, fontSize = 14.sp,
                 )
             }
             Stat("pieces", m.pieces.toString())
             Stat("footprint", if (m.area > 0) "${m.w}×${m.h}" else "0")
+            val ink = Dim
+            androidx.compose.foundation.Canvas(Modifier.size(36.dp).clickable { game.showSettings() }.padding(6.dp)
+                .semantics { contentDescription = "Settings" }) {
+                scale(size.minDimension / 24f, pivot = Offset.Zero) { gearIcon(ink) }
+            }
         }
         Readouts(board)
     }

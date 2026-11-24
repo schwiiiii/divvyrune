@@ -98,6 +98,7 @@ fun SheetHost(game: Game) {
                 Sheet.Text -> TextSheet(game)
                 Sheet.Builder -> BuilderSheet(game)
                 Sheet.Machines -> MachinesSheet(game)
+                Sheet.Settings -> SettingsSheet(game)
             }
         }
     }
@@ -301,6 +302,19 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
         }
         Text(game.label(i), style = BodyTnum, color = if (i == game.levelIndex) Src else Ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
     }
+}
+
+/** The app's settings: the look, wood or wireframe. */
+@Composable
+private fun SettingsSheet(game: Game) {
+    Title("Settings")
+    Text("Look", style = Body, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+    Buttons {
+        SheetButton(if (!game.wire) "✓ Wood" else "Wood", go = !game.wire) { game.wire = false }
+        SheetButton(if (game.wire) "✓ Wireframe" else "Wireframe", go = game.wire) { game.wire = true }
+    }
+    Text("Wood: walnut and maple blocks. Wireframe: white lines on dark, a splitter's next branch lit.", style = Body, color = Dim, fontSize = 13.sp)
+    Buttons { SheetButton("Close") { game.closeSheet() } }
 }
 
 /**

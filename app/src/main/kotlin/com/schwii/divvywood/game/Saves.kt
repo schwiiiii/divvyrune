@@ -116,6 +116,8 @@ fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNul
     val nextCustom: Int = 1,
     val draft: LevelDef = LevelDef(),
     val machines: Map<String, MachineSave> = emptyMap(),
+    /** How the game looks: "wood" or "wire". */
+    val look: String = "wood",
 )
 
 /** The save name of the level builder. */
@@ -143,8 +145,31 @@ class MemoryStore(var json: String? = null) : SaveStore {
 /** Saves per level and best scores, by level name, written through to [store] on every change. */
 class Saves(private val store: SaveStore) {
     private val json = Json { ignoreUnknownKeys = true }
-    var data: SaveData = store.read()?.let { runCatching { json.decodeFromString<SaveData>(it) }.getOrNull() } ?: SaveData()
+    var data: SaveData = store.read()?.let { runCatching { withMachines(json.decodeFromString<SaveData>(it)) }.getOrNull() } ?: SaveData()
         private set
+
+    /**
+     * Bests saved before they kept their builds: their solving build stands in for every metric, so it's a machine
+     * too.
+     */
+    private fun withMachines(d: SaveData): SaveData {
+        var machines = d.machines
+        val levels = d.levels.mapValues { (name, l) ->
+            val b = l.best
+            val sol = l.solution
+            if (b == null || b.pieces < 0 || b.piecesBuild != null || sol.isNullOrBlank()) return@mapValues l
+            val code = decodeGrid(sol).tiles?.let { encodeLine(it) } ?: return@mapValues l
+            val h = machineHash(code)
+            machines = machines + (h to MachineSave(code, name, listOf("fewest pieces", "smallest area", "best flow")))
+            l.copy(best = b.copy(piecesBuild = h, areaBuild = h, flowBuild = h))
+        }
+        return d.copy(levels = levels, machines = machines)
+    }
+
+    /** How the game looks: "wood" or "wire". */
+    var look: String
+        get() = data.look
+        set(v) { if (v != data.look) put(data.copy(look = v)) }
 
     private fun put(d: SaveData) { data = d; store.write(json.encodeToString(d)) }
 

@@ -27,6 +27,7 @@ import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.buildGraph
 import com.schwii.divvywood.engine.machinesUsed
+import com.schwii.divvywood.wood.Look
 
 /** The sheet over the game, if any. */
 sealed interface Sheet {
@@ -41,6 +42,8 @@ sealed interface Sheet {
     data object Builder : Sheet
     /** The machines to place: the best builds of solved levels. */
     data object Machines : Sheet
+    /** The app's settings: the look. */
+    data object Settings : Sheet
 }
 
 /**
@@ -88,6 +91,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     var sheet by mutableStateOf<Sheet?>(null); private set
 
     init {
+        Look.wire = saves.look == "wire"
         editor.onChange = { saves.putBuild(level.name, board.tiles) }
         editor.locked = { board.checking }
         board.onCheckDone = { w0, w1 -> finishCheck(w0, w1) }
@@ -192,6 +196,12 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     fun showText() { sheet = Sheet.Text }
     fun showBuilder() { if (inBuilder && !board.checking) sheet = Sheet.Builder }
     fun showMachines() { if (!board.checking) sheet = Sheet.Machines }
+    fun showSettings() { sheet = Sheet.Settings }
+
+    /** Wireframe (white lines on dark) or wood; saved. */
+    var wire: Boolean
+        get() = Look.wire
+        set(v) { Look.wire = v; saves.look = if (v) "wire" else "wood"; board.rebuild() }
     fun closeSheet() { sheet = null }
 
     /** Builds from a text code in place of this level's build; returns an error message, or null when built. */

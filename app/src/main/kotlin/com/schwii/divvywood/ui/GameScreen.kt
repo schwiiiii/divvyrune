@@ -236,23 +236,24 @@ private fun Pill(label: String, onClick: () -> Unit) {
 private val iconPainter by lazy { Painter() }
 private val SAMPLE_MACHINE by lazy { com.schwii.divvywood.engine.decodeGrid("IR LR SL5").tiles!! }
 
-/** A tray item drawn as the block it places, at [px] pixels square. */
+/** A tray item drawn as the block it places, at [px] pixels square, in the current look. */
 fun chipIcon(item: TrayItem, level: com.schwii.divvywood.engine.Level, px: Int, lib: com.schwii.divvywood.engine.MachineLib = com.schwii.divvywood.engine.MachineLib.EMPTY): Bitmap {
     val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
     val c = android.graphics.Canvas(bmp)
     val z = px * 0.875f; val x = px / 2f; val y = px / 2f - px * 0.02f
-    val p = iconPainter
+    val p = com.schwii.divvywood.board.lookPainter()
     p.blockShadow(c, x, y, z)
     when (item.kind) {
-        Kind.SPLIT -> { p.tile(c, x, y, z, Tile(Kind.SPLIT, inSide = 2), listOf(2), listOf(3, 1), 905); p.flipper(c, x, y, z, angleOf(3)); p.burnText(c, "÷", x + z * 0.27f, y, z * 0.36f, light = true) }
-        Kind.MERGE -> { p.tile(c, x, y, z, Tile(Kind.MERGE, out = 0), listOf(3, 1), listOf(0), 906); p.flipper(c, x, y, z, angleOf(3)); p.burnText(c, "+", x - z * 0.27f, y, z * 0.36f, light = true) }
+        Kind.SPLIT -> { val t = Tile(Kind.SPLIT, inSide = 2); p.tile(c, x, y, z, t, listOf(2), listOf(3, 1), 905); p.turn(c, x, y, z, t, 3, angleOf(3)); p.burnText(c, "÷", x + z * 0.27f, y, z * 0.36f, light = true) }
+        Kind.MERGE -> { val t = Tile(Kind.MERGE, out = 0); p.tile(c, x, y, z, t, listOf(3, 1), listOf(0), 906); p.turn(c, x, y, z, t, 3, angleOf(3)); p.burnText(c, "+", x - z * 0.27f, y, z * 0.36f, light = true) }
         Kind.SRC -> p.tile(c, x, y, z, Tile(Kind.SRC, out = 0), emptyList(), listOf(0), 903 + maxOf(item.id, 0),
             label = level.inputLabel(maxOf(item.id, 0)) + (level.inputs.getOrNull(maxOf(item.id, 0))?.let { " $it" } ?: ""), labelScale = 1.5f)
         Kind.MACHINE -> if (item.ref == null) {
             // the machines button: a machine block with a plain split inside, and a plus
-            p.machine(c, x, y, z, 908, false) { cv, l, t, size -> com.schwii.divvywood.board.drawBuild(cv, p, SAMPLE_MACHINE, lib, l, t, size) }
+            p.machineBlock(c, x - z / 2, y - z / 2, z, 908, false)
+            com.schwii.divvywood.board.drawBuild(c, p, SAMPLE_MACHINE, lib, x - z * 0.4f, y - z * 0.4f, z * 0.8f)
             p.burnText(c, "+", x + z * 0.33f, y + z * 0.3f, z * 0.34f)
-        } else com.schwii.divvywood.board.drawMachine(c, p, Tile(Kind.MACHINE, ref = item.ref), lib, x, y, z, 909, { false })
+        } else com.schwii.divvywood.board.drawBuild(c, p, mapOf(com.schwii.divvywood.engine.Cell(0, 0) to Tile(Kind.MACHINE, ref = item.ref)), lib, x - z / 2, y - z / 2, z)
         else -> p.tile(c, x, y, z, Tile(Kind.BRIDGE, out = 0, inSide = 1), emptyList(), emptyList(), 907)
     }
     return bmp
@@ -267,7 +268,7 @@ private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect,
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         for (item in editor.trayItems()) {
-            val icon = remember(item, board.level) { chipIcon(item, board.level, px, board.lib).asImageBitmap() }
+            val icon = remember(item, board.level, com.schwii.divvywood.wood.Look.wire) { chipIcon(item, board.level, px, board.lib).asImageBitmap() }
             val placed = editor.isPlaced(item)
             var origin by remember { mutableStateOf(Offset.Zero) }
             Image(icon, null,
