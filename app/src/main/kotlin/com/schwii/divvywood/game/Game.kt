@@ -107,20 +107,20 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     fun openBuilder() = loadLevel(builderIndex)
 
     /**
-     * Changes the builder's definition. The build stays, except inputs and outputs the new definition no longer
-     * has; any earlier pass no longer counts.
+     * Changes the builder's definition. The build stays, except inputs the new definition no longer has; any earlier
+     * pass no longer counts.
      */
     fun updateDraft(def: LevelDef) {
         draft = def
         saves.draft = def
         saves.clearResults(BUILDER)
         if (!inBuilder) return
-        board.tiles.entries.removeAll { (_, t) -> (t.kind == Kind.OUT && t.id >= def.out.size) || (t.kind == Kind.SRC && maxOf(t.id, 0) >= def.inputs.size) }
+        board.tiles.entries.removeAll { (_, t) -> t.kind == Kind.SRC && maxOf(t.id, 0) >= def.inputs.size }
         board.setBuild(builderLevel, board.tiles)
         saves.putBuild(BUILDER, board.tiles)
     }
 
-    /** A random single target the builder can always meet, with bypasses taking the rest. */
+    /** A random single target the builder can always meet, the rest leaving on a side of its own. */
     fun surpriseMe() {
         val half = Frac(1, 2)   // the targets are proved solvable with the input at half a belt
         val f = randomTarget(not = draft.targets.singleOrNull()?.let { (it.q / half.q).toFrac() })
@@ -129,7 +129,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     /** Saves the builder's design as a custom level, once its current build has passed Check. */
     fun saveCustom(): CustomLevel? {
-        if (!inBuilder || saves.level(BUILDER).solution == null) return null
+        if (!inBuilder || saves.level(BUILDER).solution == null || draft.problem() != null) return null
         val c = saves.addCustom(draft, saves.level(BUILDER).build)
         customs = saves.custom
         levelIndex = builderIndex   // the builder moves along one place as the list grows
@@ -172,7 +172,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
         val cycle = if (board.sol.ok && board.graph.errCount == 0) findCycle(board.graph, level) else null
         val flow = cycle?.let { flowOf(board.graph, level, it) }
         val best = saves.recordCheck(level.name, m, flow?.score, v.solved)
-        sheet = Sheet.Result(v, m, flow, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder)
+        sheet = Sheet.Result(v, m, flow, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder && draft.problem() == null)
     }
 
     // ---------- sheets ----------

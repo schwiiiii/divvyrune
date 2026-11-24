@@ -28,6 +28,11 @@ class SolverTest {
         assertEquals(solveLevel(level, 3, want = 5).map { it.code }, solveLevel(level, 3, want = 5).map { it.code })
     }
 
+    @Test fun `routes bridge straight belts when they cross`() {
+        val found = solveLevel(levelNamed("Seventeenth"), 5, want = 20)
+        assertTrue(found.any { it.metrics.bridges > 0 })
+    }
+
     @Test fun `share counts are made of twos and threes, and only twos without 3-way splits`() {
         assertEquals(listOf(9L, 12L, 16L, 18L), smooth(9, 18, threes = true))
         assertEquals(listOf(16L), smooth(9, 18, threes = false))

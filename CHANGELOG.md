@@ -7,15 +7,21 @@ release (`1.0.0.3`); before 1.0.0 they were `0.9.N`. Plans for later releases ar
 
 First release.
 
-- 20 levels, from halves to one thirtieth, three of them with two inputs to split apart and recombine.
+- 17 levels, from a quarter to one thirtieth, two of them with two inputs to split apart and recombine.
+- Marbles enter and leave on the sides of the build: an input sits at the edge and feeds the first piece in its row
+  or column, and whatever points out of the build with a clear line to the edge leaves there. Each side takes one
+  input or one way out, so a build has at most four; what no output needs leaves on a side of its own. Outputs ask
+  for rates and Check matches them to the ways out.
+- Splitters and convergers can close sides: drag along a join or belt again to undo it, and drag a splitter's side
+  out to the edge to open or close it.
+- Bridges: draw a belt straight across another and they cross without meeting.
+- A build needs at least two pieces to pass; levels a single piece could solve are gone.
 - Every rate is a share of a full belt (one marble a tick): inputs, targets, readouts and Check all use it.
-- Walnut and maple blocks: belts, splitters, convergers and bypasses, as many as you like; loops allowed.
+- Walnut and maple blocks: belts, splitters, convergers and bridges, as many as you like; loops allowed.
 - Check works out every block's exact share as a fraction, then runs the build for 3000 ticks and measures it.
-- Four metrics for every solve, each with its own best: pieces (every cell but inputs and outputs), footprint (the
-  area of the rectangle around the machine, so 3×5 beats 4×4), flow (100 when no marble ever waits; backups and
-  bottlenecks lower it, by how much time marbles spend stuck) and I/O layout (0–100: ports open to the outside,
-  inputs grouped, outputs grouped, facing away from each other). Improving one can cost
-  another. Each metric's histogram compares your build with 100 solutions the solver found for the level.
+- Three metrics for every solve, each with its own best: pieces (every cell but the inputs), footprint (the
+  area of the rectangle around the machine, so 3×5 beats 4×4) and flow (100 when no marble ever waits; backups and
+  bottlenecks lower it, by how much time marbles spend stuck). Improving one can cost another. Each metric's histogram compares your build with 100 solutions the solver found for the level.
 - The step counter counts through the machine's cycle (step 3 of 18) once it settles, instead of growing forever.
 - Levels shown as numbered cards: solved ones outlined green with their solution, started ones with the build so far.
   The sheet opens at the level you're on.

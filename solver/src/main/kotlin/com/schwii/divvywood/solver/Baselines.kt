@@ -12,12 +12,12 @@ fun main(args: Array<String>) {
         val found = solveLevel(level, seed = 1000L + i)
         val ms = System.currentTimeMillis() - t0
         fun list(f: (Found) -> Int) = found.map(f).sorted().joinToString(",", "[", "]")
-        println("%2d %-18s %3d solutions in %5d ms | best pieces %s, area %s, io %s, flow %s (avg %.1f)".format(
+        println("%2d %-18s %3d solutions in %5d ms | best pieces %s, area %s, flow %s (avg %.1f)".format(
             i + 1, level.name, found.size, ms,
-            found.minOfOrNull { it.metrics.pieces }, found.minOfOrNull { it.metrics.area }, found.maxOfOrNull { it.metrics.io },
+            found.minOfOrNull { it.metrics.pieces }, found.minOfOrNull { it.metrics.area },
             found.maxOfOrNull { it.flow }, found.map { it.flow }.average()))
         json.append("  \"${level.name}\": {\"pieces\": ${list { it.metrics.pieces }}, \"area\": ${list { it.metrics.area }}, ")
-            .append("\"io\": ${list { it.metrics.io }}, \"flow\": ${list { it.flow }}}")
+            .append("\"flow\": ${list { it.flow }}}")
             .append(if (i < LEVELS.lastIndex) ",\n" else "\n")
     }
     json.append("}\n")

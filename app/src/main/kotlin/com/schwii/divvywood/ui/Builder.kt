@@ -25,12 +25,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.schwii.divvywood.engine.LETTERS
+import com.schwii.divvywood.engine.MAX_PORTS
 import com.schwii.divvywood.game.Game
 import com.schwii.divvywood.game.LevelDef
 
 /**
  * The level builder's settings: each input's rate and each output's target (every rate a share of one full belt,
- * up to three of each), and whether 3-way splits are allowed. Every change applies at once; the design can be saved
+ * up to three of each and four in all), and whether 3-way splits are allowed. Every change applies at once; the design can be saved
  * after its build passes Check.
  */
 @Composable
@@ -45,7 +46,9 @@ fun ColumnScope.BuilderSheet(game: Game) {
             onChange = { set(d.copy(inputs = d.inputs.replaced(k, it))) },
             onRemove = { set(d.copy(inputs = d.inputs.filterIndexed { i, _ -> i != k })) })
     }
-    if (d.inputs.size < 3) Row(Modifier.fillMaxWidth()) {
+    // a build has four sides, one per input or output
+    val room = d.inputs.size + d.out.size < MAX_PORTS
+    if (d.inputs.size < 3 && room) Row(Modifier.fillMaxWidth()) {
         SmallButton("+ Input ${d.inputs.size + 1}", "add an input") { set(d.copy(inputs = d.inputs + "1/2")) }
     }
     d.out.forEachIndexed { k, v ->
@@ -53,7 +56,7 @@ fun ColumnScope.BuilderSheet(game: Game) {
             onChange = { set(d.copy(out = d.out.replaced(k, it))) },
             onRemove = { set(d.copy(out = d.out.filterIndexed { i, _ -> i != k })) })
     }
-    if (d.out.size < 3) Row(Modifier.fillMaxWidth()) {
+    if (d.out.size < 3 && room) Row(Modifier.fillMaxWidth()) {
         SmallButton("+ Output ${LETTERS[d.out.size]}", "add an output") { set(d.copy(out = d.out + "1/4")) }
     }
     Setting("3-way splits") {

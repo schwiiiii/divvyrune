@@ -17,6 +17,7 @@ import com.schwii.divvywood.engine.Snapshot
 import com.schwii.divvywood.engine.Solution
 import com.schwii.divvywood.engine.Tiles
 import com.schwii.divvywood.engine.WARM_TICKS
+import com.schwii.divvywood.engine.assignOutputs
 import com.schwii.divvywood.engine.buildGraph
 import com.schwii.divvywood.engine.dirTo
 import com.schwii.divvywood.engine.overloaded
@@ -56,7 +57,7 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     /** Milliseconds into the animation of a single step, while paused. */
     private var stepMs = STEP_MS
 
-    /** Node index of each final output A, B, C, or -1 when it isn't placed. */
+    /** Node index of the way out each final output A, B, C takes, or -1 when none does (see [assignOutputs]). */
     var outNode = IntArray(0); private set
     /** Each final output's measured share of the input, sampled as the simulation runs: the readout sparklines. */
     var hist = List(0) { ArrayDeque<Float>() }; private set
@@ -90,7 +91,7 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
         cycles = CycleFinder(sim).also { it.observe() }
         flipperAngles.clear()
         acc = 0f
-        outNode = IntArray(level.out.size) { id -> graph.nodes.indexOfFirst { it.kind == Kind.OUT && it.id == id } }
+        outNode = assignOutputs(graph, level, sol)
         hist = List(level.out.size) { ArrayDeque() }
         heat = FloatArray(graph.nodes.size); turnHeat = FloatArray(graph.nodes.size)
         stepMs = STEP_MS
@@ -206,7 +207,7 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     /** Where node [i] sends its marble next: a splitter, wherever its flipper points. */
     fun exitSide(i: Int): Int {
         val n = sim.n[i]
-        if (n.kind == Kind.OUT || n.kind == Kind.DUMP || n.succ.isEmpty()) return NONE
+        if (n.kind == Kind.OUT || n.succ.isEmpty()) return NONE
         return sideTo(i, if (n.kind == Kind.SPLIT) n.succ[n.rr % n.succ.size] else n.succ[0])
     }
 
@@ -234,20 +235,20 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
         return if (i >= 0 && sim.tick > 0) sim.n[i].sunk.toDouble() / sim.tick else null
     }
 
-    /** The label burned onto an input or output block. */
+    /** The label burned onto an input block. */
     fun labelOf(i: Int): String? {
         val n = graph.nodes[i]
-        return when (n.kind) {
-            Kind.SRC -> {
-                val r = level.inputs.getOrNull(n.inputId)
-                level.inputLabel(n.inputId) + if (r != null && z >= 34f * density) " $r" else ""
-            }
-            Kind.OUT -> {
-                val tg = level.out.getOrNull(n.id)
-                LETTERS[n.id] + if (tg != null && z >= 34f * density) " $tg" else ""
-            }
-            else -> null
-        }
+        if (n.kind != Kind.SRC) return null
+        val r = level.inputs.getOrNull(n.inputId)
+        return level.inputLabel(n.inputId) + if (r != null && z >= 34f * density) " $r" else ""
+    }
+
+    /** The tag on way out [i]: the output it serves and its target ("A 1/4"), or "rest" for what no output takes. */
+    fun exitLabel(i: Int): String {
+        val id = outNode.indexOf(i)
+        if (id < 0) return "rest"
+        val tg = level.out.getOrNull(id)
+        return LETTERS[id] + if (tg != null && z >= 34f * density) " $tg" else ""
     }
 
     companion object {

@@ -5,9 +5,9 @@ import androidx.core.content.edit
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Frac
 import com.schwii.divvywood.engine.Level
+import com.schwii.divvywood.engine.MAX_PORTS
 import com.schwii.divvywood.engine.Q
 import com.schwii.divvywood.engine.Metrics
-import com.schwii.divvywood.engine.metricsOf
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.Tiles
 import com.schwii.divvywood.engine.decodeGrid
@@ -17,20 +17,18 @@ import kotlinx.serialization.json.Json
 
 /**
  * A level's best solves, each metric on its own (they can come from different builds): fewest [pieces], smallest
- * footprint [area], highest [io] layout score, highest [flow]. -1 where none is known yet (saves from before a metric
- * existed: pieces, area and I/O are migrated from the solving build; flow waits for the next Check).
+ * footprint [area], highest [flow]. -1 where none is known yet.
  */
-@Serializable data class Best(val pieces: Int = -1, val area: Int = -1, val io: Int = -1, val flow: Int = -1) {
+@Serializable data class Best(val pieces: Int = -1, val area: Int = -1, val flow: Int = -1) {
     fun with(m: Metrics, f: Int?) = Best(
         if (pieces < 0) m.pieces else minOf(pieces, m.pieces),
         if (area < 0) m.area else minOf(area, m.area),
-        if (pieces < 0) m.io else maxOf(io, m.io),
         if (f == null) flow else maxOf(flow, f),
     )
 }
 
 /** The build's metrics at its last Check, solved or not; [flow] -1 when the build couldn't run. */
-@Serializable data class Checked(val pieces: Int = -1, val area: Int = -1, val io: Int = -1, val solved: Boolean = false, val flow: Int = -1)
+@Serializable data class Checked(val pieces: Int = -1, val area: Int = -1, val solved: Boolean = false, val flow: Int = -1)
 
 /**
  * A level's build, as its text code; its best scores and the build that last solved it, once solved; and the
@@ -46,30 +44,32 @@ import kotlinx.serialization.json.Json
 /**
  * A level a player designs in the builder. Every rate is a share of one full belt, as "p/q": each input's rate in
  * [inputs], each final output's target in [out]; [no3] turns 3-way splits off.
- * Designs saved before inputs had rates carry [t] (one marble every t ticks, targets as shares of that input);
- * [normalized] turns them into rates.
  */
 @Serializable data class LevelDef(
     val inputs: List<String> = listOf("1/2"),
-    val out: List<String> = listOf("1/4", "1/4"),
+    val out: List<String> = listOf("1/8", "3/8"),
     val no3: Boolean = false,
-    val t: Int? = null,
 ) {
     val rates: List<Frac> get() = inputs.mapNotNull { parseFrac(it) }
     val targets: List<Frac> get() = out.mapNotNull { parseFrac(it) }
     fun toLevel(name: String) = Level(name, rates, targets, no3)
 
-    fun normalized(): LevelDef {
-        val t = t ?: return this
-        val per = Frac(1, t)
-        return LevelDef(listOf(per.toString()), targets.map { (it * per).toString() }, no3)
-    }
-
-    /** Why these targets can't be met, if they can't: together they can't ask for more than the inputs send. */
+    /**
+     * Why this design can't be a level, if it can't: the targets can't ask for more than the inputs send, what they
+     * leave over must fit on one belt, it needs a side of the build for every port, and one piece mustn't meet it.
+     */
     fun problem(): String? {
+        val level = toLevel("draft")
         val want = targets.fold(Q.ZERO) { a, f -> a + f.q }
         val have = rates.fold(Q.ZERO) { a, f -> a + f.q }
-        return if (want > have) "The targets add up to $want of a belt, more than the inputs send ($have)." else null
+        return when {
+            want > have -> "The targets add up to $want of a belt, more than the inputs send ($have)."
+            level.rest > Q.ONE -> "The outputs leave ${level.rest} of a belt over, more than one belt can carry out."
+            level.ports > MAX_PORTS -> "A build has $MAX_PORTS sides, one per input or output" +
+                (if (level.rest > Q.ZERO) ", and one more for what the outputs leave over" else "") + ". This design needs ${level.ports}."
+            level.onePiece -> "A single piece meets these targets. Make them harder."
+            else -> null
+        }
     }
 }
 
@@ -84,12 +84,10 @@ fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNul
 /**
  * Everything saved: the name of the level last played and each level's save, by level name; the player's custom
  * levels and the builder's draft definition (the builder's build is saved like any level's, under [BUILDER]).
- * Saves from 0.1.x keyed levels by their index in the first 12-level list and kept the current one in [cur].
  */
 @Serializable data class SaveData(
     val level: String? = null,
     val levels: Map<String, LevelSave> = emptyMap(),
-    val cur: Int = 0,
     val custom: List<CustomLevel> = emptyList(),
     val nextCustom: Int = 1,
     val draft: LevelDef = LevelDef(),
@@ -97,30 +95,6 @@ fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNul
 
 /** The save name of the level builder. */
 const val BUILDER = "builder"
-
-/** The level order of saves that keyed levels by index. */
-private val V1_ORDER = listOf(
-    "Halves", "Quarter back", "Three ways", "Sixth", "Eighths", "One two three",
-    "Thirds by halves", "Fifth", "Seventh", "Full belt", "Seventeenth", "Sandbox",
-)
-
-private fun migrate(d: SaveData): SaveData = migrateIndex(d).let { m ->
-    m.copy(draft = m.draft.normalized(), custom = m.custom.map { it.copy(def = it.def.normalized()) }, levels = m.levels.mapValues { (_, l) -> migrateMetrics(l) })
-}
-
-/**
- * Saves from before the footprint was a rectangle's area (earlier still: parts and areas): a solved level gets its
- * metrics again from its solving build (or, without one, its current build); an older last-Check score is dropped.
- */
-private fun migrateMetrics(l: LevelSave): LevelSave {
-    val best = l.best?.takeIf { it.area < 0 }?.let { (l.solution ?: l.build).let { code -> Best().with(metricsOf(decodeGrid(code).tiles ?: linkedMapOf()), null) } } ?: l.best
-    val checked = l.checked?.takeIf { it.area >= 0 }
-    return if (best === l.best && checked === l.checked) l else l.copy(best = best, checked = checked)
-}
-
-private fun migrateIndex(d: SaveData): SaveData =
-    if (d.level != null) d
-    else d.copy(level = V1_ORDER.getOrNull(d.cur), levels = d.levels.mapKeys { (k, _) -> k.toIntOrNull()?.let { V1_ORDER.getOrNull(it) } ?: k }, cur = 0)
 
 /** Where the save JSON lives. */
 interface SaveStore {
@@ -132,7 +106,8 @@ class PrefsStore(context: Context) : SaveStore {
     private val prefs = context.getSharedPreferences("divvywood", Context.MODE_PRIVATE)
     override fun read(): String? = prefs.getString(KEY, null)
     override fun write(json: String) { prefs.edit { putString(KEY, json) } }
-    private companion object { const val KEY = "save.v1" }
+    init { if (prefs.contains(OLD_KEY)) prefs.edit { remove(OLD_KEY) } }   // saves from before ports were the build's sides start over
+    private companion object { const val KEY = "save.v2"; const val OLD_KEY = "save.v1" }
 }
 
 class MemoryStore(var json: String? = null) : SaveStore {
@@ -143,7 +118,7 @@ class MemoryStore(var json: String? = null) : SaveStore {
 /** Saves per level and best scores, by level name, written through to [store] on every change. */
 class Saves(private val store: SaveStore) {
     private val json = Json { ignoreUnknownKeys = true }
-    var data: SaveData = store.read()?.let { runCatching { migrate(json.decodeFromString<SaveData>(it)) }.getOrNull() } ?: SaveData()
+    var data: SaveData = store.read()?.let { runCatching { json.decodeFromString<SaveData>(it) }.getOrNull() } ?: SaveData()
         private set
 
     private fun put(d: SaveData) { data = d; store.write(json.encodeToString(d)) }
@@ -161,7 +136,7 @@ class Saves(private val store: SaveStore) {
     /** Records a Check of the named level's current build; returns the level's best afterwards. */
     fun recordCheck(name: String, m: Metrics, flow: Int?, solved: Boolean): Best? {
         val l = level(name)
-        val checked = Checked(m.pieces, m.area, m.io, solved, flow ?: -1)
+        val checked = Checked(m.pieces, m.area, solved, flow ?: -1)
         val nl = if (!solved) l.copy(checked = checked) else l.copy(best = (l.best ?: Best()).with(m, flow), solution = l.build, checked = checked)
         put(data.copy(levels = data.levels + (name to nl)))
         return nl.best

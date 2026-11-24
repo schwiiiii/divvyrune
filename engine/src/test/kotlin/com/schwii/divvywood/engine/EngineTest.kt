@@ -10,24 +10,23 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
 import kotlin.math.abs
 
+private val HALVES = "IR LR SL5"   // a belt into a splitter fed from the left, its top and bottom open: one way out each
+private val HALF = Level("halves", 2, listOf(Frac(1, 2), Frac(1, 2)))
+
 class LevelsTest {
     @TestFactory
     fun `every level has a reference solution that passes Check with no jams`(): List<DynamicTest> =
         LEVELS.withIndex().flatMap { (li, level) ->
             val tests = mutableListOf<DynamicTest>()
-            val name = level.name
-            for ((label, tiles) in listOfNotNull(
-                gridRefs[name]?.let { "grid" to it }, compact[name]?.let { "compact" to it },
-                textRefs[name]?.let { "text" to decodeGrid(it).tiles!! },
-            )) {
-                tests += DynamicTest.dynamicTest("L${li + 1} ${level.name} ($label)") {
-                    val g = buildGraph(tiles, level)
+            textRefs[level.name]?.let { code ->
+                tests += DynamicTest.dynamicTest("L${li + 1} ${level.name} (grid)") {
+                    val g = buildGraph(tiles(code), level)
                     assertEquals(0, g.errCount, g.nodes.filter { it.errs.isNotEmpty() }.joinToString { "${it.cell}: ${it.errs}" })
                     val v = check(g, level)
                     assertTrue(v.solved, fmt(v)); assertEquals(0, v.skips, fmt(v))
                 }
             }
-            netRefs[name]?.let { make ->
+            netRefs[level.name]?.let { make ->
                 tests += DynamicTest.dynamicTest("L${li + 1} ${level.name} (network)") {
                     val v = check(make(), level)
                     assertTrue(v.solved, fmt(v)); assertEquals(0, v.skips, fmt(v))
@@ -36,19 +35,194 @@ class LevelsTest {
             if (tests.isEmpty()) tests += DynamicTest.dynamicTest("L${li + 1} has a reference") { throw AssertionError("no reference solution") }
             tests
         }
+
+    @Test fun `every level fits on the four sides of a build`() {
+        for (l in LEVELS) assertTrue(l.ports <= MAX_PORTS, "${l.name}: ${l.ports}")
+        assertEquals(3, levelNamed("Seventh").ports, "input, A and the rest")
+        assertEquals(3, HALF.ports, "nothing left over")
+    }
+
+    @Test fun `no level can be met by a single piece`() {
+        for (l in LEVELS) assertFalse(l.onePiece, l.name)
+        assertTrue(HALF.onePiece)
+        assertTrue(Level("thirds", 2, listOf(Frac(1, 3), Frac(1, 3))).onePiece, "two thirds and the rest: a 3-way splitter")
+        assertFalse(Level("thirds", 2, listOf(Frac(1, 3), Frac(1, 3)), no3 = true).onePiece)
+        assertTrue(Level("join", listOf(Frac(1, 4), Frac(1, 2)), listOf(Frac(3, 4))).onePiece)
+        assertTrue(Level("cross", listOf(Frac(1, 4), Frac(1, 2)), listOf(Frac(1, 2), Frac(1, 4))).onePiece, "a bridge")
+        assertFalse(Level("swap", listOf(Frac(1, 3), Frac(2, 3)), listOf(Frac(1, 2), Frac(1, 2))).onePiece)
+    }
+
+    @Test fun `a single piece doesn't pass Check`() {
+        val v = check(buildGraph(tiles("IR SL5"), HALF), HALF)
+        assertFalse(v.solved); assertTrue("A machine needs at least two pieces." in v.reasons)
+    }
+}
+
+class PortTest {
+    private val halves = HALF
+
+    @Test fun `a splitter at the edge sends straight out of its open sides`() {
+        val g = buildGraph(tiles(HALVES), halves)
+        assertEquals(0, g.errCount)
+        assertEquals(2, g.exits.size)
+        assertEquals(setOf(1, 3), g.ports.filter { !it.isInput }.map { it.side }.toSet())
+        assertTrue(check(g, halves).solved)
+    }
+
+    @Test fun `every open side facing the edge is a way out`() {
+        val g = buildGraph(tiles("IR SL7"), halves)
+        assertEquals(3, g.exits.size)
+        val v = check(g, halves)
+        assertFalse(v.solved)
+        assertTrue(v.reasons.any { "gets 1/6" in it }, v.reasons.toString())
+    }
+
+    @Test fun `a belt pointing at the edge is a way out`() {
+        val level = Level("one", 2, listOf(Frac(1, 1)))
+        assertTrue(check(buildGraph(tiles("IR LR LR"), level), level).solved)
+    }
+
+    @Test fun `two ways out on one side are flagged on both`() {
+        val g = buildGraph(tiles(".. BR LR\nIR SL5 ..\n.. TR LR"), halves)
+        val flagged = g.nodes.filter { n -> n.errs.any { "right side" in it } }.map { it.cell }.toSet()
+        assertEquals(setOf(Cell(2, 0), Cell(2, 2)), flagged)
+    }
+
+    @Test fun `a belt whose way to the edge is blocked is flagged`() {
+        val g = buildGraph(tiles("IR LR .. SB5\n.. .. .. .."), halves)
+        assertTrue(g.nodes[g.idx.getValue(Cell(1, 0))].errs.any { "blocked" in it })
+    }
+
+    @Test fun `an input sits just outside the machine and feeds the first piece in its row`() {
+        val t = tiles("IR .. .. LR SL5")
+        assertEquals(Kind.SRC, t[Cell(2, 0)]?.kind, "it moves up to the machine's edge")
+        assertEquals(HALVES, encodeGrid(t))
+        assertTrue(check(buildGraph(t, halves), halves).solved)
+    }
+
+    @Test fun `an input follows the edge as the machine shrinks and grows`() {
+        val t = tiles(HALVES)
+        t.remove(Cell(1, 0)); settleInputs(t)
+        assertEquals(Kind.SRC, t[Cell(1, 0)]?.kind)
+        t[Cell(-2, 5)] = Tile(Kind.BELT, from = 2, out = 0); settleInputs(t)
+        assertEquals(Kind.SRC, t[Cell(-3, 0)]?.kind)
+    }
+
+    @Test fun `an input with nothing in its row is flagged`() {
+        val g = buildGraph(tiles("IR ..\n.. SL5"), halves)
+        assertTrue(g.nodes.first { it.kind == Kind.SRC }.errs.any { "nothing in its row" in it })
+    }
+
+    @Test fun `outputs are matched to ways out by rate`() {
+        val level = levelNamed("Quarter back")
+        val g = buildGraph(tiles(textRefs.getValue("Quarter back")), level)
+        val v = check(g, level)
+        assertTrue(v.solved, fmt(v))
+        assertEquals(listOf(Q.of(1, 8), Q.of(3, 8)), v.rows.sortedBy { it.id }.map { it.exact })
+    }
+
+    @Test fun `an output with no way out is named`() {
+        val v = check(buildGraph(tiles("IR LR"), halves), halves)
+        assertTrue(v.reasons.any { "Output B has no belt leaving" in it }, v.reasons.toString())
+    }
+
+    @Test fun `what no output needs leaves on one side`() {
+        val level = Level("sixth", 2, listOf(Frac(1, 3)))
+        val v = check(buildGraph(tiles("IR SL7"), level), level)
+        assertTrue(v.reasons.any { "2 belts leave the build with what no output needs" in it }, v.reasons.toString())
+    }
+}
+
+class ClosedSideTest {
+    @Test fun `retracing a join closes it and drawing it again opens it`() {
+        val t = tiles("IR SL7 CB")
+        val path = listOf(Cell(1, 0), Cell(2, 0))
+        assertTrue(isRetrace(t, path))
+        eraseRetrace(t, path)
+        assertFalse(t.getValue(Cell(1, 0)).isOpen(0)); assertFalse(t.getValue(Cell(2, 0)).isOpen(2))
+        val g = buildGraph(t, HALF)
+        assertTrue(g.nodes[g.idx.getValue(Cell(1, 0))].succ.none { g.nodes[it].kind == Kind.MERGE })
+        assertFalse(isRetrace(t, path))
+        commitPath(t, path)
+        assertTrue(t.getValue(Cell(1, 0)).isOpen(0)); assertTrue(t.getValue(Cell(2, 0)).isOpen(2))
+    }
+
+    @Test fun `retracing a belt removes it`() {
+        val t = tiles("IR LR LR SL5")
+        eraseRetrace(t, listOf(Cell(1, 0), Cell(2, 0), Cell(3, 0)).also { assertTrue(isRetrace(t, it)) })
+        assertNull(t[Cell(1, 0)]); assertNull(t[Cell(2, 0)]); assertEquals(Kind.SPLIT, t[Cell(3, 0)]?.kind)
+    }
+
+    @Test fun `dragging a splitter's side across the edge opens or closes it`() {
+        val t = tiles("IR SL7")
+        val up = listOf(Cell(1, 0), Cell(1, -1))
+        assertEquals(3, edgeSide(t, up))
+        assertEquals(NONE, edgeSide(t, up + Cell(1, -2)), "a longer drag draws belts")
+        toggleSide(t, Cell(1, 0), 3)
+        assertEquals(2, buildGraph(t, HALF).exits.size)
+        toggleSide(t, Cell(1, 0), 3)
+        assertEquals(3, buildGraph(t, HALF).exits.size)
+        assertEquals(NONE, edgeSide(t, listOf(Cell(1, 0), Cell(2, 0), Cell(2, 1))), "only straight out")
+    }
+
+    @Test fun `codes list open sides clockwise from the marked side`() {
+        val t = tiles("ST3")
+        val s = t.getValue(Cell(0, 0))
+        assertTrue(s.isOpen(0)); assertTrue(s.isOpen(1)); assertFalse(s.isOpen(2))
+        assertEquals("ST3", encodeGrid(t))
+        assertEquals("ST7", encodeGrid(tiles("ST")), "a plain code has every side open")
+        assertEquals("CR5", encodeGrid(tiles("CR5")))
+    }
+
+    @Test fun `turning a piece turns its closed sides with it`() {
+        val s = Tile(Kind.SPLIT, inSide = 3, closed = 1 shl 2)
+        val r = turnPiece(s)
+        assertEquals(0, r.inSide); assertFalse(r.isOpen(3)); assertTrue(r.isOpen(2))
+    }
+}
+
+class BridgeTest {
+    private val cross = Level("cross", listOf(Frac(1, 2), Frac(1, 4)), listOf(Frac(1, 2), Frac(1, 4)))
+
+    @Test fun `two lines cross on a bridge without meeting`() {
+        val t = tiles(".. IB2 ..\nIR X LR\n.. TB ..")
+        val b = t.getValue(Cell(1, 1))
+        assertEquals(Kind.BRIDGE, b.kind); assertEquals(0, b.out); assertEquals(1, b.inSide)
+        val g = buildGraph(t, cross)
+        assertEquals(0, g.errCount)
+        val v = check(g, cross)
+        assertTrue(v.solved, fmt(v))
+        assertEquals(".. IB2 ..\nIR X LR\n.. TB ..", encodeGrid(t))
+    }
+
+    @Test fun `drawing straight across a belt builds a bridge`() {
+        val t = tiles(".. IB2\n.. TB\n.. TB")
+        commitPath(t, listOf(Cell(0, 1), Cell(1, 1), Cell(2, 1)))
+        assertEquals(Tile(Kind.BRIDGE, out = 0, inSide = 1), t[Cell(1, 1)])
+        assertTrue(pathValid(t, listOf(Cell(2, 1), Cell(1, 1), Cell(0, 1))), "a bridge lets a straight line through")
+        commitPath(t, listOf(Cell(2, 1), Cell(1, 1), Cell(0, 1)))
+        assertEquals(Tile(Kind.BRIDGE, out = 2, inSide = 1), t[Cell(1, 1)], "drawing the other way turns that lane")
+        assertFalse(pathValid(t, listOf(Cell(1, 0), Cell(1, 1), Cell(2, 1))), "a turn on a bridge isn't")
+    }
+
+    @Test fun `a bridge counts as one piece and turns with a group`() {
+        val t = tiles(".. IB2 ..\nIR X LR\n.. TB ..")
+        assertEquals(3, metricsOf(t).pieces); assertEquals(1, metricsOf(t).bridges)
+        val b = Tile(Kind.BRIDGE, out = 0, inSide = 3)
+        assertEquals(b, turnPiece(turnPiece(turnPiece(turnPiece(b)))))
+        assertEquals(Tile(Kind.BRIDGE, out = 2, inSide = 1), rotBridge(Tile(Kind.BRIDGE, out = 0, inSide = 1)))
+    }
+
+    @Test fun `retracing one lane of a bridge leaves the other as a belt`() {
+        val t = tiles(".. IB2 ..\nIR X LR\n.. TB ..")
+        val across = listOf(Cell(0, 1), Cell(1, 1), Cell(2, 1))
+        assertTrue(isRetrace(t, across))
+        eraseRetrace(t, across)
+        assertEquals(Tile(Kind.BELT, from = 3, out = 1), t[Cell(1, 1)])
+    }
 }
 
 class BrokenLayoutTest {
-    @Test fun `dangling belt is flagged`() {
-        val t = grid {
-            put(0, 0, Kind.SRC); put(2, 0, Kind.SPLIT); put(2, -2, Kind.OUT, 0); put(2, 2, Kind.OUT, 1)
-            path(0 to 0, 2 to 0); path(2 to 0, 2 to -2); path(2 to 0, 3 to 0)
-        }
-        val g = buildGraph(t, levelNamed("Halves"))
-        val v = judge(g, levelNamed("Halves"), solve(g, levelNamed("Halves")))
-        assertTrue(!v.solved && v.reasons.any { "fixing" in it }, v.reasons.toString())
-    }
-
     @Test fun `over-capacity loop is flagged`() {
         val g = Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
             link(s, m); link(m, a); link(a, A); link(a, B); link(a, m); g }
@@ -59,7 +233,7 @@ class BrokenLayoutTest {
     @Test fun `closed loop is flagged`() {
         val g = Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); add(Kind.OUT, 0); add(Kind.OUT, 1)
             link(s, m); link(m, a); link(a, m); link(a, m); g }
-        val sol = solve(g, levelNamed("Halves"))
+        val sol = solve(g, HALF)
         assertTrue(!sol.ok && "no way out" in sol.why, sol.why)
     }
 
@@ -91,49 +265,6 @@ class BrokenLayoutTest {
 }
 
 class DirectionTest {
-    @Test fun `the input's direction decides what it feeds`() {
-        val t = compact.getValue("Halves").copyTiles()
-        t[Cell(0, 1)] = Tile(Kind.SRC, out = 3)
-        val g = buildGraph(t, levelNamed("Halves"))
-        assertTrue(g.nodes.first { it.kind == Kind.SRC }.errs.any { "faces nothing" in it })
-        t[Cell(0, 1)] = Tile(Kind.SRC, out = 0)
-        val g2 = buildGraph(t, levelNamed("Halves"))
-        assertEquals(0, g2.errCount); assertTrue(check(g2, levelNamed("Halves")).solved)
-    }
-
-    private fun eighths(f: String) = "..  BR  CB  RL  BL\n..  BT  $f IB  BT\nRB  SR  SR  ST  LT\nTB  RB  ST  ..  ..\nTR  CB  TL  ..  ..\n..  FT  ..  ..  .."
-
-    @Test fun `outputs take items from one side only`() {
-        val g = buildGraph(decodeGrid(eighths("FT2")).tiles!!, levelNamed("Eighths"))
-        val v = check(g, levelNamed("Eighths"))
-        val b = g.nodes.first { it.kind == Kind.OUT && it.id == 1 }
-        assertTrue(v.solved, fmt(v))
-        assertEquals(listOf(Kind.MERGE), b.pred.map { g.nodes[it].kind })
-        val down = buildGraph(decodeGrid(eighths("FB2")).tiles!!, levelNamed("Eighths"))
-        assertEquals(1, down.errCount)
-        assertTrue(down.nodes.any { n -> n.errs.any { "closed side of an output" in it } })
-    }
-
-    @Test fun `a splitter only feeds outputs and bypasses facing it`() {
-        val t = tilesOf(Cell(0, 0) to Tile(Kind.SRC, out = 0), Cell(1, 0) to Tile(Kind.SPLIT, inSide = 2), Cell(2, 0) to Tile(Kind.OUT, inSide = 2, id = 0),
-            Cell(1, 1) to Tile(Kind.OUT, inSide = 0, id = 1), Cell(1, -1) to Tile(Kind.DUMP, inSide = 1, id = 0))
-        val g = buildGraph(t, Level("t", 2, listOf(null, null)))
-        assertEquals(2, g.nodes.first { it.kind == Kind.SPLIT }.succ.size)
-        assertEquals(0, g.nodes[g.idx.getValue(Cell(1, 1))].pred.size)
-    }
-
-    @Test fun `saved outputs from older versions face what feeds them`() {
-        val t = tilesOf(Cell(0, 0) to Tile(Kind.SRC, out = 0), Cell(1, 0) to Tile(Kind.OUT, id = 0))
-        orientMissing(t)
-        assertEquals(2, t.getValue(Cell(1, 0)).inSide)
-    }
-
-    @Test fun `drawing a belt into an output turns it to face the belt`() {
-        val t = tilesOf(Cell(0, 0) to Tile(Kind.OUT, id = 0, inSide = 2))
-        commitPath(t, listOf(Cell(0, 3), Cell(0, 2), Cell(0, 1), Cell(0, 0)))
-        assertEquals(1, t.getValue(Cell(0, 0)).inSide)
-    }
-
     @Test fun `drawing out of a converger and into a splitter sets their sides`() {
         val t = tilesOf(Cell(0, 0) to Tile(Kind.MERGE, out = 0), Cell(0, 4) to Tile(Kind.SPLIT, inSide = 2))
         commitPath(t, listOf(Cell(0, 0), Cell(0, -1), Cell(0, -2)))
@@ -141,48 +272,57 @@ class DirectionTest {
         commitPath(t, listOf(Cell(2, 4), Cell(1, 4), Cell(0, 4)))
         assertEquals(0, t.getValue(Cell(0, 4)).inSide)
     }
+
+    @Test fun `an input dropped beside the machine enters from that side`() {
+        val t = tiles("SL5")
+        assertEquals(2, entrySide(t, Cell(-3, 0)))
+        assertEquals(3, entrySide(t, Cell(0, -2)))
+        assertEquals(0, entrySide(t, Cell(4, 1)))
+    }
 }
 
 class GroupTest {
-    @Test fun `level 7 moved as a whole group still solves`() {
-        val t = gridRefs.getValue("Thirds by halves").copyTiles()
+    private val thirds get() = tiles(textRefs.getValue("Thirds by halves"))
+
+    @Test fun `a build moved as a whole group still solves`() {
+        val t = thirds
         assertNotNull(moveGroup(t, t.keys.toList(), 5, -3))
         val g = buildGraph(t, levelNamed("Thirds by halves"))
         assertEquals(0, g.errCount); assertTrue(check(g, levelNamed("Thirds by halves")).solved)
     }
 
     @Test fun `move onto another piece is refused and changes nothing`() {
-        val t = gridRefs.getValue("Thirds by halves").copyTiles()
+        val t = thirds
+        val c = t.keys.first { t.getValue(it).kind == Kind.SPLIT }
         t[Cell(100, 100)] = Tile(Kind.SPLIT, inSide = 2)
         val before = t.copyTiles()
-        assertNull(moveGroup(t, listOf(Cell(0, 0)), 100, 100))
+        assertNull(moveGroup(t, listOf(c), 100 - c.x, 100 - c.y))
         assertEquals(before, t)
-        assertTrue(moveBlockedAt(t, listOf(Cell(0, 0)), Cell(100, 100)))
+        assertTrue(moveBlockedAt(t, listOf(c), Cell(100, 100)))
     }
 
     @Test fun `a piece moved onto a belt replaces it`() {
-        val t = decodeGrid("IR LR LR SL FL\n.. .. .. FT2 ..").tiles!!
+        val t = tiles("IR LR LR SL5")
         val splitter = t.getValue(Cell(3, 0))
         assertFalse(moveBlockedAt(t, listOf(Cell(3, 0)), Cell(1, 0)))
         assertEquals(listOf(Cell(1, 0)), moveGroup(t, listOf(Cell(3, 0)), -2, 0))
         assertEquals(splitter, t.getValue(Cell(1, 0)))
         assertNull(t[Cell(3, 0)])
-        assertEquals(Kind.BELT, t.getValue(Cell(2, 0)).kind)
     }
 
-    @Test fun `rotating level 1 keeps it solved and four turns restore it`() {
-        val t0 = gridRefs.getValue("Halves")
+    @Test fun `rotating a build keeps it solved and four turns restore it`() {
+        val t0 = tiles(textRefs.getValue("Fifth"))
         val t = t0.copyTiles()
         var cells = rotateGroup(t, t.keys.toList())!!
-        val g = buildGraph(t, levelNamed("Halves"))
-        assertEquals(0, g.errCount); assertTrue(check(g, levelNamed("Halves")).solved)
+        val g = buildGraph(t, levelNamed("Fifth"))
+        assertEquals(0, g.errCount); assertTrue(check(g, levelNamed("Fifth")).solved)
         repeat(3) { cells = rotateGroup(t, cells)!! }
         assertEquals(t0, t)
     }
 
     @Test fun `rotation blocked by an outside tile is refused and changes nothing`() {
-        val t0 = gridRefs.getValue("Halves")
-        val t = t0.copyTiles().apply { this[Cell(3, 1)] = Tile(Kind.BELT, from = 2, out = 0) }
+        val t0 = tiles(".. IB\n.. TB\n.. ST5")
+        val t = t0.copyTiles().apply { this[Cell(0, 1)] = Tile(Kind.BELT, from = 2, out = 0) }
         val before = t.copyTiles()
         assertNull(rotateGroup(t, t0.keys.toList()))
         assertEquals(before, t)
@@ -190,36 +330,19 @@ class GroupTest {
 }
 
 class TextCodeTest {
-    @Test fun `the whiteboard 1-30 decodes, solves, and encodes back to the same text`() {
-        val d = decodeGrid(SKETCH_1_30)
-        assertNull(d.error)
-        val level = Level("1/30", 2, listOf(Frac(1, 30)))
-        val g = buildGraph(d.tiles!!, level)
-        assertEquals(0, g.errCount)
-        val v = check(g, level)
-        assertTrue(v.solved, fmt(v)); assertEquals(0, v.skips)
-        assertEquals(SKETCH_1_30, encodeGrid(d.tiles!!))
-        assertNull(fitsLevel(d.tiles!!, levelNamed("Seventeenth")), "bypasses are unlimited")
-    }
-
     @TestFactory
-    fun `reference layouts round-trip through text`(): List<DynamicTest> = listOf(
-        Triple("Halves grid", gridRefs.getValue("Halves"), "Halves"), Triple("Thirds by halves grid", gridRefs.getValue("Thirds by halves"), "Thirds by halves"),
-        Triple("Fifth grid", gridRefs.getValue("Fifth"), "Fifth"),
-        Triple("Halves compact", compact.getValue("Halves"), "Halves"), Triple("Quarter back compact", compact.getValue("Quarter back"), "Quarter back"),
-    ).map { (name, t, ln) ->
+    fun `reference solutions round-trip through text`(): List<DynamicTest> = textRefs.map { (name, code) ->
         DynamicTest.dynamicTest(name) {
-            val text = encodeGrid(t)
-            val d = decodeGrid(text)
-            assertNull(d.error)
-            assertEquals(text, encodeGrid(d.tiles!!))
-            assertTrue(check(buildGraph(d.tiles!!, levelNamed(ln)), levelNamed(ln)).solved)
+            val t = tiles(code)
+            assertEquals(code, encodeGrid(t))
+            assertEquals(code, encodeGrid(tiles(encodeLine(t))))
         }
     }
 
-    @Test fun `numbered and unnumbered F cells get distinct outputs`() {
-        val d = decodeGrid("IR SL FL2\n.. FT ..")
-        assertEquals(listOf(0, 1), d.tiles!!.values.filter { it.kind == Kind.OUT }.map { it.id }.sorted())
+    @Test fun `old codes read their outputs and bypasses as empty`() {
+        val t = tiles("IR SL FL\n.. FT2 ..\n.. OT ..")
+        assertTrue(t.values.none { it.kind == Kind.OUT })
+        assertEquals(2, t.size)
     }
 
     @Test fun `bad text is reported with its row and cell`() {
@@ -227,38 +350,33 @@ class TextCodeTest {
         assertTrue("same side" in decodeGrid("RR").error!!)
         assertTrue("same number" in decodeGrid("IR2 IL2").error!!)
         assertTrue("Row 2, cell 3" in decodeGrid("IR,SL/..,..,ZZ").error!!)
+        assertTrue("isn't a cell code" in decodeGrid("IR5").error!!)
     }
 
     @Test fun `export is single-spaced and the one-line code builds the same layout`() {
-        val t = decodeGrid("..  ..  IB  ..\nFR2 CL  ST  FL\n..  RT  TL  ..").tiles!!
-        assertEquals(".. .. IB ..\nFR2 CL ST FL\n.. RT TL ..", encodeGrid(t))
-        assertEquals("..,..,IB,../FR2,CL,ST,FL/..,RT,TL,..", encodeLine(t))
-        assertEquals(encodeGrid(t), encodeGrid(decodeGrid(encodeLine(t)).tiles!!))
+        val t = tiles("..  ..  IB\nRL  CL  ST\n..  RT  TL")
+        assertEquals(".. .. IB\nRL CL7 ST7\n.. RT TL", encodeGrid(t))
+        assertEquals("..,..,IB/RL,CL7,ST7/..,RT,TL", encodeLine(t))
     }
 }
 
 class FairnessTest {
-    private val twoThirds = "..  ..  IB  ..\nFR2 CL  ST  FL\n..  RT  TL  .."
+    private val twoThirds = ".. .. IB\nRL CL ST\n.. RT TL"   // A (left) gets the converger's 2/3, B (right) the splitter's 1/3
 
     @Test fun `a splitter feeding a converger directly gets its full share`() {
-        val t = decodeGrid(twoThirds).tiles!!
+        val t = tiles(twoThirds)
         for (rate in listOf(2, 1)) {
             val m = measure(t, rate)
-            assertTrue(abs(m.share(1) - 2.0 / 3) < 0.01 && abs(m.share(0) - 1.0 / 3) < 0.01 && m.skips == 0,
-                "rate $rate: B ${m.share(1)} A ${m.share(0)} skips ${m.skips}")
+            assertTrue(abs(m.share(0) - 2.0 / 3) < 0.01 && abs(m.share(1) - 1.0 / 3) < 0.01 && m.skips == 0,
+                "rate $rate: left ${m.share(0)} right ${m.share(1)} skips ${m.skips}")
         }
         val level = Level("2/3", 2, listOf(Frac(1, 3), Frac(2, 3)))
         assertTrue(check(buildGraph(t, level), level).solved)
     }
 
     @Test fun `a splitter straight into a converger keeps full speed`() {
-        val m = measure(decodeGrid("IR SL CR FL\n.. FT .. ..").tiles!!, 1)
+        val m = measure(tiles("IR SL6 CR"), 1)
         assertTrue(m.throughput > 0.99, "throughput ${m.throughput}")
-    }
-
-    @Test fun `the 1-30 build measures one thirtieth with no skips`() {
-        val m = measure(decodeGrid(SKETCH_1_30).tiles!!, 2)
-        assertTrue(abs(m.share(0) - 1.0 / 30) < 0.005 && m.skips == 0, "share ${m.share(0)} skips ${m.skips}")
     }
 }
 
@@ -270,27 +388,25 @@ class RandomLevelTest {
         return ls[0]
     }
 
-    /** The construction from [RANDOM_TARGETS]' doc: N = 2^a·3^b ≥ q shares, N − q sent back, p to A, the rest to a bypass. */
+    /** The construction from [RANDOM_TARGETS]' doc: N = 2^a·3^b ≥ q shares, N − q sent back, p to A, the rest out one side. */
     private fun solution(f: Frac): Graph = Net().run {
         val q = f.d
-        var n = 1; val ways = mutableListOf<Int>()
-        // the smallest 2^a·3^b ≥ q
+        val ways = mutableListOf<Int>()
         var best = Int.MAX_VALUE; var bestA = 0; var bestB = 0
         var p3 = 1; var b = 0
         while (p3 < 4 * q) { var p2 = 1; var a = 0; while (p2 * p3 < 4 * q) { if (p2 * p3 >= q && p2 * p3 < best) { best = p2 * p3; bestA = a; bestB = b }; p2 *= 2; a++ }; p3 *= 3; b++ }
         repeat(bestB) { ways += 3 }; repeat(bestA) { ways += 2 }
-        n = best
+        val n = best
         val s = add(Kind.SRC)
         val m = if (n > q) add(Kind.MERGE) else -1
         val top = if (m >= 0) { link(s, m); m } else s
         var leaves = listOf(top)
         for (w in ways) leaves = leaves.flatMap { from -> val sp = add(Kind.SPLIT); link(from, sp); List(w) { sp } }
-        // each leaf is a splitter exit; a belt chain from it becomes the share's line
         val shares = leaves.map { sp -> add(Kind.BELT).also { link(sp, it, 0) } }
-        val back = shares.take(n - q); val toA = shares.drop(n - q).take(f.n); val toDump = shares.drop(n - q + f.n)
+        val back = shares.take(n - q); val toA = shares.drop(n - q).take(f.n); val rest = shares.drop(n - q + f.n)
         if (back.isNotEmpty()) link(join(back), m)
         link(join(toA), add(Kind.OUT, 0))
-        if (toDump.isNotEmpty()) link(join(toDump), add(Kind.DUMP, 0))
+        if (rest.isNotEmpty()) link(join(rest), add(Kind.OUT))
         check(n == leaves.size)
         g
     }
@@ -314,14 +430,13 @@ class RandomLevelTest {
 
 class WaitTest {
     @Test fun `a clean split never waits`() {
-        val s = Sim(buildGraph(decodeGrid("IR SL FL\n.. FT2 ..").tiles!!, levelNamed("Halves")), 2)
+        val s = Sim(buildGraph(tiles(HALVES), HALF), 2)
         repeat(500) { s.step() }
         assertEquals(0, s.waits.sum()); assertEquals(0, s.turnAways.sum())
     }
 
     @Test fun `a loop into a full-belt input holds marbles up at the converger`() {
-        val tiles = decodeGrid("IR CR SL SL FL\n.. RT TL FT2 ..").tiles!!
-        val g = buildGraph(tiles, levelNamed("Full belt"))
+        val g = buildGraph(tiles("IR CR SL6 SL6\n.. RT TL .."), levelNamed("Full belt"))
         val s = Sim(g, 1)
         repeat(500) { s.step() }
         val merge = g.idx.getValue(Cell(1, 0))
@@ -334,33 +449,22 @@ class WaitTest {
 class MultiInputTest {
     @Test fun `two inputs solve as rates and each is measured`() {
         val level = levelNamed("Two streams")
-        val g = buildGraph(decodeGrid(textRefs.getValue("Two streams")).tiles!!, level)
-        val sol = solve(g, level)
-        val conv = g.nodes.indexOfFirst { it.kind == Kind.MERGE }
-        assertEquals(Q.of(3, 4), sol.flow[conv])
+        val g = buildGraph(tiles(textRefs.getValue("Two streams")), level)
         val s = Sim(g, level)
         repeat(1200) { s.step() }
         assertEquals(600, s.emittedBy[0])
-        assertTrue(s.emittedBy[1] in 299..300, "the slower input can be a marble behind at the converger")
+        assertTrue(s.emittedBy[1] in 299..300, "the slower input can be a marble behind at a converger")
     }
 
     @Test fun `a missing input is named, and inputs past the level's count don't fit`() {
         val level = levelNamed("Two streams")
-        val g = buildGraph(decodeGrid("IR SL FL\n.. FT2 ..").tiles!!, level)
+        val g = buildGraph(tiles(HALVES), level)
         assertTrue("Place input 2." in judge(g, level, solve(g, level)).reasons)
-        assertEquals("This level has 1 input; the text uses 2.", fitsLevel(decodeGrid("IR FL\nIR2 FL2").tiles!!, levelNamed("Halves")))
-    }
-
-    @Test fun `numbered inputs round-trip through text`() {
-        val text = "IR CR SL\n.. IT2 FT2"
-        val d = decodeGrid(text)
-        assertEquals(setOf(0, 1), d.tiles!!.values.filter { it.kind == Kind.SRC }.map { it.id }.toSet())
-        assertEquals(text, encodeGrid(d.tiles!!))
-        assertEquals("Two inputs have the same number.", decodeGrid("IR2 IR2").error)
+        assertEquals("This level has 1 input; the text uses 2.", fitsLevel(tiles(".. IB2 ..\nIR X LR\n.. TB .."), HALF))
     }
 
     @Test fun `a rate of two thirds sends two marbles every three ticks`() {
-        val g = buildGraph(decodeGrid("IR FL").tiles!!, Level("r", listOf(Frac(2, 3)), listOf(null)))
+        val g = buildGraph(tiles("IR LR"), Level("r", listOf(Frac(2, 3)), listOf(null)))
         val s = Sim(g, listOf(Frac(2, 3)))
         repeat(300) { s.step() }
         assertEquals(200, s.emittedBy[0])
@@ -368,46 +472,25 @@ class MultiInputTest {
 }
 
 class MetricsTest {
-    private fun m(text: String) = metricsOf(decodeGrid(text).tiles!!)
-
-    @Test fun `pieces and the footprint count every cell but inputs and outputs, bypasses included`() {
-        val x = m("IR SL LR OL\n.. FT2 .. ..")
-        assertEquals(3, x.pieces); assertEquals(1, x.bypasses)
-        assertEquals(3, x.area, "the machine is the splitter, belt and bypass in a row"); assertEquals(3, x.w); assertEquals(1, x.h)
-        assertEquals(0, m("IR FL").area)
-    }
-
-    @Test fun `a straight run in and out the far side scores full marks`() {
-        assertEquals(100, m("IR FL").io)
-        assertEquals(100, m("IB\nFT").io)
-    }
-
-    @Test fun `halves scores the edge in full, outputs half grouped, and opposite faces`() {
-        // all three ports face out; A and B are 2 apart (grouping (1 + 1/2) / 2); IN faces left, A right
-        val io = m("IR SL FL\n.. FT2 ..").layout
-        assertEquals(3, io.onEdge); assertEquals(0.75, io.grouping, 1e-9); assertEquals(1.0, io.opposition, 1e-9)
-        assertEquals(93, io.score)
-    }
-
-    @Test fun `a port facing into the build loses its edge and opposition`() {
-        val io = m("BR LR LB\nIT FR TL").layout   // output A's mouth faces left, straight at the input
-        assertEquals(1, io.onEdge); assertEquals(0.0, io.opposition, 1e-9)
-        assertEquals(50, io.score)
-        assertEquals(2, m("IR LR LB\n.. FR TL").layout.onEdge, "a clear line out counts even inside the bounding box")
+    @Test fun `pieces and the footprint count every cell but the inputs`() {
+        val x = metricsOf(tiles("IR LR SL5"))
+        assertEquals(2, x.pieces); assertEquals(1, x.belts); assertEquals(1, x.splits)
+        assertEquals(2, x.area); assertEquals(2, x.w); assertEquals(1, x.h)
+        assertEquals(1, metricsOf(tiles("IR SL5")).area)
     }
 }
 
 class CycleTest {
-    private fun cycleOf(level: String, text: String) = findCycle(buildGraph(decodeGrid(text).tiles!!, levelNamed(level)), levelNamed(level))
+    private fun cycleOf(level: Level, text: String) = findCycle(buildGraph(tiles(text), level), level)
 
     @Test fun `halves repeats every four ticks`() {
         // a marble every other tick, the splitter alternating: two marbles, four ticks, then all again
-        assertEquals(4, cycleOf("Halves", "IR SL FL\n.. FT2 ..")!!.length)
+        assertEquals(4, cycleOf(HALF, HALVES)!!.length)
     }
 
     @Test fun `every level's reference solution settles into a loop`() {
         for ((name, text) in textRefs) {
-            val c = cycleOf(name, text)
+            val c = cycleOf(levelNamed(name), text)
             assertNotNull(c, name)
             assertTrue(c!!.length in 1..MAX_CYCLE_TICKS, "$name: $c")
         }
@@ -419,46 +502,41 @@ class CycleTest {
     }
 
     @Test fun `the loop's output counts are exact`() {
-        // over one loop the marbles counted at each output give its rate exactly
         val level = levelNamed("One two four")
-        val g = buildGraph(decodeGrid(textRefs.getValue("One two four")).tiles!!, level)
+        val g = buildGraph(tiles(textRefs.getValue("One two four")), level)
         val c = findCycle(g, level)!!
         val s = Sim(g, level)
         repeat(c.start) { s.step() }
         val before = s.snap()
         repeat(c.length) { s.step() }
         val after = s.snap()
-        val outs = g.nodes.indices.filter { g.nodes[it].kind == Kind.OUT }.sortedBy { g.nodes[it].id }
+        val outs = assignOutputs(g, level, solve(g, level))
         val rates = outs.map { Q.of((after.sunk[it] - before.sunk[it]).toLong(), c.length.toLong()) }
         assertEquals(level.out.map { it!!.q }, rates)
     }
 
     @Test fun `a build gives the same result however its pieces were placed`() {
-        // this layout once passed in the order it was built and jammed after a reload
         val level = levelNamed("Full belt")
-        val tiles = decodeGrid("FB RB BL .. ..\nRT CL SR BL ..\n.. FR2 CL SR IL\n.. .. RT TL ..").tiles!!
-        val first = check(buildGraph(tiles, level), level).reasons
+        val t = tiles(textRefs.getValue("Full belt"))
+        val first = check(buildGraph(t, level), level).reasons
         val rnd = kotlin.random.Random(5)
         repeat(20) {
-            val shuffled = LinkedHashMap<Cell, Tile>().apply { tiles.entries.shuffled(rnd).forEach { (c, t) -> put(c, t) } }
+            val shuffled = LinkedHashMap<Cell, Tile>().apply { t.entries.shuffled(rnd).forEach { (c, x) -> put(c, x) } }
             assertEquals(first, check(buildGraph(shuffled, level), level).reasons)
         }
     }
 
     @Test fun `flow is 100 when no marble waits`() {
-        val level = levelNamed("Halves")
-        val g = buildGraph(decodeGrid("FB ..\nSR IL\nFT ..").tiles!!, level)
-        val c = findCycle(g, level)!!
-        assertEquals(100, flowOf(g, level, c).score)
+        val level = HALF
+        val g = buildGraph(tiles(HALVES), level)
+        assertEquals(100, flowOf(g, level, findCycle(g, level)!!).score)
     }
 
     @Test fun `flow drops with how much marbles wait`() {
         // two full belts into one converger: every other tick one of them waits for its turn
         val level = Level("jam", listOf(Frac(1, 1), Frac(1, 1)), listOf(Frac(1, 1)), false)
-        val g = buildGraph(decodeGrid("IR CB IL2\n.. FT ..").tiles!!, level)
-        val c = findCycle(g, level)!!
-        val f = flowOf(g, level, c)
+        val g = buildGraph(tiles("IR CB IL2"), level)
+        val f = flowOf(g, level, findCycle(g, level)!!)
         assertTrue(f.waiting > 0); assertTrue(f.score in 1..99, "${f.score}")
     }
-
 }

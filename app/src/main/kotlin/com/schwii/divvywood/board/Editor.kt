@@ -5,7 +5,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Kind
-import com.schwii.divvywood.engine.LETTERS
+import com.schwii.divvywood.engine.NONE
+import com.schwii.divvywood.engine.bridgeOf
+import com.schwii.divvywood.engine.edgeSide
+import com.schwii.divvywood.engine.edgeSpot
+import com.schwii.divvywood.engine.entrySide
+import com.schwii.divvywood.engine.eraseRetrace
+import com.schwii.divvywood.engine.isRetrace
+import com.schwii.divvywood.engine.opp
+import com.schwii.divvywood.engine.settleInputs
+import com.schwii.divvywood.engine.toggleSide
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.commitPath
 import com.schwii.divvywood.engine.inferDir
@@ -23,9 +32,9 @@ import kotlin.math.sign
 
 enum class Haptic { PICK, DROP, CONFIRM }
 
-/** Something in the tray: a splitter, converger or bypass (unlimited), or the level's input and outputs (one each). */
+/** Something in the tray: a splitter, converger or bridge (unlimited), or the level's inputs (one each). */
 data class TrayItem(val kind: Kind, val id: Int = -1) {
-    val limited get() = kind == Kind.SRC || kind == Kind.OUT
+    val limited get() = kind == Kind.SRC
 }
 
 /** Selected pieces being dragged, shifted by (dx, dy) cells from where they sit. */
@@ -42,8 +51,10 @@ data class ChipGhost(val item: TrayItem, val cell: Cell)
  * - tap a piece: select it, which shows its numbers with Rotate and Delete (in Select mode: add it or take it out)
  * - tap the table: deselect everything
  * - drag a selected piece: move the selection; pieces landing on belts replace them, other pieces block the move
- * - drag from an unselected piece that sends marbles (input, splitter, converger, belt): draw a belt, placed on
- *   release if valid
+ * - drag from an unselected piece that sends marbles (input, splitter, converger, belt, bridge): draw a belt, placed
+ *   on release if valid; drawn straight across a belt it bridges it. A drag that only retraces connections already
+ *   there undoes them instead (belts go, a join between two pieces closes), and a drag from a splitter straight out
+ *   past the edge of the build opens or closes that side
  * - drag anything else: pan the board (in Select mode: a selection box)
  */
 class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
@@ -95,6 +106,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     }
 
     private fun afterEdit() {
+        settleInputs(tiles)   // inputs follow the edge of the machine
         board.rebuild()
         selection = selection.filter { it in tiles }.toSet()
         onChange()
@@ -126,7 +138,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     // ---------- pointer ----------
 
     /** Pieces a belt can be drawn out of: everything that sends marbles. */
-    private fun sendsMarbles(c: Cell) = when (tiles[c]?.kind) { Kind.SRC, Kind.SPLIT, Kind.MERGE, Kind.BELT -> true; else -> false }
+    private fun sendsMarbles(c: Cell) = when (tiles[c]?.kind) { Kind.SRC, Kind.SPLIT, Kind.MERGE, Kind.BELT, Kind.BRIDGE -> true; else -> false }
 
     fun down(x: Float, y: Float) {
         gesture = Tap(x, y, board.cellAt(x, y))
@@ -162,7 +174,18 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
                 val x0 = min(g.a.x, g.b.x); val x1 = max(g.a.x, g.b.x); val y0 = min(g.a.y, g.b.y); val y1 = max(g.a.y, g.b.y)
                 selection = selection + tiles.keys.filter { it.x in x0..x1 && it.y in y0..y1 }
             }
-            is Draw -> if (g.path.size > 1 && pathValid(tiles, g.path)) edit { commitPath(tiles, g.path); true }
+            is Draw -> if (g.path.size > 1) {
+                val side = edgeSide(tiles, g.path)
+                when {
+                    side != NONE -> {
+                        val wasOpen = tiles.getValue(g.path[0]).isOpen(side)
+                        edit { toggleSide(tiles, g.path[0], side); true }
+                        notice = if (wasOpen) "Side closed" else "Side opened"
+                    }
+                    isRetrace(tiles, g.path) -> edit { eraseRetrace(tiles, g.path); true }
+                    pathValid(tiles, g.path) -> edit { commitPath(tiles, g.path); true }
+                }
+            }
             is Tap -> selection = when {
                 g.cell !in tiles -> emptySet()
                 selectMode -> if (g.cell in selection) selection - g.cell else selection + g.cell
@@ -255,33 +278,38 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     // ---------- tray ----------
 
-    /** The unlimited pieces first (they are used most and must never scroll out of reach), then the input and outputs. */
+    /** The unlimited pieces first (they are used most and must never scroll out of reach), then the inputs. */
     fun trayItems(): List<TrayItem> = buildList {
-        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.DUMP, 0))
+        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.BRIDGE))
         board.level.inputs.indices.forEach { add(TrayItem(Kind.SRC, it)) }
-        board.level.out.indices.forEach { add(TrayItem(Kind.OUT, it)) }
     }
 
     fun isPlaced(item: TrayItem) = item.limited && tiles.values.any {
         it.kind == item.kind && (if (it.kind == Kind.SRC) maxOf(it.id, 0) == maxOf(item.id, 0) else it.id == item.id)
     }
 
-    /** What a chip would put on the board at [c], facing the way it will be placed (a belt there lends its direction). */
+    /**
+     * What a chip would put on the board at [c], facing the way it will be placed (a belt there lends its direction).
+     * An input enters from the side of the machine [c] lies beyond, in [c]'s row or column.
+     */
     fun chipTile(item: TrayItem, c: Cell): Tile {
         val belt = tiles[c]?.takeIf { it.kind == Kind.BELT }
         return when (item.kind) {
             Kind.SPLIT -> Tile(Kind.SPLIT, inSide = belt?.from ?: inferDir(tiles, c, Kind.SPLIT))
             Kind.MERGE -> Tile(Kind.MERGE, out = belt?.out ?: inferDir(tiles, c, Kind.MERGE))
-            Kind.SRC -> Tile(Kind.SRC, out = belt?.out ?: inferDir(tiles, c, Kind.SRC), id = maxOf(item.id, 0))
-            else -> Tile(item.kind, id = item.id, inSide = belt?.from ?: inferDir(tiles, c, item.kind))
+            Kind.BRIDGE -> belt?.let { bridgeOf(it.out, if (it.out % 2 == 0) 1 else 0) } ?: Tile(Kind.BRIDGE, out = 0, inSide = 1)
+            else -> Tile(Kind.SRC, out = opp(entrySide(tiles, c)), id = maxOf(item.id, 0))
         }
     }
 
-    /** A chip lands on an empty square or replaces a belt. */
+    /** Where a chip dropped at [c] lands: an input goes to the edge of the machine, anything else where it's dropped. */
+    fun chipCell(item: TrayItem, c: Cell): Cell = if (item.kind == Kind.SRC) edgeSpot(tiles, c, entrySide(tiles, c)) else c
+
+    /** A chip lands on an empty square or replaces a belt (an input only lands on an empty square). */
     fun chipFits(item: TrayItem, c: Cell): Boolean {
         if (isPlaced(item)) return false
-        val ex = tiles[c]
-        return ex == null || ex.kind == Kind.BELT
+        val ex = tiles[chipCell(item, c)]
+        return ex == null || (ex.kind == Kind.BELT && item.kind != Kind.SRC)
     }
 
     /** While a chip is dragged: (x, y) in board pixels, or null when the finger is off the board. */
@@ -296,7 +324,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         if (locked() || !chipFits(item, c)) return false
         val tile = chipTile(item, c)
         val ok = edit {
-            if (item.kind == Kind.SPLIT || item.kind == Kind.MERGE) placePiece(tiles, c, item.kind) else { tiles[c] = tile; true }
+            if (item.kind == Kind.SPLIT || item.kind == Kind.MERGE) placePiece(tiles, c, item.kind) else { tiles[chipCell(item, c)] = tile; true }
         }
         if (ok) haptic(Haptic.DROP)
         return ok
@@ -305,8 +333,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     fun chipLabel(item: TrayItem): String = when (item.kind) {
         Kind.SPLIT -> "splitter"
         Kind.MERGE -> "converger"
-        Kind.SRC -> if (board.level.inputs.size == 1) "input" else "input ${item.id + 1}"
-        Kind.OUT -> "output ${LETTERS[item.id]}"
-        else -> "bypass"
+        Kind.BRIDGE -> "bridge"
+        else -> if (board.level.inputs.size == 1) "input" else "input ${item.id + 1}"
     }
 }

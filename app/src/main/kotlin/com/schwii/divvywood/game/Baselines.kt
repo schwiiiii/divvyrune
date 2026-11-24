@@ -8,7 +8,6 @@ import kotlinx.serialization.json.Json
 @Serializable data class LevelBaseline(
     val pieces: List<Int> = emptyList(),
     val area: List<Int> = emptyList(),
-    val io: List<Int> = emptyList(),
     val flow: List<Int> = emptyList(),
 )
 

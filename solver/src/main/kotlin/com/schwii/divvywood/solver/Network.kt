@@ -38,14 +38,19 @@ private fun lcm(a: java.math.BigInteger, b: java.math.BigInteger) = a / a.gcd(b)
  * Each input's marbles are first shared out between the outputs (whatever no output needs goes to bypasses). An input
  * then splits into N equal shares, N made of 2s and 3s and at least the shares' common denominator q: N − q shares loop
  * back to a converger at the input, so each remaining share is exactly 1/q of the input, and those go to the outputs
- * and bypasses. Branches whose shares all go to one place collapse into a single line. Lines into an output join
- * through converger trees; each bypass line gets its own bypass.
+ * and the rest. Branches whose shares all go to one place collapse into a single line. Lines into an output join
+ * through converger trees. Each leftover line ends in a [Kind.OUT] with no target (id NONE); the layout joins them
+ * into one belt leaving on one side (see [openPorts]).
  */
-fun synthesize(level: Level, rnd: Random): Net? {
+fun synthesize(level: Level, rnd: Random): Net? =
+    // a few tries, keeping the smallest: everything left over must join into one line, and fewer pieces lay out easier
+    (1..6).mapNotNull { synthesizeOnce(level, rnd) }.minByOrNull { it.nodes.size }
+
+private fun synthesizeOnce(level: Level, rnd: Random): Net? {
     val net = Net()
     val outs = level.out.indices.map { net.add(Kind.OUT, it) }
     val need = level.out.map { it?.q ?: Q.ZERO }.toMutableList()
-    val lines = HashMap<Int, MutableList<Int>>()   // destination node → nodes each sending it one line
+    val lines = LinkedHashMap<Int, MutableList<Int>>()   // destination node → nodes each sending it one line
     val inputOrder = level.inputs.indices.shuffled(rnd)
     // share the outputs' needs among the inputs, greedily in a random order
     val give = Array(level.inputs.size) { Array(level.out.size) { Q.ZERO } }
@@ -82,19 +87,19 @@ fun synthesize(level: Level, rnd: Random): Net? {
         val dumps = (rest * Q.of(q)).n.toInt()
         blocks.shuffle(rnd)
         blocks.forEach { (d, c) -> repeat(c) { dest += d } }
-        repeat(dumps) { dest += -2 }            // -2: a bypass of its own
+        repeat(dumps) { dest += -2 }            // -2: out with the rest
         repeat(n - q.toInt()) { dest += -3 }    // -3: back round the loop
         if (rnd.nextBoolean()) dest.reverse()
         val root = if (loop >= 0) { net.link(src, loop); loop } else src
         fun send(from: Int, d: Int) {
             when (d) {
-                -2 -> net.link(from, net.add(Kind.DUMP))
+                -2 -> net.link(from, net.add(Kind.OUT))
                 -3 -> lines.getOrPut(loop) { mutableListOf() } += from
                 else -> lines.getOrPut(d) { mutableListOf() } += from
             }
         }
         fun build(from: Int, shares: List<Int>, fs: List<Int>) {
-            if (shares.distinct().size == 1) { send(from, shares[0]); return }   // a bypass takes any rate, so bypass shares collapse too
+            if (shares.distinct().size == 1) { send(from, shares[0]); return }
             if (fs.isEmpty()) { send(from, shares[0]); return }
             val s = net.add(Kind.SPLIT)
             net.link(from, s)
@@ -104,10 +109,11 @@ fun synthesize(level: Level, rnd: Random): Net? {
         build(root, dest, factors)
     }
     // join each destination's lines into one, through converger trees of up to three
-    for ((d, ls) in lines) {
+    for ((d, ls) in lines.entries.toList()) {
         var cur: List<Int> = ls
         while (cur.size > 1) {
-            cur = cur.shuffled(rnd).chunked(3).map { c ->
+            // neighbouring lines join first, so a tree stays near the splitters that feed it
+            cur = (if (rnd.nextInt(4) == 0) cur.shuffled(rnd) else cur).chunked(if (rnd.nextBoolean()) 2 else 3).map { c ->
                 if (c.size == 1) c[0] else net.add(Kind.MERGE).also { mg -> c.forEach { net.link(it, mg) } }
             }
         }
