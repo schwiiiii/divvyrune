@@ -162,7 +162,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
      */
     fun tile(c: Canvas, x: Float, y: Float, z: Float, t: Tile, ins: List<Int>, outs: List<Int>, seed: Int, bad: Boolean = false, label: String? = null, labelScale: Float = 1f) {
         val mech = t.kind == Kind.SPLIT || t.kind == Kind.MERGE
-        val stain = when (t.kind) { Kind.SRC -> Palette.stainSrc; Kind.OUT -> Palette.stainOut; Kind.DUMP -> Palette.stainDump; else -> null }
+        val stain = when (t.kind) { Kind.SRC -> Palette.stainSrc; Kind.OUT -> Palette.stainOut; else -> null }
         blockBody(c, x, y, z, if (mech) Woods.walnut else Woods.maple, seed, stain)
         val p = Path()
         when (t.kind) {
@@ -184,18 +184,51 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
                 hollow(c, x, y, z * 0.27f, false)
                 burnText(c, label ?: "IN", x, y - z * 0.33f, z * 0.15f * labelScale)
             }
-            Kind.OUT, Kind.DUMP -> {
+            Kind.OUT -> {
+                // an output cup: only drawn for the store icon; in the game, ways out are the build's sides
                 val side = if (t.inSide != NONE) t.inSide else ins.firstOrNull() ?: NONE
                 if (side != NONE) { val e = edge(x, y, z, side); p.moveTo(e[0], e[1]); p.lineTo(x, y); carve(c, z, p, false) }
-                if (t.kind == Kind.OUT) {
-                    hollow(c, x, y, z * 0.23f, true)
-                    if (label != null) burnText(c, label, x, y - z * 0.35f, z * 0.14f * labelScale, z * 0.84f)
-                } else {
-                    fill.color = rgba(40, 24, 12, 0.7)
-                    rect.set(x - z * 0.2f, y - z * 0.08f, x + z * 0.2f, y + z * 0.08f); c.drawRoundRect(rect, z * 0.08f, z * 0.08f, fill)
-                }
+                hollow(c, x, y, z * 0.23f, true)
+                if (label != null) burnText(c, label, x, y - z * 0.35f, z * 0.14f * labelScale, z * 0.84f)
+            }
+            Kind.BRIDGE -> {
+                // the across lane is carved into the block; the other runs over it on a raised plank
+                routePath(p, x, y, z, opp(t.out), t.out); carve(c, z, p, false, bad)
+                chevron(c, edge(x, y, z, t.out, 0.3f), t.out, z, false)
+                val vertical = t.inSide % 2 == 1
+                val hw = z * 0.2f; val hl = z * 0.475f
+                if (vertical) rect.set(x - hw, y - hl, x + hw, y + hl) else rect.set(x - hl, y - hw, x + hl, y + hw)
+                fill.color = rgba(60, 38, 20, 0.28)
+                rect.offset(z * 0.03f, z * 0.05f); c.drawRoundRect(rect, z * 0.05f, z * 0.05f, fill); rect.offset(-z * 0.03f, -z * 0.05f)
+                shade(LinearGradient(rect.left, rect.top, rect.right, rect.bottom, 0xFFF3E4C4.toInt(), 0xFFDCC193.toInt(), Shader.TileMode.CLAMP))
+                c.drawRoundRect(rect, z * 0.05f, z * 0.05f, fill); fill.shader = null
+                val q = Path(); routePath(q, x, y, z, opp(t.inSide), t.inSide); carve(c, z * 0.8f, q, false, bad)
+                chevron(c, edge(x, y, z, t.inSide, 0.3f), t.inSide, z, false)
             }
         }
+    }
+
+    /**
+     * Where a way out leaves the build: a dotted line from the piece at ([x0], [y0]) to the box's edge at ([x1], [y1]),
+     * then a small green tag past the edge with [label] ("A 1/4", "rest").
+     */
+    fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {
+        stroke.color = rgba(95, 62, 32, 0.4); stroke.strokeWidth = max(1.5f, z * 0.05f); stroke.strokeCap = Paint.Cap.ROUND
+        stroke.pathEffect = android.graphics.DashPathEffect(floatArrayOf(z * 0.02f, z * 0.12f), 0f)
+        c.drawLine(x0, y0, x1, y1, stroke); stroke.pathEffect = null
+        text.textSize = z * 0.2f
+        val w = max(z * 0.5f, text.measureText(label) + z * 0.2f); val h = z * 0.34f
+        rect.set(tx - w / 2, ty - h / 2, tx + w / 2, ty + h / 2)
+        fill.color = if (rest) Palette.stainDump else Palette.stainOut
+        c.drawRoundRect(rect, h / 2, h / 2, fill)
+        burnText(c, label, tx, ty, z * 0.2f, w)
+    }
+
+    /** The box around the machine, where ports sit: a faint dashed frame. */
+    fun machineBox(c: Canvas, l: Float, t: Float, r: Float, b: Float, z: Float) {
+        stroke.color = rgba(95, 62, 32, 0.28); stroke.strokeWidth = max(1f, z * 0.03f); stroke.strokeCap = Paint.Cap.BUTT
+        stroke.pathEffect = android.graphics.DashPathEffect(floatArrayOf(z * 0.16f, z * 0.1f), 0f)
+        c.drawRect(l, t, r, b, stroke); stroke.pathEffect = null
     }
 
     /** An unconnected splitter or converger: a channel stub toward its marked side and a small hollow. */

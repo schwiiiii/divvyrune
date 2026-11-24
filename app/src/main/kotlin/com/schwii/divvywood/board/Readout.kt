@@ -2,7 +2,6 @@ package com.schwii.divvywood.board
 
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Kind
-import com.schwii.divvywood.engine.LETTERS
 import java.util.Locale
 
 /** What tapping a piece shows: a title, any errors, and label → value rows. */
@@ -19,9 +18,10 @@ fun readoutOf(board: BoardState, cell: Cell): ReadoutInfo? {
     val s = board.sim
     val level = board.level
     val title = when (n.kind) {
-        Kind.BELT -> "Belt"; Kind.SPLIT -> "Splitter"; Kind.MERGE -> "Converger"
+        Kind.BELT -> if (n.bridge != null) "Bridge" else "Belt"; Kind.SPLIT -> "Splitter"; Kind.MERGE -> "Converger"
+        Kind.BRIDGE -> "Bridge"
         Kind.SRC -> if (level.inputs.size == 1) "Input" else "Input ${n.inputId + 1}"
-        Kind.OUT -> "Output ${LETTERS[n.id]}"; Kind.DUMP -> "Bypass"
+        Kind.OUT -> "Way out"
     }
     val rows = mutableListOf<Pair<String, String>>()
     var note: String? = null
@@ -33,20 +33,22 @@ fun readoutOf(board: BoardState, cell: Cell): ReadoutInfo? {
             val held = s.blockedBy.getOrElse(k) { 0 }
             if (held > 0) rows += "held up" to pct(held, s.tick)
         }
-        Kind.OUT, Kind.DUMP -> {
-            if (n.kind == Kind.OUT) level.out.getOrNull(n.id)?.let { rows += "target" to it.toString() }
-            if (s.tick > 0) rows += "measured" to "${f3(s.n[i].sunk.toDouble() / s.tick)} / tick"
-        }
+        Kind.OUT -> if (s.tick > 0) rows += "measured" to "${f3(s.n[i].sunk.toDouble() / s.tick)} / tick"
         else -> {
-            if (n.errs.isEmpty() && board.sol.ok) {
-                val f = board.sol.flow[i]
-                rows += "carries" to "$f of a belt"
-            } else if (n.errs.isEmpty()) note = board.sol.why
+            // a bridge shows both its lanes
+            val lanes = if (n.bridge != null) listOf(i, i + 1) else listOf(i)
+            val errs = lanes.flatMap { board.graph.nodes[it].errs }
+            if (errs.isEmpty() && board.sol.ok) {
+                rows += "carries" to lanes.joinToString(" and ") { "${board.sol.flow[it]}" } + " of a belt"
+                // a way out it leads to
+                lanes.flatMap { board.graph.nodes[it].succ }.filter { board.graph.nodes[it].kind == Kind.OUT }.forEach { rows += "leaves as" to board.exitLabel(it) }
+            } else if (errs.isEmpty()) note = board.sol.why
             if (s.tick > 0) rows += "measured" to "${f3(s.n[i].pass.toDouble() / s.tick)} / tick"
             if (n.kind == Kind.SPLIT && s.n[i].skips > 0) rows += "jam skips" to s.n[i].skips.toString()
             if (s.waits[i] > 0) rows += "waits" to pct(s.waits[i], s.tick)
             if (n.kind == Kind.MERGE && s.turnAways[i] > 0) rows += "turns away" to pct(s.turnAways[i], s.tick)
         }
     }
-    return ReadoutInfo(title, n.errs.toList(), rows, note)
+    val errs = if (n.bridge != null) (n.errs + board.graph.nodes[i + 1].errs).distinct() else n.errs.toList()
+    return ReadoutInfo(title, errs, rows, note)
 }

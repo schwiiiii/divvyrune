@@ -3,25 +3,15 @@
 Planned work, roughly in order. Nothing here has a date; items move to the [changelog](CHANGELOG.md) when they ship.
 
 ## Next
-- [ ] **Machines as pieces** (before 1.0). A machine's ports are its sides, and a solved machine can be placed in
-      other builds as a single piece.
-      - **Ports from the build.** Check draws the box around the build (the footprint rectangle). Each open belt
-        end runs in a clear straight line to the box edge; the line may cross belts but no other piece. Each side
-        holds at most one port: one input entering, or one belt leaving. Two streams leaving on one side must be
-        merged by the player's own converger first. That caps a level at 4 ports.
-      - **No output or bypass pieces.** Inputs stay, at the edge. Every marble that enters leaves through a side:
-        each target rate needs a side, and anything left over needs one more side of its own. Check matches the
-        leaving sides to the targets by rate.
+- [ ] **Machines as pieces** (before 1.0). A solved machine can be placed in other builds as a single piece. Its
+      ports are already its sides (shipped: see the changelog).
       - **Machines as pieces.** A solved machine takes one cell in a parent build and rotates. Its sides keep the
         mapping from its own build. The sim expands its internals into the parent's graph, ordered by parent
         cell, then the machine's own board order. Its pieces add to the parent's piece count, and its area minus
         one adds to the parent's area. Flow comes from the full sim, so a weak machine makes every build that
         uses it weaker. A machine can't contain itself, directly or through another machine.
-      - **Metrics:** the I/O layout metric goes; pieces, area and flow remain.
-      - **Knock-on effects:** "Too much to merge" (5 ports) is redesigned; the builder enforces the 4-port cap;
-        `layOut` routes to box edges and the baselines are regenerated; saved builds with output or bypass pieces
-        are migrated or cleared.
-      - **Which builds are machines:** every solved build, numbered or custom level.
+      - **Which builds are machines:** every solved build, numbered or custom level. Single-piece builds never
+        solve, so no machine just restates a piece.
       - **Snapshots.** A placed machine keeps the build it had when it was placed. When its level's solving build
         changes later, the parent shows that it uses an old version, but nothing updates by itself: a new build
         can move ports and break the parent outright. Editing and checking the parent switches it to the current
@@ -29,7 +19,6 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
       - **Text codes:** a machine is written by its level, e.g. `#001`, and reads in as that level's current
         solving build. A custom level's machine is written by a short stable hash of its rates (e.g. `#c7f3a1`),
         so the same design gets the same id on every device.
-      - To be tried in the browser prototype first.
 - [ ] **1.0.0 release** on GitHub, after the current round of playtesting.
       Before tagging: redraw the store screenshots with `StoreAssets` (the metrics and levels changed since they
       were drawn), and fill `AllowedAPKSigningKeys` in `fdroid/com.schwii.divvywood.yml` with the SHA-256 of the
@@ -38,7 +27,7 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
       GitHub update each other.
 
 ## Soon
-- [ ] **A level generator** (a developer tool) to grow the set from 20 to about 100, from simple to complex, with
+- [ ] **A level generator** (a developer tool) to grow the set from 17 to about 100, from simple to complex, with
       more levels using several inputs. Players see them as ordinary numbered levels. Builds on the solver, which
       proves each new level solvable.
 

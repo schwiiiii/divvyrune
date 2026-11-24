@@ -242,8 +242,8 @@ fun eraseRetrace(tiles: Tiles, path: List<Cell>) {
 fun machineBox(tiles: Map<Cell, Tile>): Box? = boxOf(tiles.filterValues { it.kind != Kind.SRC }.keys)
 
 /**
- * A drag from a splitter straight out across the edge of the build, over nothing but empty cells: the side it leaves
- * by, or NONE when [path] isn't one.
+ * A drag from a splitter straight out to the edge of the build, over nothing but empty cells, stopping on the first
+ * cell past the edge: the side it leaves by, or NONE when [path] isn't one. A drag on beyond draws belts as usual.
  */
 fun edgeSide(tiles: Map<Cell, Tile>, path: List<Cell>): Int {
     if (path.size < 2 || tiles[path[0]]?.kind != Kind.SPLIT) return NONE
@@ -252,7 +252,7 @@ fun edgeSide(tiles: Map<Cell, Tile>, path: List<Cell>): Int {
     for (i in 1 until path.size) {
         if (path[i] != path[i - 1].step(d) || path[i] in tiles) return NONE
     }
-    return if (path.last() in box) NONE else d
+    return if (path.last() !in box && (path.size == 2 || path[path.size - 2] in box)) d else NONE
 }
 
 /** Opens or closes side [d] of the splitter at [c] (never its input side). */
@@ -260,6 +260,12 @@ fun toggleSide(tiles: Tiles, c: Cell, d: Int) {
     val t = tiles.getValue(c)
     if (t.kind != Kind.SPLIT || t.inSide == d) return
     tiles[c] = if (t.isOpen(d)) t.close(d) else t.open(d)
+}
+
+/** Where an input entering from [side] in [c]'s row or column sits: just outside the machine's box ([c] with no machine). */
+fun edgeSpot(tiles: Map<Cell, Tile>, c: Cell, side: Int): Cell {
+    val b = machineBox(tiles) ?: return c
+    return when (side) { 0 -> Cell(b.x1 + 1, c.y); 1 -> Cell(c.x, b.y1 + 1); 2 -> Cell(b.x0 - 1, c.y); else -> Cell(c.x, b.y0 - 1) }
 }
 
 /** The side an input dropped at [c] enters from: the side of the machine's box it lies beyond, or the nearest. */
@@ -275,10 +281,9 @@ fun entrySide(tiles: Map<Cell, Tile>, c: Cell): Int {
  * grows and shrinks. Leaves inputs alone while there is no machine yet.
  */
 fun settleInputs(tiles: Tiles) {
-    val b = machineBox(tiles) ?: return
     for ((c, t) in tiles.entries.toList()) {
         if (t.kind != Kind.SRC || t.out == NONE) continue
-        val to = when (opp(t.out)) { 0 -> Cell(b.x1 + 1, c.y); 1 -> Cell(c.x, b.y1 + 1); 2 -> Cell(b.x0 - 1, c.y); else -> Cell(c.x, b.y0 - 1) }
+        val to = edgeSpot(tiles, c, opp(t.out))
         if (to == c) continue
         if (tiles[to]?.kind == Kind.SRC) continue   // another input already waits there; both are flagged
         tiles.remove(c); tiles[to] = t

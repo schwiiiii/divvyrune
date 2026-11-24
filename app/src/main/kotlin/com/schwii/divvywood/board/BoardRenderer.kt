@@ -41,7 +41,9 @@ class BoardRenderer(
         val c = Canvas(bmp)
         painter.table(c, w.toFloat(), h.toFloat(), s.ox, s.oy, s.z)
         val nodes = s.graph.nodes
-        val order = nodes.indices.sortedWith(compareBy({ nodes[it].cell.y }, { nodes[it].cell.x }))
+        // one block per cell: ways out have none, and a bridge's two lanes share one
+        val order = nodes.indices.filter { s.graph.idx[nodes[it].cell] == it }.sortedWith(compareBy({ nodes[it].cell.y }, { nodes[it].cell.x }))
+        s.graph.box?.let { b -> painter.machineBox(c, s.ox + b.x0 * s.z, s.oy + b.y0 * s.z, s.ox + (b.x1 + 1) * s.z, s.oy + (b.y1 + 1) * s.z, s.z) }
         for (i in order) {
             if (lifted != null && nodes[i].cell in lifted) continue
             painter.blockShadow(c, s.screenX(nodes[i].cell.x), s.screenY(nodes[i].cell.y), s.z)
@@ -51,8 +53,19 @@ class BoardRenderer(
             val (ins, outs, seed) = tileArgs(i)
             val dim = lifted != null && n.cell in lifted   // left behind while its lifted copy hovers elsewhere
             if (dim) c.saveLayerAlpha(null, (0.35f * 255).toInt())
-            painter.tile(c, s.screenX(n.cell.x), s.screenY(n.cell.y), s.z, n.tile, ins, outs, seed, s.isOverloaded(i), s.labelOf(i))
+            val bad = s.isOverloaded(i) || (n.bridge != null && s.isOverloaded(i + 1))
+            painter.tile(c, s.screenX(n.cell.x), s.screenY(n.cell.y), s.z, n.bridge ?: n.tile, ins, outs, seed, bad, s.labelOf(i))
             if (dim) c.restore()
+        }
+        // ways out: a dotted line to the edge of the box, and a tag past it naming the output it serves
+        for (p in s.graph.ports) if (!p.isInput) {
+            val from = nodes[p.piece].cell
+            val half = s.z * 0.5f
+            val ex = s.screenX(p.edge.x) - com.schwii.divvywood.engine.DX[p.side] * half
+            val ey = s.screenY(p.edge.y) - com.schwii.divvywood.engine.DY[p.side] * half
+            val label = s.exitLabel(p.node)
+            painter.exitTag(c, s.screenX(from.x) + com.schwii.divvywood.engine.DX[p.side] * half, s.screenY(from.y) + com.schwii.divvywood.engine.DY[p.side] * half,
+                ex, ey, s.screenX(p.edge.x), s.screenY(p.edge.y), s.z, label, label == "rest")
         }
         for (n in nodes) if (n.errs.isNotEmpty()) painter.outline(c, s.screenX(n.cell.x), s.screenY(n.cell.y), s.z, Palette.bad, 2f * max(1f, s.z / 44f), dashed = true)
     }
@@ -133,17 +146,18 @@ class BoardRenderer(
                 val x = s.screenX(to.x); val y = s.screenY(to.y)
                 val (ins, outs, seed) = tileArgs(i)
                 painter.blockShadow(c, x + z * 0.04f, y + z * 0.06f, z)
-                painter.tile(c, x, y, z, n.tile, ins, outs, seed, false, s.labelOf(i))
+                painter.tile(c, x, y, z, n.bridge ?: n.tile, ins, outs, seed, false, s.labelOf(i))
                 if (e.blockedAt(to)) painter.outline(c, x, y, z, Palette.bad, outlineW * 1.5f)
             }
         }
         e.chipGhost?.let { gh ->
-            val x = s.screenX(gh.cell.x); val y = s.screenY(gh.cell.y)
+            val at = e.chipCell(gh.item, gh.cell)
+            val x = s.screenX(at.x); val y = s.screenY(at.y)
             val fits = e.chipFits(gh.item, gh.cell)
             c.saveLayerAlpha(null, (0.9f * 255).toInt())
             painter.blockShadow(c, x + z * 0.04f, y + z * 0.06f, z)
             painter.tile(c, x, y, z, e.chipTile(gh.item, gh.cell), emptyList(), emptyList(), 77,
-                label = if (gh.item.kind == com.schwii.divvywood.engine.Kind.SRC) s.level.inputLabel(maxOf(gh.item.id, 0)) else if (gh.item.kind == com.schwii.divvywood.engine.Kind.OUT) com.schwii.divvywood.engine.LETTERS[gh.item.id].toString() else null)
+                label = if (gh.item.kind == com.schwii.divvywood.engine.Kind.SRC) s.level.inputLabel(maxOf(gh.item.id, 0)) else null)
             c.restore()
             painter.outline(c, x, y, z, if (fits) Palette.ink else Palette.bad, if (fits) outlineW else outlineW * 1.5f)
         }

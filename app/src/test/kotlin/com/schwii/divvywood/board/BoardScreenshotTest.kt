@@ -37,7 +37,7 @@ class BoardScreenshotTest {
     }
 
     @Test fun whiteboard130() {
-        val tiles = decodeGrid("OR SR IL ..\nOR ST CB BL\nOR CL ST BT\n.. RT ST LT\n.. .. FT ..").tiles!!
+        val tiles = decodeGrid(".. .. .. .. IB ..\n.. BR CB5 RL TL ..\nRB SR6 ST7 SL6 LB ..\nTB .. CB6 TL TB ..\nTR CB5 CL3 SR3 TL ..\n.. CB6 RL ST7 LR LR\n.. CB6 RL TL .. ..").tiles!!
         val state = BoardState(LEVELS.last(), tiles, density).apply { z = 64 * density }
         val bmp = render(state, 401, "board-1-30")
         // the build is in the middle of the frame and isn't blank: some pixels differ from the table
@@ -46,12 +46,11 @@ class BoardScreenshotTest {
     }
 
     @Test fun everyBlock() {
-        // the input feeds a splitter (bypass + converger); the converger feeds a second splitter that loops back
-        // through two belts and feeds output A; a stray converger and an unfed output B are outlined in red
-        val tiles = decodeGrid("IR SL OL\n.. CB BL\n.. ST LT\n.. FT ..").tiles!!
-        tiles[Cell(4, 0)] = Tile(Kind.MERGE, out = 0)
-        tiles[Cell(4, 2)] = Tile(Kind.OUT, id = 1, inSide = 3)
-        val level = Level("blocks", 2, listOf(Frac(1, 2), Frac(1, 2)))
+        // input 2's splitter sends right into a converger and down across input 1's line on a bridge; the converger
+        // joins input 1 and leaves on the right (A); the bridge's lane leaves at the bottom (B); a stray converger
+        // is outlined in red
+        val tiles = decodeGrid(".. IB2 ..\n.. ST3 CB\nIR X CR\n.. TB CL").tiles!!
+        val level = Level("blocks", listOf(Frac(1, 2), Frac(1, 4)), listOf(Frac(5, 8), Frac(1, 8)))
         render(BoardState(level, tiles, density).apply { z = 72 * density }, 7, "board-every-block")
     }
 }

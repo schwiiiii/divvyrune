@@ -155,8 +155,9 @@ class ClosedSideTest {
 
     @Test fun `dragging a splitter's side across the edge opens or closes it`() {
         val t = tiles("IR SL7")
-        val up = listOf(Cell(1, 0), Cell(1, -1), Cell(1, -2))
+        val up = listOf(Cell(1, 0), Cell(1, -1))
         assertEquals(3, edgeSide(t, up))
+        assertEquals(NONE, edgeSide(t, up + Cell(1, -2)), "a longer drag draws belts")
         toggleSide(t, Cell(1, 0), 3)
         assertEquals(2, buildGraph(t, HALF).exits.size)
         toggleSide(t, Cell(1, 0), 3)

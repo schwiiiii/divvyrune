@@ -148,10 +148,9 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     val m = r.metrics
     val best = r.best?.takeIf { it.pieces >= 0 }
     val base = game.baseline(game.levelIndex)
-    val io = m.layout
-    MetricBlock("Pieces", m.pieces.toString(), "${m.belts} belts · ${m.splits} split · ${m.merges} join · ${m.bypasses} bypass",
+    MetricBlock("Pieces", m.pieces.toString(), "${m.belts} belts · ${m.splits} split · ${m.merges} join · ${m.bridges} bridge${if (m.bridges == 1) "" else "s"}",
         best?.let { "best ${it.pieces}" }, base?.pieces, m.pieces)
-    MetricBlock("Footprint", if (m.area > 0) "${m.w}×${m.h}" else "–", "area ${m.area}: the machine's rectangle, inputs and outputs aside",
+    MetricBlock("Footprint", if (m.area > 0) "${m.w}×${m.h}" else "–", "area ${m.area}: the machine's rectangle, inputs aside",
         best?.let { "best area ${it.area}" }, base?.area, m.area)
     val f = r.flow
     MetricBlock("Flow", f?.score?.toString() ?: "–",
@@ -161,8 +160,6 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
             else -> "marbles spend ${if (f.share < 0.01) "under 1%" else pct(f.share)} of their time waiting"
         },
         best?.flow?.takeIf { it >= 0 }?.let { "best $it" }, base?.flow, f?.score ?: 0)
-    MetricBlock("I/O layout", "${m.io}", "${io.onEdge}/${io.ports} open to the outside · grouped ${pct(io.grouping)} · facing apart ${pct(io.opposition)}",
-        best?.let { "best ${it.io}" }, base?.io, m.io)
     Buttons {
         SheetButton("Keep building") { game.closeSheet() }
         if (r.next) SheetButton("Next level", go = true) { game.loadLevel(game.levelIndex + 1) }
@@ -292,8 +289,8 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
         }
         val checked = saved.checked
         val (line1, line2) = when {
-            best != null && best.pieces >= 0 -> "${parts(best.pieces)} · area ${best.area}" to scores(best.flow, best.io)
-            checked != null -> "✗ ${parts(checked.pieces)} · area ${checked.area}" to scores(checked.flow, checked.io)
+            best != null && best.pieces >= 0 -> "${parts(best.pieces)} · area ${best.area}" to scores(best.flow)
+            checked != null -> "✗ ${parts(checked.pieces)} · area ${checked.area}" to scores(checked.flow)
             else -> " " to " "
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -305,7 +302,7 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
 }
 
 private fun parts(n: Int) = if (n == 1) "1 piece" else "$n pieces"
-private fun scores(flow: Int, io: Int) = "flow ${if (flow >= 0) flow else "–"} · I/O $io"
+private fun scores(flow: Int) = "flow ${if (flow >= 0) flow else "–"}"
 
 /** A still picture of [tiles] on the table, fitted into a [px]-pixel square. */
 private fun buildPreview(level: Level, tiles: Map<Cell, Tile>, px: Int, density: Float): Bitmap {
@@ -366,16 +363,18 @@ private fun ColumnScope.TextSheet(game: Game) {
         }
     }
     Buttons { SheetButton("Build from text", go = true) { error = game.buildFromText(text) } }
-    val outs = level.out.size
     Text(
         legend(
-            "<b>I</b> input, <b>S</b> splitter, <b>C</b> converger, <b>O</b> bypass, <b>F</b> final output, then a side: <b>T R B L</b>; " +
-                "<b>I</b>…<b>2</b> and <b>I</b>…<b>3</b> are inputs 2 and 3, <b>F</b>…<b>2</b> and <b>F</b>…<b>3</b> outputs B and C. " +
-                "I and C name the side they output to; S, O and F the one side their input comes from. " +
-                "A belt is two sides, fed from then feeding (<b>RT</b>: from the right, up). <b>..</b> is empty. " +
+            "<b>I</b> input, <b>S</b> splitter, <b>C</b> converger, then a side: <b>T R B L</b>; " +
+                "<b>I</b>…<b>2</b> and <b>I</b>…<b>3</b> are inputs 2 and 3. " +
+                "I and C name the side they output to; S the side its input comes from. " +
+                "S and C end in a digit for their other sides, clockwise from that one, as binary with 1 open: " +
+                "<b>ST3</b> takes in at the top and sends right and down, its left side closed; <b>ST7</b> has every side open. " +
+                "A belt is two sides, fed from then feeding (<b>RT</b>: from the right, up). <b>X</b> is a bridge. <b>..</b> is empty. " +
+                "Marbles leave wherever a piece points out of the build. " +
                 "One-line codes put commas between cells and <b>/</b> between rows (<b>..,IB/CL,ST</b>); either form builds. " +
                 "Building from text replaces this level's build; Undo brings it back. " +
-                "This level holds ${level.inputs.size} input${if (level.inputs.size > 1) "s" else ""} and $outs final output${if (outs > 1) "s" else ""}; splitters, convergers and bypasses are unlimited.",
+                "This level holds ${level.inputs.size} input${if (level.inputs.size > 1) "s" else ""}; splitters, convergers, belts and bridges are unlimited.",
         ),
         style = Body, color = Dim, fontSize = 12.sp, lineHeight = 1.6.em,
     )
