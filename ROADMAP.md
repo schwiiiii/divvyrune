@@ -3,6 +3,28 @@
 Planned work, roughly in order. Nothing here has a date; items move to the [changelog](CHANGELOG.md) when they ship.
 
 ## Next
+- [ ] **Machines as pieces** (before 1.0). A machine's ports are its sides, and a solved machine can be placed in
+      other builds as a single piece.
+      - **Ports from the build.** Check draws the box around the build (the footprint rectangle). Each open belt
+        end runs in a clear straight line to the box edge; the line may cross belts but no other piece. Each side
+        holds at most one port: one input entering, or one belt leaving. Two streams leaving on one side must be
+        merged by the player's own converger first. That caps a level at 4 ports.
+      - **No output or bypass pieces.** Inputs stay, at the edge. Every marble that enters leaves through a side:
+        each target rate needs a side, and anything left over needs one more side of its own. Check matches the
+        leaving sides to the targets by rate.
+      - **Machines as pieces.** A solved machine takes one cell in a parent build and rotates. Its sides keep the
+        mapping from its own build. The sim expands its internals into the parent's graph, ordered by parent
+        cell, then the machine's own board order. Its pieces add to the parent's piece count, and its area minus
+        one adds to the parent's area. Flow comes from the full sim, so a weak machine makes every build that
+        uses it weaker. A machine can't contain itself, directly or through another machine.
+      - **Metrics:** the I/O layout metric goes; pieces, area and flow remain.
+      - **Knock-on effects:** "Too much to merge" (5 ports) is redesigned; the builder enforces the 4-port cap;
+        `layOut` routes to box edges and the baselines are regenerated; saved builds with output or bypass pieces
+        are migrated or cleared.
+      - **Open:** whether a machine in a parent build follows later improvements to its source build (live) or
+        stays as placed (snapshot); which builds count as machines (solved numbered levels, custom levels); how
+        a machine's build is written in text codes (embedded, so shared codes stay self-contained).
+      - To be tried in the browser prototype first.
 - [ ] **1.0.0 release** on GitHub, after the current round of playtesting.
       Before tagging: redraw the store screenshots with `StoreAssets` (the metrics and levels changed since they
       were drawn), and fill `AllowedAPKSigningKeys` in `fdroid/com.schwii.divvywood.yml` with the SHA-256 of the
