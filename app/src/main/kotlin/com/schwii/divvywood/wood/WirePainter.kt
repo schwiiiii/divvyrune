@@ -139,9 +139,13 @@ class WirePainter : Painter() {
     }
 
     override fun taper(c: Canvas, tri: FloatArray, z: Float) {
-        val q = Path(); q.moveTo(tri[0], tri[1]); q.lineTo(tri[2], tri[3]); q.lineTo(tri[4], tri[5]); q.close()
-        fill.color = rgba(237, 239, 242, 0.14); c.drawPath(q, fill)
-        line.color = rgba(237, 239, 242, 0.6); line.strokeWidth = max(1f, z * 0.015f); line.pathEffect = null; c.drawPath(q, line)
+        val q = Path()
+        q.moveTo(tri[0], tri[1]); q.quadTo(tri[8], tri[9], tri[2], tri[3])       // out: the parent's line to one end
+        q.quadTo(tri[10], tri[11], tri[4], tri[5])                                // in: that end to the port's line
+        q.quadTo(tri[10], tri[11], tri[6], tri[7])                                // in: the port's line to the other end
+        q.quadTo(tri[8], tri[9], tri[0], tri[1]); q.close()                       // out: back to the parent's line
+        fill.color = rgba(237, 239, 242, 0.1); c.drawPath(q, fill)
+        line.color = rgba(237, 239, 242, 0.45); line.strokeWidth = max(1f, z * 0.01f); line.pathEffect = null; c.drawPath(q, line)
     }
 
     override fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {

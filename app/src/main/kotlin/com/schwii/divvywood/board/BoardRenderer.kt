@@ -82,15 +82,23 @@ class Layout(val g: Graph, val ox: Float, val oy: Float, val z: Float) {
     fun connector(i: Int): FloatArray { val a = portLane(i); val b = portInner(i); return floatArrayOf(a[0], a[1], b[0], b[1]) }
 
     /**
-     * The taper outside port [i]'s side: from a point just past the middle of the side, where the parent's line
-     * comes in, widening to the whole side. The side is the port, not the one line.
+     * The flare at port [i]'s side, as eight points (x, y pairs): the parent's line just outside the middle of the
+     * side, one end of the side, the port's own line just inside, the other end; then the two curves' control points
+     * on the side, near the middle and near the line. It widens from the parent's line to the whole side, and narrows
+     * again to the port's line: the side is the port, not the one line.
      */
     fun taper(i: Int): FloatArray {
-        val n = g.nodes[i]; val v = n.portView!!; val m = portMid(i)
+        val n = g.nodes[i]; val v = n.portView!!; val m = portMid(i); val l = portLane(i)
         val h = (v.size * z / 2).toFloat(); val d = n.portSide
-        val apex = floatArrayOf(m[0] + DX[d] * h * 0.35f, m[1] + DY[d] * h * 0.35f)
+        val depth = h * 0.16f
         val ax = DY[d].toFloat(); val ay = DX[d].toFloat()   // along the side
-        return floatArrayOf(apex[0], apex[1], m[0] + ax * h, m[1] + ay * h, m[0] - ax * h, m[1] - ay * h)
+        return floatArrayOf(
+            m[0] + DX[d] * depth, m[1] + DY[d] * depth,
+            m[0] + ax * h, m[1] + ay * h,
+            l[0] - DX[d] * depth, l[1] - DY[d] * depth,
+            m[0] - ax * h, m[1] - ay * h,
+            m[0], m[1], l[0], l[1],
+        )
     }
 }
 

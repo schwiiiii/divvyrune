@@ -233,11 +233,15 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         carve(c, z, q, false)
     }
 
-    /** A taper into a machine's side: the triangle [tri] (apex, then the side's two ends), for a machine of size [z]. */
+    /** The flare where a machine's side becomes a port: [tri] as made by the board's layout, for a machine of size [z]. */
     open fun taper(c: Canvas, tri: FloatArray, z: Float) {
-        val q = Path(); q.moveTo(tri[0], tri[1]); q.lineTo(tri[2], tri[3]); q.lineTo(tri[4], tri[5]); q.close()
-        fill.color = rgba(95, 62, 32, 0.22); c.drawPath(q, fill)
-        stroke.color = rgba(95, 62, 32, 0.45); stroke.strokeWidth = max(1f, z * 0.015f); stroke.pathEffect = null; c.drawPath(q, stroke)
+        val q = Path()
+        q.moveTo(tri[0], tri[1]); q.quadTo(tri[8], tri[9], tri[2], tri[3])       // out: the parent's line to one end
+        q.quadTo(tri[10], tri[11], tri[4], tri[5])                                // in: that end to the port's line
+        q.quadTo(tri[10], tri[11], tri[6], tri[7])                                // in: the port's line to the other end
+        q.quadTo(tri[8], tri[9], tri[0], tri[1]); q.close()                       // out: back to the parent's line
+        fill.color = rgba(95, 62, 32, 0.16); c.drawPath(q, fill)
+        stroke.color = rgba(95, 62, 32, 0.4); stroke.strokeWidth = max(1f, z * 0.01f); stroke.pathEffect = null; c.drawPath(q, stroke)
     }
 
     /**
