@@ -21,9 +21,13 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
       - **Knock-on effects:** "Too much to merge" (5 ports) is redesigned; the builder enforces the 4-port cap;
         `layOut` routes to box edges and the baselines are regenerated; saved builds with output or bypass pieces
         are migrated or cleared.
-      - **Open:** whether a machine in a parent build follows later improvements to its source build (live) or
-        stays as placed (snapshot); which builds count as machines (solved numbered levels, custom levels); how
-        a machine's build is written in text codes (embedded, so shared codes stay self-contained).
+      - **Which builds are machines:** every solved build, numbered or custom level.
+      - **Snapshots.** A placed machine keeps the build it had when it was placed. When its level's solving build
+        changes later, the parent shows that it uses an old version, but nothing updates by itself: a new build
+        can move ports and break the parent outright. Editing and checking the parent switches it to the current
+        machine.
+      - **Text codes:** a machine is written by its level, e.g. `#001`, and reads in as that level's current
+        solving build. Custom levels need an id of their own here.
       - To be tried in the browser prototype first.
 - [ ] **1.0.0 release** on GitHub, after the current round of playtesting.
       Before tagging: redraw the store screenshots with `StoreAssets` (the metrics and levels changed since they
