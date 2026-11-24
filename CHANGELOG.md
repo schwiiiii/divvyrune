@@ -25,7 +25,7 @@ First release.
   outputs line up across the middle (left and right on one row, top and bottom in one column) become machines, so
   their lines meet the middle of each side, straight on to the lines around them.
 - Settings (the gear in the top strip): switch between the wood look and a wireframe look, white lines and dots on
-  dark across the whole app, with no arrows or dots: lines keep one width on screen at every zoom, and each splitter
+  dark across the whole app, with no arrows, just faint dots where grid lines meet (machines show their own finer grid): lines keep one width on screen at every zoom, and each splitter
   lights only the branch its next marble takes.
 - Blocks fill their cells, so neighbouring pieces meet without gaps.
 - Levels solved before machines arrived offer their solutions as machines too.

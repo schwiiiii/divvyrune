@@ -57,6 +57,17 @@ class WirePainter : Painter() {
 
     override fun table(c: Canvas, w: Float, h: Float, ox: Float, oy: Float, z: Float) {
         fill.color = ground; c.drawRect(0f, 0f, w, h, fill)
+        // faint dots where grid lines meet, so the cells show
+        var gx = Math.floor((-ox / z).toDouble()).toInt()
+        while (ox + gx * z <= w) {
+            var gy = Math.floor((-oy / z).toDouble()).toInt()
+            while (oy + gy * z <= h) { gridDot(c, ox + gx * z, oy + gy * z); gy++ }
+            gx++
+        }
+    }
+
+    override fun gridDot(c: Canvas, x: Float, y: Float) {
+        fill.color = rgba(237, 239, 242, 0.16); c.drawCircle(x, y, 1.1f * unit, fill)
     }
 
     override fun blockShadow(c: Canvas, x: Float, y: Float, z: Float) = Unit
@@ -70,12 +81,12 @@ class WirePainter : Painter() {
         when (t.kind) {
             Kind.BELT -> { route(p, x, y, z, t.from, t.out); stroke(c, p, z, col) }
             Kind.SPLIT -> {
-                // the way in, bright; every branch dim (the next one is lit by [turn])
-                val e = edge(x, y, z, t.inSide, 0.5f); p.moveTo(e[0], e[1]); p.lineTo(x, y); stroke(c, p, z, col)
+                // every branch dim (the next one is lit by [turn]); with none, a stub where marbles come in
+                if (outs.isEmpty()) { val e = edge(x, y, z, t.inSide, 0.5f); p.moveTo(e[0], e[1]); p.lineTo(x, y); stroke(c, p, z, col) }
                 for (o in outs) { val q = Path(); route(q, x, y, z, t.inSide, o); stroke(c, q, z, faint) }
             }
             Kind.MERGE -> {
-                val e = edge(x, y, z, t.out, 0.5f); p.moveTo(x, y); p.lineTo(e[0], e[1]); stroke(c, p, z, col)
+                if (ins.isEmpty()) { val e = edge(x, y, z, t.out, 0.5f); p.moveTo(x, y); p.lineTo(e[0], e[1]); stroke(c, p, z, col) }
                 for (i in ins) { val q = Path(); route(q, x, y, z, i, t.out); stroke(c, q, z, faint) }
             }
             Kind.SRC -> {

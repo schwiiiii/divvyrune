@@ -112,9 +112,13 @@ fun paintBuild(
         }
         if (dim) c.restore()
     }
-    // machines inside machines get their blocks too
-    for (v in g.machines) if (v.size < 1.0) {
-        painter.machineBlock(c, lay.ox + (v.x * lay.z).toFloat(), lay.oy + (v.y * lay.z).toFloat(), (v.size * lay.z).toFloat(), 0, false)
+    // machines inside machines get their blocks too; every machine shows its own grid's dots
+    for (v in g.machines) {
+        if (v.size < 1.0) painter.machineBlock(c, lay.ox + (v.x * lay.z).toFloat(), lay.oy + (v.y * lay.z).toFloat(), (v.size * lay.z).toFloat(), 0, false)
+        val f = v.inner
+        val n = Math.round(v.size / f.s).toInt()
+        val i0 = Math.round((v.x - f.ox) / f.s).toInt(); val j0 = Math.round((v.y - f.oy) / f.s).toInt()
+        for (i in 1 until n) for (j in 1 until n) painter.gridDot(c, lay.ox + ((f.ox + (i0 + i) * f.s) * lay.z).toFloat(), lay.oy + ((f.oy + (j0 + j) * f.s) * lay.z).toFloat())
     }
     // everything inside machines, each cell once
     val seen = HashSet<Pair<Frame, Cell>>()

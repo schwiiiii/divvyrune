@@ -36,8 +36,11 @@ data class Frame(val ox: Double, val oy: Double, val s: Double) {
     companion object { val BOARD = Frame(0.0, 0.0, 1.0) }
 }
 
-/** A machine as drawn: [tile] filling the square at ([x], [y]) of side [size], in board cells. */
-class MachineView(val tile: Tile, val x: Double, val y: Double, val size: Double)
+/**
+ * A machine as drawn: [tile] filling the square at ([x], [y]) of side [size], in board cells; [inner] is the grid
+ * its build is drawn in.
+ */
+class MachineView(val tile: Tile, val x: Double, val y: Double, val size: Double, val inner: Frame = Frame.BOARD)
 
 /** The rectangle around everything built, corners included. */
 data class Box(val x0: Int, val y0: Int, val x1: Int, val y1: Int) {
@@ -231,9 +234,9 @@ private fun layMachine(
     val half = maxOf(cx - b.x0, b.x1 + 1 - cx, cy - b.y0, b.y1 + 1 - cy)
     val s = 1.0 / (2 * half)
     val fit = Frame(c.x + 0.5 - cx * s, c.y + 0.5 - cy * s, s)
-    val me = MachineView(t, c.x.toDouble(), c.y.toDouble(), 1.0)
+    val me = MachineView(t, c.x.toDouble(), c.y.toDouble(), 1.0, fit)
     views += me
-    val inside = cg.machines.associateWith { v -> MachineView(v.tile, fit.ox + v.x * s, fit.oy + v.y * s, v.size * s) }
+    val inside = cg.machines.associateWith { v -> MachineView(v.tile, fit.ox + v.x * s, fit.oy + v.y * s, v.size * s, fit.compose(v.inner)) }
     views += inside.values
     val base = nodes.size
     val portOf = cg.ports.associateBy { it.node }

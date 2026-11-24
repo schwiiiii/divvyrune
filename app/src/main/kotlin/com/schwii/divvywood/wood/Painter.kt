@@ -232,6 +232,11 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
     /** A machine's border, and the flares where its sides become ports. */
     private val machineEdge = rgba(98, 66, 44, 1.0)
 
+    /** A faint dot where grid lines meet, inside a machine. */
+    open fun gridDot(c: Canvas, x: Float, y: Float) {
+        fill.color = rgba(90, 70, 50, 0.22); c.drawCircle(x, y, max(1f, unit), fill)
+    }
+
     /** A machine's input or way out: a channel along the points [pts] (x, y pairs) from its cell's edge, at cell size [z]. */
     open fun connector(c: Canvas, pts: FloatArray, z: Float) {
         val q = Path(); q.moveTo(pts[0], pts[1]); var k = 2
