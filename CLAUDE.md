@@ -50,4 +50,5 @@ https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 - Ask before side effects (new hosts, secrets, anything outside the repo). Mobile first, touch only. Concise answers; no needless choices.
 - Commit messages and PR descriptions describe what IS, in the present tense.
 - Every user-visible change adds a line to `CHANGELOG.md` (under the unreleased version, concise, player's view); shipped roadmap items move from `ROADMAP.md` to the changelog. For a release, the changelog's entry is condensed into `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (≤ 500 chars).
+- Before every push, check the state of git: fetch `main` and the branch, see whether the branch's PR has merged (its commits are on `main`), what's ahead/behind, and whether the working tree is clean. A merged PR means new work goes in a new PR.
 - Shallow clone: `git config --add remote.origin.fetch "+refs/heads/<branch>:refs/remotes/origin/<branch>"`, push with `git -c push.negotiate=true push`.
