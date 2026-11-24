@@ -592,6 +592,17 @@ class MachineTest {
         assertTrue("A machine needs at least two pieces." in v.reasons, v.reasons.toString())
     }
 
+    @Test fun `a machine's ports must line up across its middle`() {
+        assertTrue(portsAligned(halves))
+        val skew = tiles(".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR")   // left and right ways out on different rows
+        assertFalse(portsAligned(skew))
+        val (hs, code) = machineOf(skew)
+        val l2 = lib.plus(mapOf(hs to MachineDef(code)))
+        assertTrue(buildGraph(tiles(".. IB\n.. TB\n.. #$hs.0"), half, l2).nodes.any { n -> n.errs.any { "don't line up" in it } })
+        val straight = tiles("IR SL6 LR CR3\n.. ST3 LR LT\n.. TB .. ..")   // in left, out right on the same row, out below
+        assertTrue(portsAligned(straight))
+    }
+
     @Test fun `machines nest`() {
         val outer = tiles("IR LR #$h.0")
         val (h2, code2) = machineOf(outer)

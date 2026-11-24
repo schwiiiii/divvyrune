@@ -49,6 +49,8 @@ fun angleOf(d: Int) = atan2(DY[d].toFloat(), DX[d].toFloat())
 
 /** Draws walnut and maple blocks, carved channels, cups, flippers and glass marbles; a port of the prototype's renderer. */
 open class Painter(private val labelFace: Typeface = Fonts.label, private val labelVariation: String? = Fonts.labelVariation) {
+    /** Screen pixels per dp, for lines drawn at a fixed width on screen. */
+    var unit = 1f
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -230,21 +232,16 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
     /** A machine's border, and the flares where its sides become ports. */
     private val machineEdge = rgba(98, 66, 44, 1.0)
 
+    /** A faint dot where grid lines meet, inside a machine. */
+    open fun gridDot(c: Canvas, x: Float, y: Float) {
+        fill.color = rgba(90, 70, 50, 0.22); c.drawCircle(x, y, max(1f, unit), fill)
+    }
+
     /** A machine's input or way out: a channel along the points [pts] (x, y pairs) from its cell's edge, at cell size [z]. */
     open fun connector(c: Canvas, pts: FloatArray, z: Float) {
         val q = Path(); q.moveTo(pts[0], pts[1]); var k = 2
         while (k < pts.size) { q.lineTo(pts[k], pts[k + 1]); k += 2 }
         carve(c, z, q, false)
-    }
-
-    /** The flare where a machine's side becomes a port: [tri] as made by the board's layout, for a machine of size [z]. */
-    open fun taper(c: Canvas, tri: FloatArray, z: Float) {
-        val q = Path()
-        q.moveTo(tri[0], tri[1]); q.quadTo(tri[8], tri[9], tri[2], tri[3])       // out: the parent's line to one end
-        q.quadTo(tri[10], tri[11], tri[4], tri[5])                                // in: that end to the port's line
-        q.quadTo(tri[10], tri[11], tri[6], tri[7])                                // in: the port's line to the other end
-        q.quadTo(tri[8], tri[9], tri[0], tri[1]); q.close()                       // out: back to the parent's line
-        fill.color = machineEdge; c.drawPath(q, fill)
     }
 
     /**

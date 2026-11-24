@@ -63,12 +63,12 @@ class GameScreenshotTest {
 
     @Test fun machines() {
         // level 1 solved, then the builder set to the same rates with the machine placed and the picker open
-        val q = ".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR"
+        val q = "IR SL6 LR CR3\n.. ST3 LR LT\n.. TB .. .."
         val g = Game(Saves(MemoryStore()), density = 3f).apply {
             buildFromText(q); startCheck(); board.finishCheck(); closeSheet()
             openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
             val h = com.schwii.divvywood.engine.machineOf(com.schwii.divvywood.engine.decodeGrid(q).tiles!!).first
-            pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.0 .."); editor.dismissNotice(); board.z = 150f * 3
+            pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.1 .."); editor.dismissNotice(); board.z = 150f * 3
         }
         g.run(300)
         compose.setContent { GameScreen(g, animate = false) }
@@ -92,12 +92,12 @@ class GameScreenshotTest {
 
     @Test fun machineWire() {
         try {
-            val q = ".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR"
+            val q = "IR SL6 LR CR3\n.. ST3 LR LT\n.. TB .. .."
             val g = Game(Saves(MemoryStore()), density = 3f).apply {
                 buildFromText(q); startCheck(); board.finishCheck(); closeSheet()
                 openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
                 val h = com.schwii.divvywood.engine.machineOf(com.schwii.divvywood.engine.decodeGrid(q).tiles!!).first
-                pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.0 .."); editor.dismissNotice(); board.z = 150f * 3
+                pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.1 .."); editor.dismissNotice(); board.z = 150f * 3
                 wire = true
             }
             g.run(300)
