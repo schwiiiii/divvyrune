@@ -22,6 +22,8 @@ import org.junit.Test
 class GameTest {
     /** Level 1 (Quarter back: a half-belt input into 1/8 and 3/8), solved. */
     private val quarter = ".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR"
+    /** Level 1 again, its ports lined up across its middle (in left, out right on the same row, out below): a machine. */
+    private val straight = "IR SL6 LR CR3\n.. ST3 LR LT\n.. TB .. .."
     /** An even split: a belt into a splitter sending up and down. */
     private val halves = "IR LR SL5"
 
@@ -217,8 +219,8 @@ class GameTest {
     @Test fun `a solve becomes a machine another level can place and solve with`() {
         val store = MemoryStore()
         val g = Game(Saves(store))
-        g.buildFromText(quarter); check(g)
-        val h = com.schwii.divvywood.engine.machineOf(decodeGrid(quarter).tiles!!).first
+        g.buildFromText(straight); check(g)
+        val h = com.schwii.divvywood.engine.machineOf(decodeGrid(straight).tiles!!).first
         assertEquals(h, g.best(0)!!.piecesBuild)
         assertTrue("not offered on its own level", g.machineChoices().none { it.hash == h })
         // the builder, set to the same rates, may use it
@@ -228,14 +230,14 @@ class GameTest {
         assertEquals(listOf("fewest pieces", "smallest area", "best flow"), ch.best)
         g.pickMachine(h)
         assertEquals(TrayItem(Kind.MACHINE, ref = h), g.editor.trayItems().last { it.kind == Kind.MACHINE })
-        assertNull(g.buildFromText(".. IB\n.. TB\n.. #$h.0"))
+        assertNull(g.buildFromText(".. IB\n.. TB\n.. #$h.1"))   // turned so its input faces up
         val r = check(g)
         assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
-        assertEquals("a belt and every piece inside", 1 + metricsOf(decodeGrid(quarter).tiles!!).pieces, r.metrics.pieces)
+        assertEquals("a belt and every piece inside", 1 + metricsOf(decodeGrid(straight).tiles!!).pieces, r.metrics.pieces)
         assertEquals(2, r.metrics.area)
         // the code carries the machine, and reads back in a fresh game
         val code = com.schwii.divvywood.engine.encodeShare(g.board.tiles, g.board.lib)
-        assertTrue(code, code.endsWith("#$h = " + com.schwii.divvywood.engine.encodeLine(decodeGrid(quarter).tiles!!)))
+        assertTrue(code, code.endsWith("#$h = " + com.schwii.divvywood.engine.encodeLine(decodeGrid(straight).tiles!!)))
         val fresh = Game(Saves(MemoryStore()))
         fresh.openBuilder(); fresh.updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
         assertNull(fresh.buildFromText(code))
@@ -247,21 +249,21 @@ class GameTest {
         val store = MemoryStore()
         Saves(store).apply {
             // a worse solve of level 1 first, best at everything; then a better one
-            putBuild("Quarter back", decodeGrid(".. .. .. IB ..\nRL BL .. TB ..\n.. CT3 RL ST6 ..\n.. RT RL ST6 ..\n.. .. .. TR LR").tiles!!)
+            putBuild("Quarter back", decodeGrid("IR SL6 LR LR CR3\n.. ST3 LR LR LT\n.. TB .. .. ..").tiles!!)
             recordCheck("Quarter back", com.schwii.divvywood.engine.Metrics(11, 7, 2, 1, 5, 4), 50, solved = true)
         }
         val old = Saves(store).best("Quarter back")!!.piecesBuild!!
         Saves(store).apply {
-            putBuild("Quarter back", decodeGrid(quarter).tiles!!)
+            putBuild("Quarter back", decodeGrid(straight).tiles!!)
             recordCheck("Quarter back", com.schwii.divvywood.engine.Metrics(9, 6, 2, 1, 4, 4), 95, solved = true)
         }
         val g = Game(Saves(store))
         g.openBuilder(); g.updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
-        assertNull(g.buildFromText(".. IB\n.. TB\n.. #$old.0"))
+        assertNull(g.buildFromText(".. IB\n.. TB\n.. #$old.1"))
         assertTrue(g.outdated(old))
         assertTrue(check(g).verdict.solved)
         val now = g.board.tiles.values.single { it.kind == Kind.MACHINE }.ref
-        assertEquals(com.schwii.divvywood.engine.machineOf(decodeGrid(quarter).tiles!!).first, now)
+        assertEquals(com.schwii.divvywood.engine.machineOf(decodeGrid(straight).tiles!!).first, now)
         assertFalse(g.outdated(now!!))
     }
 

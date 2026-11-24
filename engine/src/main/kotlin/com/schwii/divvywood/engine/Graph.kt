@@ -205,8 +205,8 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
 
 /**
  * Lays machine [t] at [c] into [nodes]: its build turned its way, each node on [c], links inside it added to [links],
- * itself and any machines inside it to [views]. Its build is drawn within [c]: the square around its box fills the
- * cell, and its inputs and ways out run straight to the cell's edges. Its inputs become belts taking marbles in on their sides, its
+ * itself and any machines inside it to [views]. Its build is drawn within [c]: the smallest square centred where its
+ * ports' lines cross (see [portAxes]) fills the cell, so each input and way out runs straight to the middle of its side. Its inputs become belts taking marbles in on their sides, its
  * ways out belts sending them out of theirs. Returns why it can't be laid (unknown, itself inside itself, its own
  * level's machine, or broken here), or null.
  */
@@ -223,11 +223,14 @@ private fun layMachine(
     val tiles = turned(inner, t.out)
     val cg = buildGraph(tiles, Level(level.name, List(ins) { Frac(1, 1) }, emptyList(), level.no3), lib, stack + h)
     cg.nodes.firstOrNull { it.errs.isNotEmpty() }?.let { return "This machine doesn't work here: ${it.errs.first()}" }
-    // the square around the machine's box fills the cell, the box centred in it; inputs and ways out reach its edges
+    // the square centred where its ports' lines cross fills the cell, so each port meets the middle of its side
     val b = machineBox(tiles) ?: return "This machine is empty."
-    val w = b.x1 - b.x0 + 1; val hh = b.y1 - b.y0 + 1; val n = maxOf(w, hh)
-    val s = 1.0 / n
-    val fit = Frame(c.x + (n - w) / 2.0 * s - b.x0 * s, c.y + (n - hh) / 2.0 * s - b.y0 * s, s)
+    val (col, row) = portAxes(cg) ?: return "This machine's ports don't line up across its middle, so it can't be a machine."
+    val cx = col?.let { it + 0.5 } ?: ((b.x0 + b.x1 + 1) / 2.0)
+    val cy = row?.let { it + 0.5 } ?: ((b.y0 + b.y1 + 1) / 2.0)
+    val half = maxOf(cx - b.x0, b.x1 + 1 - cx, cy - b.y0, b.y1 + 1 - cy)
+    val s = 1.0 / (2 * half)
+    val fit = Frame(c.x + 0.5 - cx * s, c.y + 0.5 - cy * s, s)
     val me = MachineView(t, c.x.toDouble(), c.y.toDouble(), 1.0)
     views += me
     val inside = cg.machines.associateWith { v -> MachineView(v.tile, fit.ox + v.x * s, fit.oy + v.y * s, v.size * s) }

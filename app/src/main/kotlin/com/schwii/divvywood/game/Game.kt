@@ -227,7 +227,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     /**
      * The machines this level may use: each other solved level's best builds (one per metric, the same build once),
-     * leaving out any that hold this level's own machine.
+     * leaving out any that hold this level's own machine, and any whose ports don't line up across the middle.
      */
     fun machineChoices(): List<MachineChoice> {
         val lib = board.lib
@@ -236,6 +236,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
             b.machines.mapNotNull { (h, what) ->
                 val t = lib.tiles(h) ?: return@mapNotNull null
                 if ((machinesUsed(t, lib) + h).any { lib[it]?.level == level.name }) return@mapNotNull null
+                if (!com.schwii.divvywood.engine.portsAligned(t, lib)) return@mapNotNull null   // its ports must line up
                 MachineChoice(h, i, what, t)
             }
         }

@@ -80,26 +80,6 @@ class Layout(val g: Graph, val ox: Float, val oy: Float, val z: Float) {
 
     /** Port [i]'s line: from its machine's edge straight to the piece it joins. */
     fun connector(i: Int): FloatArray { val a = portLane(i); val b = portInner(i); return floatArrayOf(a[0], a[1], b[0], b[1]) }
-
-    /**
-     * The flare at port [i]'s side, as eight points (x, y pairs): the parent's line just outside the middle of the
-     * side, one end of the side, the port's own line just inside, the other end; then the two curves' control points
-     * on the side, near the middle and near the line. It widens from the parent's line to the whole side, and narrows
-     * again to the port's line: the side is the port, not the one line.
-     */
-    fun taper(i: Int): FloatArray {
-        val n = g.nodes[i]; val v = n.portView!!; val m = portMid(i); val l = portLane(i)
-        val h = (v.size * z / 2).toFloat(); val d = n.portSide
-        val depth = h * 0.16f
-        val ax = DY[d].toFloat(); val ay = DX[d].toFloat()   // along the side
-        return floatArrayOf(
-            m[0] + DX[d] * depth, m[1] + DY[d] * depth,
-            m[0] + ax * h, m[1] + ay * h,
-            l[0] - DX[d] * depth, l[1] - DY[d] * depth,
-            m[0] - ax * h, m[1] - ay * h,
-            m[0], m[1], l[0], l[1],
-        )
-    }
 }
 
 /**
@@ -141,8 +121,7 @@ fun paintBuild(
     for (i in nodes.indices) {
         val n = nodes[i]
         if (!n.inside || n.kind == Kind.MACHINE || n.cell in skip || !seen.add(n.frame to n.local)) continue
-        if (n.portView != null) {   // a machine's input or way out: its taper outside, its line inside
-            painter.taper(c, lay.taper(i), (n.portView!!.size * lay.z).toFloat())
+        if (n.portView != null) {   // a machine's input or way out: its line from the middle of its side
             painter.connector(c, lay.connector(i), lay.size(i))
             continue
         }
@@ -196,6 +175,7 @@ class BoardRenderer(
 
     fun draw(c: Canvas, w: Int, h: Int) {
         if (w <= 0 || h <= 0) return
+        painter.unit = state.density
         drawLayer(w, h)
         c.drawBitmap(layer!!, 0f, 0f, null)
         val s = state
@@ -208,7 +188,7 @@ class BoardRenderer(
             if (n.kind == Kind.OUT || n.kind == Kind.MACHINE) return@forEachIndexed
             val x = lay.x(i); val y = lay.y(i); val z = lay.size(i)
             s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
-            s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
+            if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
         }
         // the next way each splitter sends and each converger takes: a flipper, or a lit branch
         sim.n.forEachIndexed { i, sn ->

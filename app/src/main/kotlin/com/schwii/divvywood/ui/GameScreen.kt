@@ -242,6 +242,7 @@ fun chipIcon(item: TrayItem, level: com.schwii.divvywood.engine.Level, px: Int, 
     val c = android.graphics.Canvas(bmp)
     val z = px * 0.875f; val x = px / 2f; val y = px / 2f - px * 0.02f
     val p = com.schwii.divvywood.board.lookPainter()
+    p.unit = px / 48f
     p.blockShadow(c, x, y, z)
     when (item.kind) {
         Kind.SPLIT -> { val t = Tile(Kind.SPLIT, inSide = 2); p.tile(c, x, y, z, t, listOf(2), listOf(3, 1), 905); p.turn(c, x, y, z, t, 3, angleOf(3)); p.burnText(c, "÷", x + z * 0.27f, y, z * 0.36f, light = true) }

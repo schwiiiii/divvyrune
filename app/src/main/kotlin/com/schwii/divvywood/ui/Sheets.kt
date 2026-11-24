@@ -326,10 +326,12 @@ private fun MachinesSheet(game: Game) {
     Title("Machines")
     val choices = remember(game.levelIndex) { game.machineChoices() }
     if (choices.isEmpty()) {
-        Text("Solve a level and its best builds become machines: whole builds you can place here as a single piece.",
+        Text("Solve a level and its best builds become machines: whole builds you can place here as a single piece. " +
+            "A build's inputs and outputs must line up across its middle: left and right on one row, top and bottom in one column.",
             style = Body, color = Dim, fontSize = 14.sp)
     } else {
-        Text("A machine is a solved build placed as one piece. Its pieces all count; its sides stay as they were built.",
+        Text("A machine is a solved build placed as one piece. Its pieces all count; its sides stay as they were built. " +
+            "Only builds whose inputs and outputs line up across the middle become machines.",
             style = Body, color = Dim, fontSize = 13.sp)
         val density = LocalDensity.current
         val px = with(density) { 100.dp.roundToPx() }

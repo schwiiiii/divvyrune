@@ -56,3 +56,22 @@ fun machinePieces(hash: String, lib: MachineLib, stack: Set<String> = emptySet()
     val t = lib.tiles(hash) ?: return 1
     return t.values.sumOf { if (it.kind == Kind.SRC) 0 else if (it.kind == Kind.MACHINE && it.ref != null) machinePieces(it.ref, lib, stack + hash) else 1 }
 }
+
+/**
+ * Where a build's ports line up, if they do: the column every top and bottom port runs in and the row every left and
+ * right port runs in (null on an axis with no ports). A build qualifies as a machine only when they line up, so
+ * every port can meet the middle of its side of the machine's cell, straight on to the lines around it.
+ */
+fun portAxes(g: Graph): Pair<Int?, Int?>? {
+    val lanes = g.ports.map { p -> p.side to if (p.side % 2 == 0) p.edge.y else p.edge.x }
+    val cols = lanes.filter { it.first % 2 == 1 }.map { it.second }.distinct()
+    val rows = lanes.filter { it.first % 2 == 0 }.map { it.second }.distinct()
+    if (cols.size > 1 || rows.size > 1) return null
+    return cols.firstOrNull() to rows.firstOrNull()
+}
+
+/** Can [tiles] be a machine: do its ports line up across its middle (see [portAxes])? */
+fun portsAligned(tiles: Map<Cell, Tile>, lib: MachineLib = MachineLib.EMPTY): Boolean {
+    val ins = tiles.values.count { it.kind == Kind.SRC }
+    return portAxes(buildGraph(tiles, Level("machine", List(ins) { Frac(1, 1) }, emptyList()), lib)) != null
+}

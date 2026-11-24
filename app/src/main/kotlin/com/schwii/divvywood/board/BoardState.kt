@@ -28,7 +28,7 @@ import com.schwii.divvywood.engine.solve
  * Everything the board shows: the level, its tiles and the derived graph, exact solution and live simulation,
  * plus the camera. [version] changes whenever the build changes; [frame] changes every animation frame.
  */
-class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f, lib: MachineLib = MachineLib.EMPTY) {
+class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: MachineLib = MachineLib.EMPTY) {
     /** The machines builds here may use. */
     var lib = lib
         set(v) { field = v; rebuild() }
