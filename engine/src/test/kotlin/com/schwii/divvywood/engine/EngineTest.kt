@@ -551,3 +551,69 @@ class CycleTest {
         assertTrue(f.waiting > 0); assertTrue(f.score in 1..99, "${f.score}")
     }
 }
+
+class MachineTest {
+    /** The even split as a machine: in from the left, out of the top and bottom. */
+    private val halves = tiles("IR LR SL5")
+    private val h = machineOf(halves).first
+    private val lib = MachineLib(mapOf(h to MachineDef(machineOf(halves).second, level = "halves")))
+    private val half = Level("split", 2, listOf(Frac(1, 2), Frac(1, 2)))
+
+    @Test fun `a machine is named by its build and placed as one piece`() {
+        assertEquals(6, h.length)
+        assertEquals(h, machineOf(tiles("IR .. LR SL5")).first, "the same build, however it was typed")
+        val t = tiles("IR LR #$h.0")
+        val g = buildGraph(t, half, lib)
+        assertEquals(0, g.errCount, g.nodes.flatMap { it.errs }.toString())
+        val v = check(g, half)
+        assertTrue(v.solved, fmt(v))
+        assertEquals(2, g.exits.size, "its ways out are the parent's")
+        val m = metricsOf(t, lib)
+        assertEquals(3, m.pieces, "a belt and the machine's two pieces"); assertEquals(1, m.machines)
+        assertEquals(2, m.area, "a machine is one cell on the board")
+    }
+
+    @Test fun `a machine turns with its sides`() {
+        val g = buildGraph(tiles("IR LR #$h.1"), half, lib)   // its input now on top
+        assertTrue(g.nodes.any { n -> n.errs.any { "no input" in it } }, g.nodes.flatMap { it.errs }.toString())
+        val ok = buildGraph(tiles(".. IB\n.. TB\n.. #$h.1"), half, lib)
+        assertEquals(0, ok.errCount, ok.nodes.flatMap { it.errs }.toString())
+        assertEquals(setOf(0, 2), ok.ports.filter { !it.isInput }.map { it.side }.toSet(), "out to the left and right")
+    }
+
+    @Test fun `a level can't be solved with its own machine, and unknown machines are named`() {
+        val own = Level("halves", 2, listOf(Frac(1, 2), Frac(1, 2)))
+        assertTrue(buildGraph(tiles("IR LR #$h.0"), own, lib).nodes.any { n -> n.errs.any { "its own machine" in it } })
+        assertTrue(buildGraph(tiles("IR LR #abcdef.0"), half, lib).nodes.any { n -> n.errs.any { "#abcdef isn't one of yours" in it } })
+    }
+
+    @Test fun `a lone machine is one piece and doesn't pass`() {
+        val v = check(buildGraph(tiles("IR #$h.0"), half, lib), half)
+        assertTrue("A machine needs at least two pieces." in v.reasons, v.reasons.toString())
+    }
+
+    @Test fun `machines nest`() {
+        val outer = tiles("IR LR #$h.0")
+        val (h2, code2) = machineOf(outer)
+        val lib2 = lib.plus(mapOf(h2 to MachineDef(code2, "split")))
+        val t = tiles("IR LR #$h2.0")
+        val g = buildGraph(t, Level("other", 2, listOf(Frac(1, 2), Frac(1, 2))), lib2)
+        assertEquals(0, g.errCount, g.nodes.flatMap { it.errs }.toString())
+        assertTrue(check(g, Level("other", 2, listOf(Frac(1, 2), Frac(1, 2)))).solved)
+        assertEquals(4, metricsOf(t, lib2).pieces)
+        assertEquals(setOf(h2, h), machinesUsed(t, lib2))
+    }
+
+    @Test fun `a shared code carries its machines`() {
+        val t = tiles("IR LR #$h.0")
+        val text = encodeShare(t, lib)
+        assertEquals("IR LR #$h.0\n#$h = ${lib[h]!!.code}", text)
+        val d = decodeGrid(text)
+        assertNull(d.error)
+        assertEquals(mapOf(h to lib[h]!!.code), d.machines)
+        assertEquals(t, d.tiles)
+        val line = decodeGrid(encodeShareLine(t, lib))
+        assertEquals(t, line.tiles); assertEquals(d.machines, line.machines)
+        assertTrue("doesn't match" in decodeGrid("IR LR #$h.0\n#$h = IR,LR,SL7").error!!)
+    }
+}

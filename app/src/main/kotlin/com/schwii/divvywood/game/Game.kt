@@ -23,6 +23,10 @@ import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.fitsLevel
 import com.schwii.divvywood.engine.judge
 import com.schwii.divvywood.engine.metricsOf
+import com.schwii.divvywood.engine.Cell
+import com.schwii.divvywood.engine.Tile
+import com.schwii.divvywood.engine.buildGraph
+import com.schwii.divvywood.engine.machinesUsed
 
 /** The sheet over the game, if any. */
 sealed interface Sheet {
@@ -35,6 +39,8 @@ sealed interface Sheet {
     data object Text : Sheet
     /** The builder's settings: input rate, targets, 3-way splits. */
     data object Builder : Sheet
+    /** The machines to place: the best builds of solved levels. */
+    data object Machines : Sheet
 }
 
 /**
@@ -73,7 +79,10 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     ); private set
     val level: Level get() = levelAt(levelIndex)
 
-    val board = BoardState(level, saves.build(level.name), density)
+    val board = BoardState(level, saves.build(level.name), density, saves.lib).also { b ->
+        b.outdated = { outdated(it) }
+        b.levelLabel = { h -> saves.machine(h)?.level?.let { name -> (0 until levelCount).firstOrNull { levelAt(it).name == name } }?.let { label(it) } }
+    }
     val editor = Editor(board, haptic)
 
     var sheet by mutableStateOf<Sheet?>(null); private set
@@ -159,6 +168,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     fun startCheck() {
         if (board.checking) return
         editor.cancel()
+        updateMachines()
         val pre = judge(board.graph, level, board.sol)
         if (pre.reasons.isNotEmpty() && (pre.rows.isEmpty() || !board.sol.ok)) { showResult(pre); return }
         board.startCheck()
@@ -167,11 +177,12 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     private fun finishCheck(w0: Snapshot?, w1: Snapshot) = showResult(judge(board.graph, level, board.sol, w0, w1))
 
     private fun showResult(v: Verdict) {
-        val m = metricsOf(board.tiles)
+        val m = metricsOf(board.tiles, board.lib)
         // a build that runs gets its flow measured over one loop; one that can't run has none
         val cycle = if (board.sol.ok && board.graph.errCount == 0) findCycle(board.graph, level) else null
         val flow = cycle?.let { flowOf(board.graph, level, it) }
         val best = saves.recordCheck(level.name, m, flow?.score, v.solved)
+        if (v.solved) board.lib = saves.lib
         sheet = Sheet.Result(v, m, flow, best, next = v.solved && levelIndex < LEVELS.lastIndex, save = v.solved && inBuilder && draft.problem() == null)
     }
 
@@ -180,6 +191,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     fun showLevels() { if (!board.checking) sheet = Sheet.Levels }
     fun showText() { sheet = Sheet.Text }
     fun showBuilder() { if (inBuilder && !board.checking) sheet = Sheet.Builder }
+    fun showMachines() { if (!board.checking) sheet = Sheet.Machines }
     fun closeSheet() { sheet = null }
 
     /** Builds from a text code in place of this level's build; returns an error message, or null when built. */
@@ -187,10 +199,70 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
         val d = decodeGrid(text)
         val tiles = d.tiles ?: return d.error
         fitsLevel(tiles, level)?.let { return it }
+        val known = saves.lib.defs.keys + d.machines.keys
+        tiles.values.firstOrNull { it.kind == Kind.MACHINE && it.ref !in known }?.let { return "The text uses machine #${it.ref} without its build." }
+        saves.addMachines(d.machines)
+        board.lib = saves.lib
         editor.replaceAll(tiles)
         board.refit()
         sheet = null
         editor.say("Built from text")
         return null
+    }
+
+    // ---------- machines ----------
+
+    /** A machine to place: its name, the level it solves, what it's best at there, and its build. */
+    class MachineChoice(val hash: String, val level: Int, val best: List<String>, val tiles: Map<Cell, Tile>)
+
+    /**
+     * The machines this level may use: each other solved level's best builds (one per metric, the same build once),
+     * leaving out any that hold this level's own machine.
+     */
+    fun machineChoices(): List<MachineChoice> {
+        val lib = board.lib
+        return (0 until levelCount).filter { it != levelIndex }.flatMap { i ->
+            val b = saves.best(levelAt(i).name) ?: return@flatMap emptyList()
+            b.machines.mapNotNull { (h, what) ->
+                val t = lib.tiles(h) ?: return@mapNotNull null
+                if ((machinesUsed(t, lib) + h).any { lib[it]?.level == level.name }) return@mapNotNull null
+                MachineChoice(h, i, what, t)
+            }
+        }
+    }
+
+    /** Puts machine [hash] in the tray, ready to drag onto the board. */
+    fun pickMachine(hash: String) {
+        editor.hold(hash)
+        sheet = null
+        editor.say("Drag the machine onto the board")
+    }
+
+    /** Is machine [hash] an older build of its level, no longer one of its bests? */
+    fun outdated(hash: String): Boolean {
+        val m = saves.machine(hash) ?: return false
+        val b = saves.best(m.level ?: return false) ?: return false
+        return b.machines.none { it.first == hash }
+    }
+
+    /**
+     * Before a Check, each outdated machine moves to the build that is now its level's best at what it was best at,
+     * when that build has the same sides; one whose sides changed stays as it was.
+     */
+    private fun updateMachines() {
+        val lib = board.lib
+        fun sides(h: String) = lib.tiles(h)?.let { t ->
+            buildGraph(t, Level("m", List(t.values.count { it.kind == Kind.SRC }) { Frac(1, 1) }, emptyList()), lib).ports
+                .map { it.side to it.isInput }.toSet()
+        }
+        val swaps = board.tiles.filterValues { it.kind == Kind.MACHINE && it.ref != null && outdated(it.ref!!) }.mapNotNull { (c, t) ->
+            val m = saves.machine(t.ref!!) ?: return@mapNotNull null
+            val b = saves.best(m.level!!) ?: return@mapNotNull null
+            val now = when (m.best.firstOrNull()) { "smallest area" -> b.areaBuild; "best flow" -> b.flowBuild; else -> b.piecesBuild } ?: return@mapNotNull null
+            if (sides(now) != sides(t.ref!!)) null else c to t.copy(ref = now)
+        }
+        if (swaps.isEmpty()) return
+        editor.edit { swaps.forEach { (c, t) -> board.tiles[c] = t }; true }
+        editor.say(if (swaps.size == 1) "A machine moved to its level's newer build" else "${swaps.size} machines moved to their levels' newer builds")
     }
 }

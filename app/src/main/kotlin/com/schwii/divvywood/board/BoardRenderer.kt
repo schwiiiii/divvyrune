@@ -56,7 +56,9 @@ class BoardRenderer(
             val dim = lifted != null && n.cell in lifted   // left behind while its lifted copy hovers elsewhere
             if (dim) c.saveLayerAlpha(null, (0.35f * 255).toInt())
             val bad = s.isOverloaded(i) || (n.bridge != null && s.isOverloaded(i + 1))
-            painter.tile(c, s.screenX(n.cell.x), s.screenY(n.cell.y), s.z, n.bridge ?: n.tile, ins, outs, seed, bad, s.labelOf(i))
+            val m = n.machine
+            if (m != null) drawMachine(c, painter, m, s.lib, s.screenX(n.cell.x), s.screenY(n.cell.y), s.z, seed, s.outdated)
+            else painter.tile(c, s.screenX(n.cell.x), s.screenY(n.cell.y), s.z, n.bridge ?: n.tile, ins, outs, seed, bad, s.labelOf(i))
             if (dim) c.restore()
         }
         // ways out: a dotted line to the edge of the box, and a tag past it naming the output it serves
@@ -85,6 +87,7 @@ class BoardRenderer(
         val r = max(3f, z * 0.12f)
         // where marbles have been held up lately: a red glow, and a red ring on convergers turning them away
         nodes.forEachIndexed { i, n ->
+            if (n.inside) return@forEachIndexed   // a machine's insides stay out of sight
             val x = s.screenX(n.cell.x); val y = s.screenY(n.cell.y)
             s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
             s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(2f, z * 0.06f) * (0.4f + it)) }
@@ -92,6 +95,7 @@ class BoardRenderer(
         // marbles: the first half of a tick finishes the old cell's curve, the second half starts the new one
         sim.n.forEachIndexed { i, sn ->
             val it = sn.item ?: return@forEachIndexed
+            if (nodes[i].inside) return@forEachIndexed   // out of sight inside a machine
             val p = when {
                 it.pf == i -> at(i, it.curIn, s.exitSide(i), 0.5f)
                 a < 0.5f -> at(it.pf, it.prevIn, s.sideTo(it.pf, i), 0.5f + a)
@@ -100,13 +104,14 @@ class BoardRenderer(
             painter.marble(c, p[0], p[1], r, waiting = sim.waiting[i])
         }
         for (g in sim.ghosts) {
+            if (nodes[g.from].inside) continue
             val p = if (a < 0.5f) at(g.from, g.item?.curIn ?: NONE, s.sideTo(g.from, g.to), 0.5f + a)
             else at(g.to, s.sideTo(g.to, g.from), NONE, a - 0.5f)
             painter.marble(c, p[0], p[1], r, if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2))
         }
         // flippers swing toward the next channel
         sim.n.forEachIndexed { i, sn ->
-            if (sn.kind != Kind.SPLIT && sn.kind != Kind.MERGE) return@forEachIndexed
+            if (sn.kind != Kind.SPLIT && sn.kind != Kind.MERGE || nodes[i].inside) return@forEachIndexed
             val list = if (sn.kind == Kind.SPLIT) sn.succ else sn.pred
             if (list.size < 2) return@forEachIndexed
             val target = angleOf(s.sideTo(i, list[sn.rr % list.size]))
@@ -148,7 +153,9 @@ class BoardRenderer(
                 val x = s.screenX(to.x); val y = s.screenY(to.y)
                 val (ins, outs, seed) = tileArgs(i)
                 painter.blockShadow(c, x + z * 0.04f, y + z * 0.06f, z)
-                painter.tile(c, x, y, z, n.bridge ?: n.tile, ins, outs, seed, false, s.labelOf(i))
+                val mt = n.machine
+                if (mt != null) drawMachine(c, painter, mt, s.lib, x, y, z, seed, s.outdated)
+                else painter.tile(c, x, y, z, n.bridge ?: n.tile, ins, outs, seed, false, s.labelOf(i))
                 if (e.blockedAt(to)) painter.outline(c, x, y, z, Palette.bad, outlineW * 1.5f)
             }
         }
@@ -158,10 +165,45 @@ class BoardRenderer(
             val fits = e.chipFits(gh.item, gh.cell)
             c.saveLayerAlpha(null, (0.9f * 255).toInt())
             painter.blockShadow(c, x + z * 0.04f, y + z * 0.06f, z)
-            painter.tile(c, x, y, z, e.chipTile(gh.item, gh.cell), emptyList(), emptyList(), 77,
+            val ct = e.chipTile(gh.item, gh.cell)
+            if (ct.kind == com.schwii.divvywood.engine.Kind.MACHINE) drawMachine(c, painter, ct, s.lib, x, y, z, 77, s.outdated)
+            else painter.tile(c, x, y, z, ct, emptyList(), emptyList(), 77,
                 label = if (gh.item.kind == com.schwii.divvywood.engine.Kind.SRC) s.level.inputLabel(maxOf(gh.item.id, 0)) else null)
             c.restore()
             painter.outline(c, x, y, z, if (fits) Palette.ink else Palette.bad, if (fits) outlineW else outlineW * 1.5f)
         }
+    }
+}
+
+/**
+ * Draws [tiles] fitted into the square at ([l], [t]) of side [size], each block with its channels; machines inside
+ * show their own builds down to [depth] levels, plain walnut below that.
+ */
+fun drawBuild(c: Canvas, painter: Painter, tiles: Map<com.schwii.divvywood.engine.Cell, com.schwii.divvywood.engine.Tile>,
+    lib: com.schwii.divvywood.engine.MachineLib, l: Float, t: Float, size: Float, depth: Int = 2, outdated: (String) -> Boolean = { false }) {
+    if (tiles.isEmpty()) return
+    val x0 = tiles.keys.minOf { it.x }; val y0 = tiles.keys.minOf { it.y }
+    val w = tiles.keys.maxOf { it.x } - x0 + 1; val h = tiles.keys.maxOf { it.y } - y0 + 1
+    val z = size / maxOf(w, h)
+    val ox = l + (size - w * z) / 2; val oy = t + (size - h * z) / 2
+    val ins = com.schwii.divvywood.engine.Level("draw", List(tiles.values.count { it.kind == Kind.SRC }) { com.schwii.divvywood.engine.Frac(1, 1) }, emptyList())
+    val g = com.schwii.divvywood.engine.buildGraph(tiles, ins, lib)
+    for ((cell, i) in g.idx) {
+        val n = g.nodes[i]
+        val x = ox + (cell.x - x0 + 0.5f) * z; val y = oy + (cell.y - y0 + 0.5f) * z
+        val side = { j: Int -> com.schwii.divvywood.engine.dirTo(cell, g.nodes[j].cell) }
+        val m = n.machine
+        if (m != null) drawMachine(c, painter, m, lib, x, y, z, hashCell(cell.x, cell.y), outdated, depth - 1)
+        else painter.tile(c, x, y, z, n.bridge ?: n.tile, n.pred.map(side), n.succ.map(side), hashCell(cell.x, cell.y))
+    }
+}
+
+/** Machine [m] as a block at (x, y) with its build, turned its way, in the window. */
+fun drawMachine(c: Canvas, painter: Painter, m: com.schwii.divvywood.engine.Tile, lib: com.schwii.divvywood.engine.MachineLib,
+    x: Float, y: Float, z: Float, seed: Int, outdated: (String) -> Boolean, depth: Int = 2) {
+    val ref = m.ref
+    painter.machine(c, x, y, z, seed, ref != null && outdated(ref)) { cv, l, t, size ->
+        val inner = ref?.let { lib.tiles(it) } ?: return@machine
+        if (depth > 0) drawBuild(cv, painter, com.schwii.divvywood.engine.turned(inner, m.out), lib, l, t, size, depth, outdated)
     }
 }

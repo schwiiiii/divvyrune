@@ -19,6 +19,7 @@ import com.schwii.divvywood.engine.Tiles
 import com.schwii.divvywood.engine.WARM_TICKS
 import com.schwii.divvywood.engine.assignOutputs
 import com.schwii.divvywood.engine.buildGraph
+import com.schwii.divvywood.engine.MachineLib
 import com.schwii.divvywood.engine.dirTo
 import com.schwii.divvywood.engine.overloaded
 import com.schwii.divvywood.engine.solve
@@ -27,7 +28,14 @@ import com.schwii.divvywood.engine.solve
  * Everything the board shows: the level, its tiles and the derived graph, exact solution and live simulation,
  * plus the camera. [version] changes whenever the build changes; [frame] changes every animation frame.
  */
-class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
+class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f, lib: MachineLib = MachineLib.EMPTY) {
+    /** The machines builds here may use. */
+    var lib = lib
+        set(v) { field = v; rebuild() }
+    /** Whether a machine is an older build of its level (shown on its block). */
+    var outdated: (String) -> Boolean = { false }
+    /** The label of the level a machine solves ("05", "C2"), if known. */
+    var levelLabel: (String) -> String? = { null }
     var level = level; private set
     var tiles = tiles; private set
     lateinit var graph: Graph; private set
@@ -77,7 +85,7 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f) {
     fun setBuild(level: Level, tiles: Tiles) { this.level = level; this.tiles = tiles; checking = false; rebuild() }
 
     fun rebuild() {
-        graph = buildGraph(tiles, level)
+        graph = buildGraph(tiles, level, lib)
         sol = solve(graph, level)
         restartSim()
         version++

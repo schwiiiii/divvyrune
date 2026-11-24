@@ -3,22 +3,6 @@
 Planned work, roughly in order. Nothing here has a date; items move to the [changelog](CHANGELOG.md) when they ship.
 
 ## Next
-- [ ] **Machines as pieces** (before 1.0). A solved machine can be placed in other builds as a single piece. Its
-      ports are already its sides (shipped: see the changelog).
-      - **Machines as pieces.** A solved machine takes one cell in a parent build and rotates. Its sides keep the
-        mapping from its own build. The sim expands its internals into the parent's graph, ordered by parent
-        cell, then the machine's own board order. Its pieces add to the parent's piece count, and its area minus
-        one adds to the parent's area. Flow comes from the full sim, so a weak machine makes every build that
-        uses it weaker. A machine can't contain itself, directly or through another machine.
-      - **Which builds are machines:** every solved build, numbered or custom level. Single-piece builds never
-        solve, so no machine just restates a piece.
-      - **Snapshots.** A placed machine keeps the build it had when it was placed. When its level's solving build
-        changes later, the parent shows that it uses an old version, but nothing updates by itself: a new build
-        can move ports and break the parent outright. Editing and checking the parent switches it to the current
-        machine.
-      - **Text codes:** a machine is written by its level, e.g. `#001`, and reads in as that level's current
-        solving build. A custom level's machine is written by a short stable hash of its rates (e.g. `#c7f3a1`),
-        so the same design gets the same id on every device.
 - [ ] **1.0.0 release** on GitHub, after the current round of playtesting.
       Before tagging: redraw the store screenshots with `StoreAssets` (the metrics and levels changed since they
       were drawn), and fill `AllowedAPKSigningKeys` in `fdroid/com.schwii.divvywood.yml` with the SHA-256 of the
