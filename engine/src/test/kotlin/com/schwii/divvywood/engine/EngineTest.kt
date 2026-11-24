@@ -273,6 +273,17 @@ class DirectionTest {
         assertEquals(0, t.getValue(Cell(0, 4)).inSide)
     }
 
+    @Test fun `before there is a machine, an input faces the start cell from the side it's dropped on`() {
+        val t = tilesOf()
+        assertEquals(3, entrySide(t, Cell(0, -2)), "dropped above: it enters from the top")
+        assertEquals(Cell(0, -1), edgeSpot(t, Cell(0, -2), 3))
+        t[Cell(0, -1)] = Tile(Kind.SRC, out = 1)
+        settleInputs(t)
+        assertEquals(Kind.SRC, t[Cell(0, -1)]?.kind)
+        placePiece(t, START, Kind.SPLIT)
+        assertEquals(3, t.getValue(START).inSide, "a splitter on the start cell takes the input's marbles")
+    }
+
     @Test fun `an input dropped beside the machine enters from that side`() {
         val t = tiles("SL5")
         assertEquals(2, entrySide(t, Cell(-3, 0)))

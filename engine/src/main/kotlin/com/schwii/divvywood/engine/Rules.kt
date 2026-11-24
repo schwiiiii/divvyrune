@@ -262,15 +262,21 @@ fun toggleSide(tiles: Tiles, c: Cell, d: Int) {
     tiles[c] = if (t.isOpen(d)) t.close(d) else t.open(d)
 }
 
-/** Where an input entering from [side] in [c]'s row or column sits: just outside the machine's box ([c] with no machine). */
+/** The cell a build starts from: while there is no machine yet, inputs sit around it and face into it. */
+val START = Cell(0, 0)
+
+/** The box ports sit around: the machine's, or the [START] cell before there is a machine. */
+fun portBox(tiles: Map<Cell, Tile>): Box = machineBox(tiles) ?: Box(START.x, START.y, START.x, START.y)
+
+/** Where an input entering from [side] in [c]'s row or column sits: just outside the box ports sit around ([portBox]). */
 fun edgeSpot(tiles: Map<Cell, Tile>, c: Cell, side: Int): Cell {
-    val b = machineBox(tiles) ?: return c
+    val b = portBox(tiles)
     return when (side) { 0 -> Cell(b.x1 + 1, c.y); 1 -> Cell(c.x, b.y1 + 1); 2 -> Cell(b.x0 - 1, c.y); else -> Cell(c.x, b.y0 - 1) }
 }
 
 /** The side an input dropped at [c] enters from: the side of the machine's box it lies beyond, or the nearest. */
 fun entrySide(tiles: Map<Cell, Tile>, c: Cell): Int {
-    val b = machineBox(tiles) ?: return 2
+    val b = portBox(tiles)
     val dist = intArrayOf(c.x - b.x1, c.y - b.y1, b.x0 - c.x, b.y0 - c.y)   // how far past each side
     return dist.indices.maxByOrNull { dist[it] }!!
 }
@@ -278,7 +284,7 @@ fun entrySide(tiles: Map<Cell, Tile>, c: Cell): Int {
 /**
  * Moves every input to the edge: just outside the machine's box on the side it enters from ([opp] of its [Tile.out]),
  * in the same row or column, its lane. Inputs never count as part of the box, so they follow its edge as the machine
- * grows and shrinks. Leaves inputs alone while there is no machine yet.
+ * grows and shrinks. Before there is a machine they sit around the [START] cell.
  */
 fun settleInputs(tiles: Tiles) {
     for ((c, t) in tiles.entries.toList()) {
