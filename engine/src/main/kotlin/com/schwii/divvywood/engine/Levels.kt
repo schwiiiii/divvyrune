@@ -35,6 +35,23 @@ data class Level(
     /** Sides the build needs: one per input, one per output, and one for the rest if there is any. */
     val ports: Int get() = inputs.size + out.size + if (rest > Q.ZERO) 1 else 0
 
+    /**
+     * Can a single piece meet this level? A belt passing one input straight out, a splitter dealing one input evenly
+     * out of its sides, a converger joining every input into one output, or a bridge passing two straight through.
+     * Such levels aren't puzzles: a one-piece machine only restates that piece.
+     */
+    val onePiece: Boolean get() {
+        val leaving = out.filterNotNull().map { it.q } + if (rest > Q.ZERO) listOf(rest) else emptyList()
+        if (out.any { it == null }) return false
+        val ins = inputs.map { it.q }
+        fun same(a: List<Q>, b: List<Q>) = a.sorted() == b.sorted()
+        if (ins.size == 1) {
+            val r = ins[0]
+            return (if (no3) listOf(1, 2) else listOf(1, 2, 3)).any { k -> same(leaving, List(k) { r / Q.of(k.toLong()) }) }
+        }
+        return (rest.isZero && out.size == 1 && ins.size <= 3) || (ins.size == 2 && rest.isZero && same(leaving, ins))
+    }
+
     /** Input [k]'s name on blocks and readouts: IN alone, IN1, IN2… when there are several. */
     fun inputLabel(k: Int) = if (inputs.size == 1) "IN" else "IN${k + 1}"
 }
@@ -48,9 +65,7 @@ const val MAX_PORTS = 4
 fun levelNamed(name: String): Level = LEVELS.first { it.name == name }
 
 val LEVELS = listOf(
-    Level("Halves", 2, listOf(Frac(1, 2), Frac(1, 2))),
     Level("Quarter back", 2, listOf(Frac(1, 4), Frac(3, 4))),
-    Level("Three ways", 2, listOf(Frac(1, 3), Frac(1, 3), Frac(1, 3))),
     Level("Sixth", 2, listOf(Frac(1, 6), Frac(5, 6))),
     Level("Eighths", 2, listOf(Frac(3, 8), Frac(5, 8))),
     Level("Two streams", listOf(Frac(1, 2), Frac(1, 4)), listOf(Frac(3, 8), Frac(3, 8))),

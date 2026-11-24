@@ -1,6 +1,7 @@
 package com.schwii.divvywood.engine
 
-class Node(val cell: Cell, val tile: Tile) {
+/** One node of the graph: a piece, a bridge's lane (a straight belt, [bridge] its tile), or a way out. */
+class Node(val cell: Cell, val tile: Tile, val bridge: Tile? = null) {
     val kind get() = tile.kind
     val id get() = tile.id
     /** An input's number (an unnumbered input is the first). */
@@ -44,16 +45,22 @@ class Graph(val nodes: List<Node>, val idx: Map<Cell, Int>, val ports: List<Port
  * The board as a graph. Nodes run in board order (row by row, top to bottom, each row left to right), so the sim's
  * turn order, and with it every result, depends only on the layout, never on the order pieces were placed in.
  *
- * Marbles enter and leave on the sides of the box around the build. Each input takes them in from behind, and each
- * belt, converger or splitter side pointing at empty space lets them out; either way the line to the box's edge must be clear, and
- * each side holds at most one of these ports. A way out becomes an [Kind.OUT] node after the board's nodes, in board
+ * Marbles enter and leave on the sides of the box around the machine (its pieces but the inputs). Each input sits
+ * just outside it and feeds the first piece in its row or column; each belt, converger or open splitter side pointing
+ * at empty space with a clear line to the box's edge lets them out. Each side holds at most one of these ports. A way out becomes an [Kind.OUT] node after the board's nodes, in board
  * order of where it leaves.
  */
 fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
     val cells = tiles.keys.sortedWith(compareBy({ it.y }, { it.x }))
-    val idx = cells.withIndex().associate { (i, c) -> c to i }
-    val nodes = cells.map { Node(it, tiles.getValue(it)) }.toMutableList()
-    val box = boxOf(cells)
+    // a bridge is two nodes, its lanes, each a straight belt
+    val nodes = cells.flatMap { c -> tiles.getValue(c).let { t -> if (t.kind == Kind.BRIDGE) bridgeLanes(t).map { Node(c, it, t) } else listOf(Node(c, t)) } }.toMutableList()
+    val idx = HashMap<Cell, Int>().apply { nodes.forEachIndexed { i, n -> putIfAbsent(n.cell, i) } }
+    /** The node at [c] that marbles entering from side [s] reach: on a bridge, the lane on that axis. */
+    fun nodeAt(c: Cell, s: Int): Int? {
+        val i = idx[c] ?: return null
+        return if (nodes[i].bridge != null && nodes[i].tile.from != s) i + 1 else i
+    }
+    val box = machineBox(tiles)
     val g = Graph(nodes, idx, mutableListOf(), box)
     val ports = g.ports as MutableList<Port>
 
@@ -69,14 +76,14 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
     val exitsAt = mutableListOf<Pair<Int, Int>>()   // piece, side
     nodes.toList().forEachIndexed { i, n ->
         for (d in 0..3) {
-            if (!sends(n.tile, d)) continue
-            val j = idx[n.cell.step(d)]
+            if (!sends(n.tile, d) || n.kind == Kind.SRC) continue
+            val j = nodeAt(n.cell.step(d), opp(d))
             if (j != null && accepts(nodes[j].tile, opp(d))) { g.link(i, j); continue }
             // a side facing empty space with a clear line to the edge is a way out
             if (j == null && clearLine(n.cell, d) != null) { exitsAt += i to d; continue }
             // a belt or converger has one way on, so a dead end there is an error; a splitter's other sides may stay unused
             if (n.kind != Kind.BELT && n.kind != Kind.MERGE) continue
-            val what = if (n.kind == Kind.BELT) "This belt" else "This converger"
+            val what = if (n.bridge != null) "This bridge" else if (n.kind == Kind.BELT) "This belt" else "This converger"
             val m = j?.let { nodes[it] }
             if (m == null) { n.errs += "$what points at the edge of the build, but its way out there is blocked."; continue }
             n.errs += when (m.kind) {
@@ -85,16 +92,23 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
                 Kind.MERGE -> "$what runs into the output side of a converger. Rotate the converger to face away."
                 Kind.SRC -> "$what runs into the input."
                 Kind.OUT -> "$what runs into the way out."
+                Kind.BRIDGE -> "$what runs into a bridge."
             }
         }
     }
-    // inputs take marbles in from the edge behind them
+    // an input sits outside the box and feeds the first piece in its lane
     nodes.forEachIndexed { i, n ->
         if (n.kind != Kind.SRC || n.tile.out == NONE) return@forEachIndexed
-        val back = opp(n.tile.out)
-        val line = clearLine(n.cell, back)
-        if (line == null) n.errs += "Something sits behind this input. An input takes marbles in from the edge of the build, so nothing may be behind it."
-        else ports += Port(i, i, back, line, pastEdge(n.cell, back))
+        val d = n.tile.out
+        val line = mutableListOf<Cell>()
+        var c = n.cell.step(d)
+        while (box != null && c in box && c !in tiles) { line += c; c = c.step(d) }
+        val j = if (box != null && c in box) nodeAt(c, opp(d)) else null
+        when {
+            j == null -> n.errs += "This input has nothing in its ${if (d % 2 == 0) "row" else "column"} to feed. Move it, or build in its way."
+            !accepts(nodes[j].tile, opp(d)) -> n.errs += "The first piece in this input's way doesn't take marbles from this side."
+            else -> { g.link(i, j); ports += Port(i, i, opp(d), line, n.cell) }
+        }
     }
     // ways out, in board order of where they leave
     exitsAt.sortedWith(compareBy({ pastEdge(nodes[it.first].cell, it.second).y }, { pastEdge(nodes[it.first].cell, it.second).x }))
@@ -118,7 +132,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
         val p = n.pred.size
         val s = n.succ.size
         when (n.kind) {
-            Kind.BELT -> if (p == 0) n.errs += "Nothing feeds this belt."
+            Kind.BELT -> if (p == 0) n.errs += if (n.bridge != null) "Nothing feeds one of this bridge's lanes. A bridge needs a belt in and out on both." else "Nothing feeds this belt."
             Kind.SPLIT -> {
                 if (p == 0) n.errs += "Nothing feeds this splitter."
                 if (p > 1) n.errs += "A splitter takes exactly one input. Join the belts with a converger first."
@@ -126,8 +140,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
                 if (s == 3 && level.no3) n.errs += "3-way splits are off in this level."
             }
             Kind.MERGE -> if (p == 0) n.errs += "Nothing feeds this converger."
-            Kind.SRC -> if (s == 0) n.errs += "The input faces nothing. Rotate it, or put a belt or piece against its arrow side."
-            Kind.OUT -> Unit
+            Kind.SRC, Kind.OUT, Kind.BRIDGE -> Unit
         }
     }
     return g

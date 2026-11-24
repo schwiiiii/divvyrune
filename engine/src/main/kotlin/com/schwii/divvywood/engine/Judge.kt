@@ -85,6 +85,7 @@ fun judge(g: Graph, level: Level, sol: Solution, w0: Snapshot? = null, w1: Snaps
     }
     val rest = g.exits.count { it !in assigned }
     if (rest > 1) reasons += "$rest belts leave the build with what no output needs. Join them with a converger: the rest leaves on one side."
+    if (n.filter { it.kind != Kind.SRC && it.kind != Kind.OUT }.map { it.cell }.distinct().size == 1) reasons += "A machine needs at least two pieces."
     val over = n.indices.count { overloaded(g, sol, level, it) }
     if (over > 0) reasons += "$over ${if (over == 1) "piece carries" else "pieces carry"} more than a full belt (shown in red)."
     if (w1 != null && w0 != null) level.inputs.forEachIndexed { k, r ->

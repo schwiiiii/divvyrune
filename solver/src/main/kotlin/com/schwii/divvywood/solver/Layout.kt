@@ -6,6 +6,8 @@ import com.schwii.divvywood.engine.NONE
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.Tiles
 import com.schwii.divvywood.engine.opp
+import com.schwii.divvywood.engine.settleInputs
+import com.schwii.divvywood.engine.bridgeOf
 import kotlin.random.Random
 
 /**
@@ -60,7 +62,8 @@ fun layOut(net: Net, rnd: Random, spread: Int = 3): Tiles? {
             val c = queue.removeFirst()
             if (c in goals) { end = c; break }
             for (d in (0..3).shuffled(rnd)) {
-                val nx = c.step(d)
+                // a straight belt across the way is bridged: the route hops over it
+                val nx = c.step(d).let { if (bridgeable(tiles, it, d)) it.step(d) else it }
                 if (nx in prev || !free(nx) || kotlin.math.abs(nx.x) > box || kotlin.math.abs(nx.y) > box) continue
                 prev[nx] = c; queue += nx
             }
@@ -68,11 +71,7 @@ fun layOut(net: Net, rnd: Random, spread: Int = 3): Tiles? {
         val last = end ?: return false
         val path = generateSequence(last) { prev[it] }.toList().reversed()
         val d0 = startSide.getValue(path[0]); val e = goals.getValue(last)
-        for ((i, c) in path.withIndex()) {
-            val from = if (i == 0) opp(d0) else dirBetween(c, path[i - 1])
-            val out = if (i == path.lastIndex) opp(e) else dirBetween(c, path[i + 1])
-            tiles[c] = Tile(Kind.BELT, from = from, out = out)
-        }
+        layPath(tiles, path, opp(d0), opp(e))
         claim(u, d0, v, e)
         return true
     }
@@ -110,8 +109,9 @@ fun layOut(net: Net, rnd: Random, spread: Int = 3): Tiles? {
         val s = side[i]
         tiles[pos[i]!!] = when (k) {
             Kind.SRC -> Tile(k, out = s, id = n[i].id)
-            Kind.MERGE -> Tile(k, out = s)
-            Kind.SPLIT -> Tile(k, inSide = s)
+            // sides no line uses are closed, so nothing joins or leaks through them
+            Kind.MERGE -> Tile(k, out = s, closed = (0..3).filter { it != s && it !in used[i] }.sumOf { 1 shl it })
+            Kind.SPLIT -> Tile(k, inSide = s, closed = (0..3).filter { it != s && it !in used[i] }.sumOf { 1 shl it })
             else -> Tile(k, inSide = s, id = n[i].id)
         }
     }
@@ -126,8 +126,15 @@ fun layOut(net: Net, rnd: Random, spread: Int = 3): Tiles? {
  * Ports go in a random order, each to a random free side; null when one can't be routed.
  */
 internal fun openPorts(tiles: Tiles, rnd: Random): Tiles? {
-    val ports = tiles.filterValues { it.kind == Kind.OUT || it.kind == Kind.SRC }.keys.shuffled(rnd)
+    // the leftover lines: one leads out, and the others join its belt afterwards
+    val rests = tiles.filterValues { it.kind == Kind.OUT && it.id == NONE }.keys.toList()
+    val main = rests.randomOrNull(rnd)
+    // the leftover line leads out first, and the others join it while there is still room round the build
+    val ports = listOfNotNull(main) + tiles.filter { (c, t) -> t.kind == Kind.SRC || (t.kind == Kind.OUT && t.id != NONE) }.keys.shuffled(rnd)
     if (ports.size > 4) return null
+    val trunk = HashSet<Cell>()
+    // the others step aside until then, keeping their cells free
+    val waiting = rests.filter { it != main }.associateWith { tiles.remove(it)!! }.toMutableMap()
     val sides = (0..3).shuffled(rnd)
     val rays = HashSet<Cell>()   // the clear lines out of ports already led out, which later routes must keep clear
     for ((k, c) in ports.withIndex()) {
@@ -148,8 +155,8 @@ internal fun openPorts(tiles: Tiles, rnd: Random): Tiles? {
                 if (beyond(p) && p != c) return generateSequence(p) { prev[it] }.toList().reversed()   // c … past the edge
                 if (beyond(p)) continue
                 for (d in (0..3).shuffled(rnd)) {
-                    val nx = p.step(d)
-                    if (nx in prev || nx in tiles || nx in rays || !inBounds(nx)) continue
+                    val nx = p.step(d).let { if (bridgeable(tiles, it, d) && it !in rays) it.step(d) else it }
+                    if (nx in prev || nx in tiles || nx in rays || nx in waiting || !inBounds(nx)) continue
                     prev[nx] = p; queue += nx
                 }
             }
@@ -160,29 +167,87 @@ internal fun openPorts(tiles: Tiles, rnd: Random): Tiles? {
         repeat(4) { rays += r; r = r.step(s) }
         if (path.size < 2) return null
         if (t.kind == Kind.OUT) {
-            for ((i, p) in path.withIndex()) {
-                val from = if (i == 0) t.inSide else dirBetween(p, path[i - 1])
-                val out = if (i == path.lastIndex) s else dirBetween(p, path[i + 1])
-                if (from == out) return null
-                tiles[p] = Tile(Kind.BELT, from = from, out = out)
+            if (dirBetween(c, path[1]) == t.inSide) return null
+            layPath(tiles, path, t.inSide, s)
+            if (c == main) {
+                trunk += path
+                // each joins where it can; one boxed in now may reach a belt laid by another
+                while (waiting.isNotEmpty()) {
+                    val joined = waiting.keys.toList().filter { w -> joinRest(tiles, w, waiting.getValue(w), waiting.keys - w, trunk, rays, rnd).also { if (it) waiting.remove(w) } }
+                    if (joined.isEmpty()) return null
+                }
             }
         } else {
             // the input moves to the far end, its back to the edge; belts carry its marbles back to where it stood
-            val far = path.last()
-            tiles[far] = Tile(Kind.SRC, out = dirBetween(far, path[path.lastIndex - 1]), id = t.id)
-            if (tiles[far]!!.out == s) return null
-            for (i in path.lastIndex - 1 downTo 0) {
-                val p = path[i]
-                val from = dirBetween(p, path[i + 1])
-                val out = if (i == 0) t.out else dirBetween(p, path[i - 1])
-                if (from == out) return null
-                tiles[p] = Tile(Kind.BELT, from = from, out = out)
-            }
+            if (dirBetween(c, path[1]) == t.out) return null
+            val rev = path.reversed()
+            layPath(tiles, rev, s, t.out)
+            tiles[rev[0]] = Tile(Kind.SRC, out = dirBetween(rev[0], rev[1]), id = t.id)
         }
     }
+    settleInputs(tiles)
     return tiles
+}
+
+/**
+ * Leads the leftover line ending at placeholder [w] (tile [t], already lifted off the board) into a belt of [trunk] (the leftover line that leads out), where a
+ * converger put on that belt joins them. False when no free route reaches it.
+ */
+private fun joinRest(tiles: Tiles, w: Cell, t: Tile, others: Set<Cell>, trunk: MutableSet<Cell>, rays: Set<Cell>, rnd: Random): Boolean {
+    if (tiles.isEmpty()) return false
+    val x0 = tiles.keys.minOf { it.x } - 1; val x1 = tiles.keys.maxOf { it.x } + 1
+    val y0 = tiles.keys.minOf { it.y } - 1; val y1 = tiles.keys.maxOf { it.y } + 1
+    fun joinable(b: Cell, e: Int) = b in trunk && tiles[b]?.let { it.kind == Kind.BELT && e != it.from && e != it.out } == true
+    val prev = HashMap<Cell, Cell?>().apply { put(w, null) }
+    val queue = ArrayDeque(listOf(w))
+    while (queue.isNotEmpty()) {
+        val c = queue.removeFirst()
+        val into = (0..3).shuffled(rnd).firstOrNull { (c != w || it != t.inSide) && joinable(c.step(it), opp(it)) }
+        if (into != null) {
+            val path = generateSequence(c) { prev[it] }.toList().reversed()
+            for ((i, p) in path.withIndex()) {
+                val from = if (i == 0) t.inSide else dirBetween(p, path[i - 1])
+                val out = if (i == path.lastIndex) into else dirBetween(p, path[i + 1])
+                tiles[p] = Tile(Kind.BELT, from = from, out = out)
+            }
+            val b = c.step(into); val bt = tiles.getValue(b); val e = opp(into)
+            tiles[b] = Tile(Kind.MERGE, out = bt.out, closed = (0..3).filter { it != bt.out && it != bt.from && it != e }.sumOf { 1 shl it })
+            trunk += path
+            return true
+        }
+        for (d in (0..3).shuffled(rnd)) {
+            if (c == w && d == t.inSide) continue
+            val nx = c.step(d)
+            if (nx in prev || nx in tiles || nx in rays || nx in others || nx.x !in x0..x1 || nx.y !in y0..y1) continue
+            prev[nx] = c; queue += nx
+        }
+    }
+    return false
+}
+
+/** Can a route heading [d] hop over [c]: a straight belt across its way? */
+internal fun bridgeable(tiles: Map<Cell, Tile>, c: Cell, d: Int): Boolean {
+    val t = tiles[c] ?: return false
+    return t.kind == Kind.BELT && t.from == opp(t.out) && t.out % 2 != d % 2
+}
+
+/**
+ * Lays belts along [path], entering its first cell from side [from] and leaving its last by [out]; where two cells
+ * of the path are two apart, the belt between them becomes a bridge.
+ */
+internal fun layPath(tiles: Tiles, path: List<Cell>, from: Int, out: Int) {
+    for ((i, c) in path.withIndex()) {
+        val f = if (i == 0) from else dirBetween(c, path[i - 1])
+        val o = if (i == path.lastIndex) out else dirBetween(c, path[i + 1])
+        tiles[c] = Tile(Kind.BELT, from = f, out = o)
+        if (i > 0 && kotlin.math.abs(c.x - path[i - 1].x) + kotlin.math.abs(c.y - path[i - 1].y) == 2) {
+            val mid = Cell((c.x + path[i - 1].x) / 2, (c.y + path[i - 1].y) / 2)
+            tiles[mid] = bridgeOf(dirBetween(path[i - 1], c), tiles.getValue(mid).out)
+        }
+    }
 }
 
 private fun dirBetween(a: Cell, b: Cell): Int = when {
     b.x > a.x -> 0; b.y > a.y -> 1; b.x < a.x -> 2; else -> 3
 }
+
