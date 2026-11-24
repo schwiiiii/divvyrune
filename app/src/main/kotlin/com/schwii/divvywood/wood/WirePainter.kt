@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import androidx.core.graphics.withSave
 import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.NONE
 import com.schwii.divvywood.engine.Tile
@@ -53,11 +54,11 @@ class WirePainter : Painter() {
     private fun label(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int, maxWidth: Float = Float.MAX_VALUE) {
         text.textSize = size; text.color = color
         val w = text.measureText(s)
-        c.save()
-        if (w > maxWidth) { c.translate(x, 0f); c.scale(maxWidth / w, 1f); c.translate(-x, 0f) }
-        val fm = text.fontMetrics
-        c.drawText(s, x, y - (fm.ascent + fm.descent) / 2, text)
-        c.restore()
+        c.withSave {
+            if (w > maxWidth) { translate(x, 0f); scale(maxWidth / w, 1f); translate(-x, 0f) }
+            val fm = text.fontMetrics
+            drawText(s, x, y - (fm.ascent + fm.descent) / 2, text)
+        }
     }
 
     override fun table(c: Canvas, w: Float, h: Float, ox: Float, oy: Float, z: Float) {
