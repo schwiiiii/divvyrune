@@ -125,10 +125,11 @@ class WirePainter : Painter() {
     override fun flipper(c: Canvas, x: Float, y: Float, z: Float, angle: Float) = Unit
 
     override fun machineBlock(c: Canvas, x: Float, y: Float, size: Float, seed: Int, outdated: Boolean) {
-        rect.set(x + size * 0.03f, y + size * 0.03f, x + size * 0.97f, y + size * 0.97f)
-        fill.color = rgba(28, 31, 36, 1.0); c.drawRoundRect(rect, size * 0.06f, size * 0.06f, fill)
-        line.color = grey; line.strokeWidth = max(1f, size * 0.02f); line.pathEffect = null
-        c.drawRoundRect(rect, size * 0.06f, size * 0.06f, line)
+        // the border on the cell's edge
+        rect.set(x, y, x + size, y + size)
+        fill.color = rgba(28, 31, 36, 1.0); c.drawRect(rect, fill)
+        line.color = grey; line.strokeWidth = max(1f, size * 0.02f); line.pathEffect = null; line.strokeCap = Paint.Cap.BUTT
+        rect.inset(line.strokeWidth / 2, line.strokeWidth / 2); c.drawRect(rect, line); line.strokeCap = Paint.Cap.ROUND
         if (outdated) { fill.color = amber; c.drawCircle(x + size * 0.88f, y + size * 0.12f, size * 0.07f, fill) }
     }
 
@@ -144,8 +145,7 @@ class WirePainter : Painter() {
         q.quadTo(tri[10], tri[11], tri[4], tri[5])                                // in: that end to the port's line
         q.quadTo(tri[10], tri[11], tri[6], tri[7])                                // in: the port's line to the other end
         q.quadTo(tri[8], tri[9], tri[0], tri[1]); q.close()                       // out: back to the parent's line
-        fill.color = rgba(237, 239, 242, 0.1); c.drawPath(q, fill)
-        line.color = rgba(237, 239, 242, 0.45); line.strokeWidth = max(1f, z * 0.01f); line.pathEffect = null; c.drawPath(q, line)
+        fill.color = grey; c.drawPath(q, fill)
     }
 
     override fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {
@@ -167,9 +167,9 @@ class WirePainter : Painter() {
     }
 
     override fun heatGlow(c: Canvas, x: Float, y: Float, z: Float, heat: Float) {
-        val h = z * 0.475f
+        val h = z * 0.5f
         fill.color = rgba(255, 107, 94, 0.08 + 0.3 * heat.coerceIn(0f, 1f))
-        rect.set(x - h, y - h, x + h, y + h); c.drawRoundRect(rect, z * 0.07f, z * 0.07f, fill)
+        rect.set(x - h, y - h, x + h, y + h); c.drawRect(rect, fill)
     }
 
     override fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float, waiting: Boolean) {

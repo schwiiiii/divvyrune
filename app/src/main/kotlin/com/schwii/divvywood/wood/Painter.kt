@@ -84,17 +84,17 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
     }
 
     open fun blockShadow(c: Canvas, x: Float, y: Float, z: Float) {
-        val s = z * 0.95f
+        val s = z
         fill.color = rgba(60, 38, 20, 0.10)
         rect.set(x - s / 2 + z * 0.01f, y - s / 2 + z * 0.06f, x - s / 2 + z * 0.01f + s + z * 0.05f, y - s / 2 + z * 0.06f + s + z * 0.04f)
-        c.drawRoundRect(rect, z * 0.1f, z * 0.1f, fill)
+        c.drawRect(rect, fill)
         fill.color = rgba(60, 38, 20, 0.16)
         rect.set(x - s / 2 + z * 0.025f, y - s / 2 + z * 0.045f, x + s / 2 + z * 0.025f, y + s / 2 + z * 0.045f)
-        c.drawRoundRect(rect, z * 0.08f, z * 0.08f, fill)
+        c.drawRect(rect, fill)
     }
 
     private fun blockBody(c: Canvas, x: Float, y: Float, z: Float, wood: Bitmap, seed: Int, stain: Int?) {
-        val s = z * 0.95f; val x0 = x - s / 2; val y0 = y - s / 2; val r = z * 0.07f
+        val s = z; val x0 = x - s / 2; val y0 = y - s / 2; val r = 0f   // blocks fill their cells: neighbours share an edge
         val rr = rand(seed)
         c.save()
         path.reset(); rect.set(x0, y0, x0 + s, y0 + s); path.addRoundRect(rect, r, r, Path.Direction.CW); c.clipPath(path)
@@ -215,16 +215,20 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
      * [size] (top left). An [outdated] machine wears an amber dot: its level has a better build now.
      */
     open fun machineBlock(c: Canvas, x: Float, y: Float, size: Float, seed: Int, outdated: Boolean) {
+        // a pale floor filling the cell, its build drawn onto it, a walnut border on the cell's edge
+        rect.set(x, y, x + size, y + size)
+        fill.color = rgba(236, 222, 194, 1.0); c.drawRect(rect, fill)
+        stroke.color = machineEdge; stroke.strokeWidth = max(1f, size * 0.03f); stroke.pathEffect = null
+        rect.inset(stroke.strokeWidth / 2, stroke.strokeWidth / 2); c.drawRect(rect, stroke)
         val cx = x + size / 2; val cy = y + size / 2
-        blockBody(c, cx, cy, size, Woods.walnut, seed, null)
-        val w = size * 0.92f
-        rect.set(cx - w / 2, cy - w / 2, cx + w / 2, cy + w / 2)
-        fill.color = rgba(236, 222, 194, 0.9); c.drawRoundRect(rect, size * 0.05f, size * 0.05f, fill)
         if (outdated) {
             fill.color = rgba(212, 162, 79, 1.0); c.drawCircle(cx + size * 0.38f, cy - size * 0.38f, size * 0.08f, fill)
             stroke.color = rgba(59, 38, 22, 0.7); stroke.strokeWidth = max(1f, size * 0.02f); c.drawCircle(cx + size * 0.38f, cy - size * 0.38f, size * 0.08f, stroke)
         }
     }
+
+    /** A machine's border, and the flares where its sides become ports. */
+    private val machineEdge = rgba(98, 66, 44, 1.0)
 
     /** A machine's input or way out: a channel along the points [pts] (x, y pairs) from its cell's edge, at cell size [z]. */
     open fun connector(c: Canvas, pts: FloatArray, z: Float) {
@@ -240,8 +244,7 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         q.quadTo(tri[10], tri[11], tri[4], tri[5])                                // in: that end to the port's line
         q.quadTo(tri[10], tri[11], tri[6], tri[7])                                // in: the port's line to the other end
         q.quadTo(tri[8], tri[9], tri[0], tri[1]); q.close()                       // out: back to the parent's line
-        fill.color = rgba(95, 62, 32, 0.16); c.drawPath(q, fill)
-        stroke.color = rgba(95, 62, 32, 0.4); stroke.strokeWidth = max(1f, z * 0.01f); stroke.pathEffect = null; c.drawPath(q, stroke)
+        fill.color = machineEdge; c.drawPath(q, fill)
     }
 
     /**
@@ -299,9 +302,9 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
     /** A clear glass marble with its shadow; [alpha] fades it as it drops into a cup. */
     /** A block where marbles are being held up: a red wash, stronger the more often lately ([heat], 0–1). */
     open fun heatGlow(c: Canvas, x: Float, y: Float, z: Float, heat: Float) {
-        val h = z * 0.475f
+        val h = z * 0.5f
         fill.color = rgba(192, 84, 74, (0.12 + 0.45 * heat.coerceIn(0f, 1f)))
-        rect.set(x - h, y - h, x + h, y + h); c.drawRoundRect(rect, z * 0.07f, z * 0.07f, fill)
+        rect.set(x - h, y - h, x + h, y + h); c.drawRect(rect, fill)
     }
 
     open fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float = 1f, waiting: Boolean = false) {
