@@ -106,7 +106,7 @@ fun GameScreen(game: Game, modifier: Modifier = Modifier, animate: Boolean = tru
                 Modifier.fillMaxWidth().background(Panel).navigationBarsPadding().padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Tray(editor, boardBounds) { dragIcon = it }
+                Tray(editor, boardBounds, onPick = { game.showMachines() }) { dragIcon = it }
                 Toolbar(game)
             }
         }
@@ -234,9 +234,10 @@ private fun Pill(label: String, onClick: () -> Unit) {
 // ---------- tray ----------
 
 private val iconPainter by lazy { Painter() }
+private val SAMPLE_MACHINE by lazy { com.schwii.divvywood.engine.decodeGrid("IR LR SL5").tiles!! }
 
 /** A tray item drawn as the block it places, at [px] pixels square. */
-fun chipIcon(item: TrayItem, level: com.schwii.divvywood.engine.Level, px: Int): Bitmap {
+fun chipIcon(item: TrayItem, level: com.schwii.divvywood.engine.Level, px: Int, lib: com.schwii.divvywood.engine.MachineLib = com.schwii.divvywood.engine.MachineLib.EMPTY): Bitmap {
     val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
     val c = android.graphics.Canvas(bmp)
     val z = px * 0.875f; val x = px / 2f; val y = px / 2f - px * 0.02f
@@ -247,13 +248,18 @@ fun chipIcon(item: TrayItem, level: com.schwii.divvywood.engine.Level, px: Int):
         Kind.MERGE -> { p.tile(c, x, y, z, Tile(Kind.MERGE, out = 0), listOf(3, 1), listOf(0), 906); p.flipper(c, x, y, z, angleOf(3)); p.burnText(c, "+", x - z * 0.27f, y, z * 0.36f, light = true) }
         Kind.SRC -> p.tile(c, x, y, z, Tile(Kind.SRC, out = 0), emptyList(), listOf(0), 903 + maxOf(item.id, 0),
             label = level.inputLabel(maxOf(item.id, 0)) + (level.inputs.getOrNull(maxOf(item.id, 0))?.let { " $it" } ?: ""), labelScale = 1.5f)
+        Kind.MACHINE -> if (item.ref == null) {
+            // the machines button: a machine block with a plain split inside, and a plus
+            p.machine(c, x, y, z, 908, false) { cv, l, t, size -> com.schwii.divvywood.board.drawBuild(cv, p, SAMPLE_MACHINE, lib, l, t, size) }
+            p.burnText(c, "+", x + z * 0.33f, y + z * 0.3f, z * 0.34f)
+        } else com.schwii.divvywood.board.drawMachine(c, p, Tile(Kind.MACHINE, ref = item.ref), lib, x, y, z, 909, { false })
         else -> p.tile(c, x, y, z, Tile(Kind.BRIDGE, out = 0, inSide = 1), emptyList(), emptyList(), 907)
     }
     return bmp
 }
 
 @Composable
-private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect, onDragIcon: (Pair<ImageBitmap, Offset>?) -> Unit) {
+private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect, onPick: () -> Unit, onDragIcon: (Pair<ImageBitmap, Offset>?) -> Unit) {
     val board = editor.board
     board.version   // placed state follows the build
     val px = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.roundToPx() }
@@ -261,7 +267,7 @@ private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect,
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         for (item in editor.trayItems()) {
-            val icon = remember(item, board.level) { chipIcon(item, board.level, px).asImageBitmap() }
+            val icon = remember(item, board.level) { chipIcon(item, board.level, px, board.lib).asImageBitmap() }
             val placed = editor.isPlaced(item)
             var origin by remember { mutableStateOf(Offset.Zero) }
             Image(icon, null,
@@ -289,7 +295,8 @@ private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect,
                                 }
                             }
                             onDragIcon(null)
-                            if (!moved) { editor.chipHover(item, null, null); editor.notifyDragOnly(); return@awaitEachGesture }
+                            if (!moved) { editor.chipHover(item, null, null); if (item.picker) onPick() else editor.notifyDragOnly(); return@awaitEachGesture }
+                            if (item.picker) { editor.chipHover(item, null, null); return@awaitEachGesture }
                             if (boardBounds.contains(last)) editor.chipDrop(item, last.x - boardBounds.left, last.y - boardBounds.top)
                             else editor.chipHover(item, null, null)
                         }

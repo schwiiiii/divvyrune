@@ -32,9 +32,14 @@ import kotlin.math.sign
 
 enum class Haptic { PICK, DROP, CONFIRM }
 
-/** Something in the tray: a splitter, converger or bridge (unlimited), or the level's inputs (one each). */
-data class TrayItem(val kind: Kind, val id: Int = -1) {
+/**
+ * Something in the tray: a splitter, converger or bridge (unlimited), the level's inputs (one each), the machines
+ * button ([Kind.MACHINE] with no [ref]: tap to pick one) and the machine picked, [ref] (unlimited).
+ */
+data class TrayItem(val kind: Kind, val id: Int = -1, val ref: String? = null) {
     val limited get() = kind == Kind.SRC
+    /** The machines button: tapped, not dragged. */
+    val picker get() = kind == Kind.MACHINE && ref == null
 }
 
 /** Selected pieces being dragged, shifted by (dx, dy) cells from where they sit. */
@@ -64,6 +69,10 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     var notice by mutableStateOf<String?>(null); private set
     var chipGhost by mutableStateOf<ChipGhost?>(null); private set
     var canUndo by mutableStateOf(false); private set
+    /** The machine picked to place, shown in the tray. */
+    var held by mutableStateOf<String?>(null); private set
+
+    fun hold(hash: String?) { held = hash }
 
     /** The gesture in progress. */
     sealed interface Gesture
@@ -121,7 +130,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     /** Forgets undo history, selection and any gesture: for a freshly loaded level. */
     fun reset() {
-        undoStack.clear(); canUndo = false
+        undoStack.clear(); canUndo = false; held = null
         selection = emptySet(); selectMode = false
         move = null; chipGhost = null; gesture = null
     }
@@ -273,14 +282,15 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     /** Shows [msg] briefly in the banner. */
     fun say(msg: String) { notice = msg }
 
-    /** Tapping a tray chip does nothing but say how to use it: chips only drag. */
+    /** Tapping a tray chip does nothing but say how to use it: chips only drag (but the machines button). */
     fun notifyDragOnly() { notice = "Drag it onto the board" }
 
     // ---------- tray ----------
 
     /** The unlimited pieces first (they are used most and must never scroll out of reach), then the inputs. */
     fun trayItems(): List<TrayItem> = buildList {
-        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.BRIDGE))
+        add(TrayItem(Kind.SPLIT)); add(TrayItem(Kind.MERGE)); add(TrayItem(Kind.BRIDGE)); add(TrayItem(Kind.MACHINE))
+        held?.let { add(TrayItem(Kind.MACHINE, ref = it)) }
         board.level.inputs.indices.forEach { add(TrayItem(Kind.SRC, it)) }
     }
 
@@ -298,6 +308,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
             Kind.SPLIT -> Tile(Kind.SPLIT, inSide = belt?.from ?: inferDir(tiles, c, Kind.SPLIT))
             Kind.MERGE -> Tile(Kind.MERGE, out = belt?.out ?: inferDir(tiles, c, Kind.MERGE))
             Kind.BRIDGE -> belt?.let { bridgeOf(it.out, if (it.out % 2 == 0) 1 else 0) } ?: Tile(Kind.BRIDGE, out = 0, inSide = 1)
+            Kind.MACHINE -> Tile(Kind.MACHINE, ref = item.ref, out = 0)
             else -> Tile(Kind.SRC, out = opp(entrySide(tiles, c)), id = maxOf(item.id, 0))
         }
     }
@@ -307,7 +318,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     /** A chip lands on an empty square or replaces a belt (an input only lands on an empty square). */
     fun chipFits(item: TrayItem, c: Cell): Boolean {
-        if (isPlaced(item)) return false
+        if (isPlaced(item) || item.picker) return false
         val ex = tiles[chipCell(item, c)]
         return ex == null || (ex.kind == Kind.BELT && item.kind != Kind.SRC)
     }
@@ -334,6 +345,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         Kind.SPLIT -> "splitter"
         Kind.MERGE -> "converger"
         Kind.BRIDGE -> "bridge"
+        Kind.MACHINE -> if (item.picker) "machines" else "machine"
         else -> if (board.level.inputs.size == 1) "input" else "input ${item.id + 1}"
     }
 }

@@ -12,6 +12,9 @@ package com.schwii.divvywood.engine
  * One-line form: commas between cells, "/" between rows.
  * Codes from before outputs were the build's sides may hold O (bypass) and F (final output) cells: they read as empty,
  * so the belts that fed them lead out of the build.
+ * A machine is # + its six-hex-digit name + . + quarter turns clockwise: #a1b2c3.1. A code that uses machines ends
+ * with one line per machine (nested ones too), "#a1b2c3 = " + its build's one-line code; on one line they follow
+ * the grid after ";" each ("…;#a1b2c3=…"). So a code builds anywhere.
  */
 
 private const val SIDE = "RBLT"
@@ -38,6 +41,7 @@ private fun gridRows(tiles: Map<Cell, Tile>): List<List<String>> {
                 Kind.MERGE -> "C${SIDE[t.out]}${openDigit(t, t.out)}"
                 Kind.OUT -> ".."
                 Kind.BRIDGE -> "X"
+                Kind.MACHINE -> "#${t.ref}.${t.out}"
             }
         }
     }
@@ -49,16 +53,44 @@ fun encodeGrid(tiles: Map<Cell, Tile>) = if (tiles.isEmpty()) "" else gridRows(t
 /** The whole build on one line: commas between cells, "/" between rows. */
 fun encodeLine(tiles: Map<Cell, Tile>) = if (tiles.isEmpty()) "" else gridRows(tiles).joinToString("/") { it.joinToString(",") }
 
-class Decoded(val tiles: Tiles?, val error: String?)
+/** The build with the machines it uses defined below it: the form to share. */
+fun encodeShare(tiles: Map<Cell, Tile>, lib: MachineLib): String =
+    encodeGrid(tiles) + machinesUsed(tiles, lib).mapNotNull { h -> lib[h]?.let { "\n#$h = ${it.code}" } }.joinToString("")
+
+/** [encodeShare] on one line. */
+fun encodeShareLine(tiles: Map<Cell, Tile>, lib: MachineLib): String =
+    encodeLine(tiles) + machinesUsed(tiles, lib).mapNotNull { h -> lib[h]?.let { ";#$h=${it.code}" } }.joinToString("")
+
+/** A decoded build, the machines its code defines (by name, as one-line codes), or why it couldn't be read. */
+class Decoded(val tiles: Tiles?, val error: String?, val machines: Map<String, String> = emptyMap())
+
+private val DEF_LINE = Regex("^#([0-9a-fA-F]{6})\\s*=\\s*(\\S+)$")
+private val MACHINE_CODE = Regex("^#([0-9A-F]{6})\\.([0-3])$")
 
 private val BELT_CODE = Regex("^([TRBL])([TRBL])$")
 private val PIECE_CODE = Regex("^([ISCOF])([TRBL])([0-7]?)$")
 
 fun decodeGrid(text: String): Decoded {
+    // machine definitions: lines "#a1b2c3 = …", or ";#a1b2c3=…" after a one-line grid
+    val machines = LinkedHashMap<String, String>()
+    val parts = text.split(';')
+    val gridLines = mutableListOf<String>()
+    for ((k, part) in parts.withIndex()) for (line in part.split(Regex("\r?\n"))) {
+        val m = DEF_LINE.find(line.trim())
+        when {
+            m != null -> {
+                val (h, code) = m.destructured
+                if (machineHash(code) != h.lowercase()) return Decoded(null, "Machine #${h.lowercase()} doesn't match its build.")
+                machines[h.lowercase()] = code
+            }
+            k == 0 -> gridLines += line
+            line.isNotBlank() -> return Decoded(null, "\"${line.trim()}\" isn't a machine definition.")
+        }
+    }
     val tiles: Tiles = linkedMapOf()
     val pendingIn = mutableListOf<Pair<Cell, Int>>()
     val bridges = mutableListOf<Cell>()
-    val rows = text.split(Regex("\r?\n|/")).map { it.trim() }.filter { it.isNotEmpty() }
+    val rows = gridLines.joinToString("\n").split(Regex("\r?\n|/")).map { it.trim() }.filter { it.isNotEmpty() }
     if (rows.isEmpty()) return Decoded(null, "The text is empty.")
     for ((y, row) in rows.withIndex()) {
         val cells = row.split(Regex("[\\s,]+")).filter { it.isNotEmpty() }
@@ -68,6 +100,7 @@ fun decodeGrid(text: String): Decoded {
             val where = "Row ${y + 1}, cell ${x + 1}"
             if (c == "..") continue
             if (c == "X") { bridges += at; continue }
+            MACHINE_CODE.find(c)?.let { m -> tiles[at] = Tile(Kind.MACHINE, ref = m.groupValues[1].lowercase(), out = m.groupValues[2].toInt()); continue }
             val belt = BELT_CODE.find(c)
             val piece = PIECE_CODE.find(c)
             if (belt != null) {
@@ -100,7 +133,7 @@ fun decodeGrid(text: String): Decoded {
     }
     inferBridges(tiles, bridges)
     settleInputs(tiles)
-    return Decoded(tiles, null)
+    return Decoded(tiles, null, machines)
 }
 
 /** Can [level] hold these tiles? Returns an error message, or null. */

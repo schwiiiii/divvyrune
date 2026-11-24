@@ -55,7 +55,7 @@ fun TopStrip(game: Game) {
     val board = game.board
     board.version   // parts and area follow the build
     val level = game.level
-    val m = metricsOf(board.tiles)
+    val m = metricsOf(board.tiles, board.lib)
     Column(
         Modifier.fillMaxWidth().background(Panel)
             .drawBehind { drawLine(Line, Offset(0f, size.height - 0.5f), Offset(size.width, size.height - 0.5f), 1.dp.toPx()) }

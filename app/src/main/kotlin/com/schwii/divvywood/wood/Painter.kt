@@ -11,6 +11,7 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import androidx.core.graphics.withClip
 import com.schwii.divvywood.engine.DX
 import com.schwii.divvywood.engine.DY
 import com.schwii.divvywood.engine.Kind
@@ -191,6 +192,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
                 hollow(c, x, y, z * 0.23f, true)
                 if (label != null) burnText(c, label, x, y - z * 0.35f, z * 0.14f * labelScale, z * 0.84f)
             }
+            Kind.MACHINE -> Unit   // drawn by [machine], with its build inside
             Kind.BRIDGE -> {
                 // the across lane is carved into the block; the other runs over it on a raised plank
                 routePath(p, x, y, z, opp(t.out), t.out); carve(c, z, p, false, bad)
@@ -205,6 +207,24 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
                 val q = Path(); routePath(q, x, y, z, opp(t.inSide), t.inSide); carve(c, z * 0.8f, q, false, bad)
                 chevron(c, edge(x, y, z, t.inSide, 0.3f), t.inSide, z, false)
             }
+        }
+    }
+
+    /**
+     * A machine: a walnut block with a maple window, [inside] drawing its build into the window's square (left, top,
+     * size). An [outdated] machine wears an amber dot: its level has a better build now.
+     */
+    fun machine(c: Canvas, x: Float, y: Float, z: Float, seed: Int, outdated: Boolean, inside: (Canvas, Float, Float, Float) -> Unit) {
+        blockBody(c, x, y, z, Woods.walnut, seed, null)
+        val w = z * 0.78f; val l = x - w / 2; val t = y - w / 2
+        rect.set(l, t, l + w, t + w)
+        fill.color = rgba(236, 222, 194, 1.0); c.drawRoundRect(rect, z * 0.05f, z * 0.05f, fill)
+        c.withClip(rect) { inside(c, l, t, w) }
+        stroke.color = rgba(40, 24, 12, 0.55); stroke.strokeWidth = max(1f, z * 0.03f); stroke.pathEffect = null
+        c.drawRoundRect(rect, z * 0.05f, z * 0.05f, stroke)
+        if (outdated) {
+            fill.color = rgba(212, 162, 79, 1.0); c.drawCircle(x + z * 0.36f, y - z * 0.36f, z * 0.09f, fill)
+            stroke.color = rgba(59, 38, 22, 0.7); stroke.strokeWidth = max(1f, z * 0.02f); c.drawCircle(x + z * 0.36f, y - z * 0.36f, z * 0.09f, stroke)
         }
     }
 

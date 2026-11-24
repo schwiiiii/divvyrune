@@ -1,7 +1,16 @@
 package com.schwii.divvywood.engine
 
-/** One node of the graph: a piece, a bridge's lane (a straight belt, [bridge] its tile), or a way out. */
-class Node(val cell: Cell, val tile: Tile, val bridge: Tile? = null) {
+/**
+ * One node of the graph: a piece, a bridge's lane (a straight belt, [bridge] its tile), or a way out. A machine's
+ * build is laid into the graph node by node, all on the machine's cell, with [machine] its tile: its inputs become
+ * belts taking marbles in from side [inPort], its ways out belts sending them out of side [outPort].
+ */
+class Node(
+    val cell: Cell, val tile: Tile, val bridge: Tile? = null,
+    val machine: Tile? = null, val inPort: Int = NONE, val outPort: Int = NONE,
+) {
+    /** Inside a machine: drawn as the machine, its marbles hidden. */
+    val inside get() = machine != null
     val kind get() = tile.kind
     val id get() = tile.id
     /** An input's number (an unnumbered input is the first). */
@@ -50,18 +59,38 @@ class Graph(val nodes: List<Node>, val idx: Map<Cell, Int>, val ports: List<Port
  * at empty space with a clear line to the box's edge lets them out. Each side holds at most one of these ports. A way out becomes an [Kind.OUT] node after the board's nodes, in board
  * order of where it leaves.
  */
-fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
+fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLib.EMPTY, stack: Set<String> = emptySet()): Graph {
     val cells = tiles.keys.sortedWith(compareBy({ it.y }, { it.x }))
-    // a bridge is two nodes, its lanes, each a straight belt
-    val nodes = cells.flatMap { c -> tiles.getValue(c).let { t -> if (t.kind == Kind.BRIDGE) bridgeLanes(t).map { Node(c, it, t) } else listOf(Node(c, t)) } }.toMutableList()
+    val nodes = mutableListOf<Node>()
+    val links = mutableListOf<Pair<Int, Int>>()   // inside machines, already known
+    val machineIn = HashMap<Cell, Map<Int, Int>>()   // a machine's cell → its input nodes by side
+    val machineErr = HashMap<Int, String>()
+    for (c in cells) {
+        val t = tiles.getValue(c)
+        when (t.kind) {
+            // a bridge is two nodes, its lanes, each a straight belt
+            Kind.BRIDGE -> bridgeLanes(t).forEach { nodes += Node(c, it, t) }
+            Kind.MACHINE -> {
+                val base = nodes.size
+                val why = layMachine(c, t, level, lib, stack, nodes, links)
+                if (why != null) { nodes.subList(base, nodes.size).clear(); links.removeAll { it.first >= base }; nodes += Node(c, t, machine = t); machineErr[base] = why }
+                else machineIn[c] = (base until nodes.size).filter { nodes[it].inPort != NONE }.associateBy { nodes[it].inPort }
+            }
+            else -> nodes += Node(c, t)
+        }
+    }
     val idx = HashMap<Cell, Int>().apply { nodes.forEachIndexed { i, n -> putIfAbsent(n.cell, i) } }
-    /** The node at [c] that marbles entering from side [s] reach: on a bridge, the lane on that axis. */
+    /** The node at [c] that marbles entering from side [s] reach: on a bridge, the lane on that axis; on a machine, its input there. */
     fun nodeAt(c: Cell, s: Int): Int? {
+        machineIn[c]?.let { return it[s] }
         val i = idx[c] ?: return null
+        if (nodes[i].machine != null) return null
         return if (nodes[i].bridge != null && nodes[i].tile.from != s) i + 1 else i
     }
     val box = machineBox(tiles)
     val g = Graph(nodes, idx, mutableListOf(), box)
+    for ((a, b) in links) g.link(a, b)
+    for ((i, why) in machineErr) nodes[i].errs += why
     val ports = g.ports as MutableList<Port>
 
     /** The empty cells from [from] (excluded) to the edge of the box in direction [d], or null when something is in the way. */
@@ -77,14 +106,16 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
     nodes.toList().forEachIndexed { i, n ->
         for (d in 0..3) {
             if (!sends(n.tile, d) || n.kind == Kind.SRC) continue
+            if (n.inside && n.outPort != d) continue   // inside a machine, only its ways out reach the board
             val j = nodeAt(n.cell.step(d), opp(d))
             if (j != null && accepts(nodes[j].tile, opp(d))) { g.link(i, j); continue }
             // a side facing empty space with a clear line to the edge is a way out
             if (j == null && clearLine(n.cell, d) != null) { exitsAt += i to d; continue }
             // a belt or converger has one way on, so a dead end there is an error; a splitter's other sides may stay unused
             if (n.kind != Kind.BELT && n.kind != Kind.MERGE) continue
-            val what = if (n.bridge != null) "This bridge" else if (n.kind == Kind.BELT) "This belt" else "This converger"
+            val what = if (n.inside) "This machine" else if (n.bridge != null) "This bridge" else if (n.kind == Kind.BELT) "This belt" else "This converger"
             val m = j?.let { nodes[it] }
+            if (m == null && tiles[n.cell.step(d)]?.kind == Kind.MACHINE) { n.errs += "$what runs into a machine where it has no input."; continue }
             if (m == null) { n.errs += "$what points at the edge of the build, but its way out there is blocked."; continue }
             n.errs += when (m.kind) {
                 Kind.BELT -> "$what runs into the side of a belt. Join them with a converger."
@@ -93,6 +124,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
                 Kind.SRC -> "$what runs into the input."
                 Kind.OUT -> "$what runs into the way out."
                 Kind.BRIDGE -> "$what runs into a bridge."
+                Kind.MACHINE -> "$what runs into a machine where it has no input."
             }
         }
     }
@@ -133,7 +165,8 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
         val p = n.pred.size
         val s = n.succ.size
         when (n.kind) {
-            Kind.BELT -> if (p == 0) n.errs += if (n.bridge != null) "Nothing feeds one of this bridge's lanes. A bridge needs a belt in and out on both." else "Nothing feeds this belt."
+            Kind.BELT -> if (p == 0) n.errs += if (n.inPort != NONE) "Nothing feeds this machine's input on its ${SIDE_NAMES[n.inPort]} side."
+                else if (n.bridge != null) "Nothing feeds one of this bridge's lanes. A bridge needs a belt in and out on both." else "Nothing feeds this belt."
             Kind.SPLIT -> {
                 if (p == 0) n.errs += "Nothing feeds this splitter."
                 if (p > 1) n.errs += "A splitter takes exactly one input. Join the belts with a converger first."
@@ -141,8 +174,38 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level): Graph {
                 if (s == 3 && level.no3) n.errs += "3-way splits are off in this level."
             }
             Kind.MERGE -> if (p == 0) n.errs += "Nothing feeds this converger."
-            Kind.SRC, Kind.OUT, Kind.BRIDGE -> Unit
+            Kind.SRC, Kind.OUT, Kind.BRIDGE, Kind.MACHINE -> Unit
         }
     }
     return g
+}
+
+/**
+ * Lays machine [t] at [c] into [nodes]: its build turned its way, each node on [c], links inside it added to [links].
+ * Its inputs become belts taking marbles in on their sides, its ways out belts sending them out of theirs. Returns
+ * why it can't be laid (unknown, itself inside itself, its own level's machine, or broken here), or null.
+ */
+private fun layMachine(c: Cell, t: Tile, level: Level, lib: MachineLib, stack: Set<String>, nodes: MutableList<Node>, links: MutableList<Pair<Int, Int>>): String? {
+    val h = t.ref ?: return "This machine has no build."
+    val def = lib[h] ?: return "Machine #$h isn't one of yours. Build it from a code that includes it."
+    if (h in stack) return "A machine can't hold itself."
+    if (def.level != null && def.level == level.name) return "A level can't be solved with its own machine."
+    val inner = lib.tiles(h) ?: return "Machine #$h can't be read."
+    val ins = inner.values.count { it.kind == Kind.SRC }
+    val cg = buildGraph(turned(inner, t.out), Level(level.name, List(ins) { Frac(1, 1) }, emptyList(), level.no3), lib, stack + h)
+    cg.nodes.firstOrNull { it.errs.isNotEmpty() }?.let { return "This machine doesn't work here: ${it.errs.first()}" }
+    val base = nodes.size
+    val portOf = cg.ports.associateBy { it.node }
+    cg.nodes.forEachIndexed { i, n ->
+        val p = portOf[i]
+        nodes += when {
+            n.kind == Kind.SRC && p != null -> Node(c, Tile(Kind.BELT, from = p.side), machine = n.machine ?: t, inPort = p.side)
+            n.kind == Kind.OUT && p != null -> Node(c, Tile(Kind.BELT, from = opp(p.side), out = p.side), machine = n.machine ?: t, outPort = p.side)
+            else -> Node(c, n.tile, n.bridge, machine = n.machine ?: t)
+        }
+    }
+    cg.nodes.forEachIndexed { i, n -> for (j in n.succ) links += (base + i) to (base + j) }
+    // a machine inside this one shows as this one
+    for (i in base until nodes.size) if (nodes[i].machine !== t) nodes[i] = Node(c, nodes[i].tile, nodes[i].bridge, t, nodes[i].inPort, nodes[i].outPort)
+    return null
 }

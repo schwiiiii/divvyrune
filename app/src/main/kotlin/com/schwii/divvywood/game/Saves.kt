@@ -10,22 +10,46 @@ import com.schwii.divvywood.engine.Q
 import com.schwii.divvywood.engine.Metrics
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.Tiles
+import com.schwii.divvywood.engine.MachineDef
+import com.schwii.divvywood.engine.MachineLib
 import com.schwii.divvywood.engine.decodeGrid
 import com.schwii.divvywood.engine.encodeGrid
+import com.schwii.divvywood.engine.encodeLine
+import com.schwii.divvywood.engine.machineHash
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
  * A level's best solves, each metric on its own (they can come from different builds): fewest [pieces], smallest
- * footprint [area], highest [flow]. -1 where none is known yet.
+ * footprint [area], highest [flow]; -1 where none is known yet. [piecesBuild], [areaBuild] and [flowBuild] are the
+ * builds that set them, by machine name: the level's machines.
  */
-@Serializable data class Best(val pieces: Int = -1, val area: Int = -1, val flow: Int = -1) {
-    fun with(m: Metrics, f: Int?) = Best(
-        if (pieces < 0) m.pieces else minOf(pieces, m.pieces),
-        if (area < 0) m.area else minOf(area, m.area),
-        if (f == null) flow else maxOf(flow, f),
-    )
+@Serializable data class Best(
+    val pieces: Int = -1, val area: Int = -1, val flow: Int = -1,
+    val piecesBuild: String? = null, val areaBuild: String? = null, val flowBuild: String? = null,
+) {
+    /** With a solve of metrics [m], flow [f] by the build named [build]: each metric it betters (or ties first) takes it. */
+    fun with(m: Metrics, f: Int?, build: String? = null): Best {
+        val p = pieces < 0 || m.pieces < pieces
+        val a = area < 0 || m.area < area
+        val fl = f != null && f > flow
+        return Best(
+            if (p) m.pieces else pieces, if (a) m.area else area, if (fl) f!! else flow,
+            if (p) build ?: piecesBuild else piecesBuild, if (a) build ?: areaBuild else areaBuild, if (fl) build ?: flowBuild else flowBuild,
+        )
+    }
+
+    /** The level's machines with what each is best at, in order: fewest pieces, smallest area, best flow. */
+    val machines: List<Pair<String, List<String>>> get() =
+        listOf("fewest pieces" to piecesBuild, "smallest area" to areaBuild, "best flow" to flowBuild)
+            .filter { it.second != null }.groupBy({ it.second!! }, { it.first }).toList()
 }
+
+/**
+ * A machine in the player's collection: its one-line build, the level it solves (null when read in from a code) and
+ * what it was best at when it solved it ("fewest pieces"…), which says what replaces it once it's outdated.
+ */
+@Serializable data class MachineSave(val code: String, val level: String? = null, val best: List<String> = emptyList())
 
 /** The build's metrics at its last Check, solved or not; [flow] -1 when the build couldn't run. */
 @Serializable data class Checked(val pieces: Int = -1, val area: Int = -1, val solved: Boolean = false, val flow: Int = -1)
@@ -91,6 +115,7 @@ fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNul
     val custom: List<CustomLevel> = emptyList(),
     val nextCustom: Int = 1,
     val draft: LevelDef = LevelDef(),
+    val machines: Map<String, MachineSave> = emptyMap(),
 )
 
 /** The save name of the level builder. */
@@ -133,13 +158,32 @@ class Saves(private val store: SaveStore) {
     /** Everything saved for the named level. */
     fun level(name: String): LevelSave = data.levels[name] ?: LevelSave()
 
-    /** Records a Check of the named level's current build; returns the level's best afterwards. */
+    /**
+     * Records a Check of the named level's current build; returns the level's best afterwards. A solve that sets a
+     * best joins the machines, named by its build.
+     */
     fun recordCheck(name: String, m: Metrics, flow: Int?, solved: Boolean): Best? {
         val l = level(name)
         val checked = Checked(m.pieces, m.area, solved, flow ?: -1)
-        val nl = if (!solved) l.copy(checked = checked) else l.copy(best = (l.best ?: Best()).with(m, flow), solution = l.build, checked = checked)
-        put(data.copy(levels = data.levels + (name to nl)))
+        if (!solved) { put(data.copy(levels = data.levels + (name to l.copy(checked = checked)))); return l.best }
+        val code = decodeGrid(l.build).tiles?.let { encodeLine(it) } ?: l.build
+        val hash = machineHash(code)
+        val best = (l.best ?: Best()).with(m, flow, hash)
+        val nl = l.copy(best = best, solution = l.build, checked = checked)
+        val at = best.machines.firstOrNull { it.first == hash }?.second
+        put(data.copy(levels = data.levels + (name to nl), machines = if (at != null) data.machines + (hash to MachineSave(code, name, at)) else data.machines))
         return nl.best
+    }
+
+    /** Every machine the player has: their levels' best builds, and any read in from codes. */
+    val lib: MachineLib get() = MachineLib(data.machines.mapValues { (_, m) -> MachineDef(m.code, m.level) })
+
+    fun machine(hash: String): MachineSave? = data.machines[hash]
+
+    /** Adds machines read in from a code (by name, as one-line builds); ones already known keep their level. */
+    fun addMachines(codes: Map<String, String>) {
+        val new = codes.filterKeys { it !in data.machines }.mapValues { MachineSave(it.value) }
+        if (new.isNotEmpty()) put(data.copy(machines = data.machines + new))
     }
 
     /** Forgets the named level's results, keeping its build (the builder's, when its definition changes). */

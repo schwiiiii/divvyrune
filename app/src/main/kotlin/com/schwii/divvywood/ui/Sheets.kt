@@ -97,6 +97,7 @@ fun SheetHost(game: Game) {
                 Sheet.Levels -> LevelsSheet(game)
                 Sheet.Text -> TextSheet(game)
                 Sheet.Builder -> BuilderSheet(game)
+                Sheet.Machines -> MachinesSheet(game)
             }
         }
     }
@@ -148,7 +149,8 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     val m = r.metrics
     val best = r.best?.takeIf { it.pieces >= 0 }
     val base = game.baseline(game.levelIndex)
-    MetricBlock("Pieces", m.pieces.toString(), "${m.belts} belts · ${m.splits} split · ${m.merges} join · ${m.bridges} bridge${if (m.bridges == 1) "" else "s"}",
+    MetricBlock("Pieces", m.pieces.toString(), "${m.belts} belts · ${m.splits} split · ${m.merges} join · ${m.bridges} bridge${if (m.bridges == 1) "" else "s"}" +
+            if (m.machines > 0) " · ${m.machines} machine${if (m.machines == 1) "" else "s"}, every piece inside counted" else "",
         best?.let { "best ${it.pieces}" }, base?.pieces, m.pieces)
     MetricBlock("Footprint", if (m.area > 0) "${m.w}×${m.h}" else "–", "area ${m.area}: the machine's rectangle, inputs aside",
         best?.let { "best area ${it.area}" }, base?.area, m.area)
@@ -283,7 +285,7 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(6.dp)).background(Page), contentAlignment = Alignment.Center) {
             if (tiles != null) {
-                val img = remember(level, shown, px) { buildPreview(level, tiles, px, density.density).asImageBitmap() }
+                val img = remember(level, shown, px) { buildPreview(level, tiles, px, density.density, game.board.lib).asImageBitmap() }
                 Image(img, null, Modifier.fillMaxSize())
             } else Text("?", style = Body, color = Dim, fontWeight = FontWeight.Bold, fontSize = 32.sp)
         }
@@ -301,14 +303,51 @@ private fun LevelCard(game: Game, i: Int, modifier: Modifier) {
     }
 }
 
+/**
+ * The machines this level may use: each solved level's best builds, as cards with the build and what it's best at.
+ * Tapping one puts it in the tray to drag onto the board.
+ */
+@Composable
+private fun MachinesSheet(game: Game) {
+    Title("Machines")
+    val choices = remember(game.levelIndex) { game.machineChoices() }
+    if (choices.isEmpty()) {
+        Text("Solve a level and its best builds become machines: whole builds you can place here as a single piece.",
+            style = Body, color = Dim, fontSize = 14.sp)
+    } else {
+        Text("A machine is a solved build placed as one piece. Its pieces all count; its sides stay as they were built.",
+            style = Body, color = Dim, fontSize = 13.sp)
+        val density = LocalDensity.current
+        val px = with(density) { 100.dp.roundToPx() }
+        CardGrid(choices.indices.toList()) { k, modifier ->
+            val ch = choices[k]
+            val shape = RoundedCornerShape(10.dp)
+            Column(
+                modifier.background(Raise, shape).clip(shape).clickable { game.pickMachine(ch.hash) }.padding(6.dp)
+                    .semantics { contentDescription = "Machine from level ${game.label(ch.level)}, ${ch.best.joinToString()}" },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(6.dp)).background(Page), contentAlignment = Alignment.Center) {
+                    val img = remember(ch.hash, px) { buildPreview(game.levelAt(ch.level), ch.tiles, px, density.density, game.board.lib).asImageBitmap() }
+                    Image(img, null, Modifier.fillMaxSize())
+                }
+                Text("best " + ch.best.joinToString(" · ") { it.substringAfterLast(' ') }, style = Body, color = Dim, fontSize = 11.sp, maxLines = 2, textAlign = TextAlign.Center)
+                Text(game.label(ch.level), style = BodyTnum, color = Ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            }
+        }
+    }
+    Buttons { SheetButton("Close") { game.closeSheet() } }
+}
+
 private fun parts(n: Int) = if (n == 1) "1 piece" else "$n pieces"
 private fun scores(flow: Int) = "flow ${if (flow >= 0) flow else "–"}"
 
 /** A still picture of [tiles] on the table, fitted into a [px]-pixel square. */
-private fun buildPreview(level: Level, tiles: Map<Cell, Tile>, px: Int, density: Float): Bitmap {
+private fun buildPreview(level: Level, tiles: Map<Cell, Tile>, px: Int, density: Float, lib: com.schwii.divvywood.engine.MachineLib): Bitmap {
     val w = tiles.keys.maxOf { it.x } - tiles.keys.minOf { it.x } + 1
     val h = tiles.keys.maxOf { it.y } - tiles.keys.minOf { it.y } + 1
-    val state = BoardState(level, LinkedHashMap(tiles), density).apply { z = minOf(px * 0.88f / maxOf(w, h), px / 2.4f) }
+    val state = BoardState(level, LinkedHashMap(tiles), density, lib).apply { z = minOf(px * 0.88f / maxOf(w, h), px / 2.4f) }
     state.fit(px.toFloat(), px.toFloat())
     val bmp = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
     BoardRenderer(state, reduceMotion = true).draw(android.graphics.Canvas(bmp), px, px)
@@ -334,7 +373,7 @@ private fun legend(s: String): AnnotatedString = buildAnnotatedString {
 private fun ColumnScope.TextSheet(game: Game) {
     val level = game.level
     val context = LocalContext.current
-    var text by remember { mutableStateOf(encodeGrid(game.board.tiles)) }
+    var text by remember { mutableStateOf(com.schwii.divvywood.engine.encodeShare(game.board.tiles, game.board.lib)) }
     var error by remember { mutableStateOf<String?>(null) }
     var copied by remember { mutableStateOf<String?>(null) }
     fun copy(which: String, s: String) {
@@ -359,7 +398,7 @@ private fun ColumnScope.TextSheet(game: Game) {
         SheetButton(if (copied == "grid") "Copied" else "Copy") { copy("grid", text) }
         SheetButton(if (copied == "line") "Copied" else "Copy as one line") {
             val d = decodeGrid(text)
-            copy("line", d.tiles?.let { encodeLine(it) } ?: text.trim().lines().joinToString("/") { it.trim().split(Regex("\\s+")).joinToString(",") })
+            copy("line", d.tiles?.let { com.schwii.divvywood.engine.encodeShareLine(it, game.board.lib.plus(d.machines.mapValues { (_, c) -> com.schwii.divvywood.engine.MachineDef(c) })) } ?: text.trim().lines().joinToString("/") { it.trim().split(Regex("\\s+")).joinToString(",") })
         }
     }
     Buttons { SheetButton("Build from text", go = true) { error = game.buildFromText(text) } }

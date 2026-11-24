@@ -61,6 +61,23 @@ class GameScreenshotTest {
         save("screen-start-cell")
     }
 
+    @Test fun machines() {
+        // level 1 solved, then the builder set to the same rates with the machine placed and the picker open
+        val q = ".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR"
+        val g = Game(Saves(MemoryStore()), density = 3f).apply {
+            buildFromText(q); startCheck(); board.finishCheck(); closeSheet()
+            openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
+            val h = com.schwii.divvywood.engine.machineOf(com.schwii.divvywood.engine.decodeGrid(q).tiles!!).first
+            pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.0 .."); editor.dismissNotice(); board.z = 96f * 3
+        }
+        g.run(300)
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.board.refit() }
+        save("screen-machine")
+        compose.runOnIdle { g.showMachines() }
+        save("screen-machines-picker")
+    }
+
     @Test fun selectedPiece() {
         val g = gameFor(LEVELS.lastIndex, ".. .. .. .. IB ..\n.. BR CB5 RL TL ..\nRB SR6 ST7 SL6 LB ..\nTB .. CB6 TL TB ..\nTR CB5 CL3 SR3 TL ..\n.. CB6 RL ST7 LR LR\n.. CB6 RL TL .. ..", 56f)
         val e = g.editor

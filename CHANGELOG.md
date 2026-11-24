@@ -17,6 +17,12 @@ First release.
   out to the edge to open or close it.
 - Bridges: draw a belt straight across another and they cross without meeting.
 - A build needs at least two pieces to pass; levels a single piece could solve are gone.
+- Machines: a level's best builds (fewest pieces, smallest area, best flow) become machines you can place in other
+  levels as a single piece, from the Machines button in the tray. A machine keeps the sides it was built with and
+  turns like any piece; every piece inside counts. When its level gets a better build it shows an amber dot, and the
+  next Check moves it to the new build if the sides still match. A level can't be solved with its own machine.
+- Build codes name machines by a hash of their build and carry those builds with them, so a shared code builds
+  anywhere and adds its machines to yours.
 - Every rate is a share of a full belt (one marble a tick): inputs, targets, readouts and Check all use it.
 - Walnut and maple blocks: belts, splitters, convergers and bridges, as many as you like; loops allowed.
 - Check works out every block's exact share as a fraction, then runs the build for 3000 ticks and measures it.

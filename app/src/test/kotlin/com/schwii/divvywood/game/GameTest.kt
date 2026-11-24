@@ -39,7 +39,7 @@ class GameTest {
         assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
         assertEquals(listOf("1/8", "3/8"), r.verdict.rows.sortedBy { it.id }.map { it.exact.toString() })
         val m = metricsOf(decodeGrid(quarter).tiles!!)
-        assertEquals(Best(m.pieces, m.area, r.flow!!.score), r.best)
+        assertEquals(Best(m.pieces, m.area, r.flow!!.score), r.best!!.copy(piecesBuild = null, areaBuild = null, flowBuild = null))
         assertTrue(r.next)
         assertEquals(r.best, Saves(store).best("Quarter back"))
 
@@ -211,7 +211,58 @@ class GameTest {
 
     @Test fun `the tray holds splitters, convergers, bridges and the inputs, no outputs`() {
         val g = Game(Saves(MemoryStore()))
-        assertEquals(listOf(Kind.SPLIT, Kind.MERGE, Kind.BRIDGE, Kind.SRC), g.editor.trayItems().map { it.kind })
+        assertEquals(listOf(Kind.SPLIT, Kind.MERGE, Kind.BRIDGE, Kind.MACHINE, Kind.SRC), g.editor.trayItems().map { it.kind })
+    }
+
+    @Test fun `a solve becomes a machine another level can place and solve with`() {
+        val store = MemoryStore()
+        val g = Game(Saves(store))
+        g.buildFromText(quarter); check(g)
+        val h = com.schwii.divvywood.engine.machineOf(decodeGrid(quarter).tiles!!).first
+        assertEquals(h, g.best(0)!!.piecesBuild)
+        assertTrue("not offered on its own level", g.machineChoices().none { it.hash == h })
+        // the builder, set to the same rates, may use it
+        g.openBuilder(); g.updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
+        val ch = g.machineChoices().single()
+        assertEquals(h, ch.hash); assertEquals(0, ch.level)
+        assertEquals(listOf("fewest pieces", "smallest area", "best flow"), ch.best)
+        g.pickMachine(h)
+        assertEquals(TrayItem(Kind.MACHINE, ref = h), g.editor.trayItems().last { it.kind == Kind.MACHINE })
+        assertNull(g.buildFromText(".. IB\n.. TB\n.. #$h.0"))
+        val r = check(g)
+        assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
+        assertEquals("a belt and every piece inside", 1 + metricsOf(decodeGrid(quarter).tiles!!).pieces, r.metrics.pieces)
+        assertEquals(2, r.metrics.area)
+        // the code carries the machine, and reads back in a fresh game
+        val code = com.schwii.divvywood.engine.encodeShare(g.board.tiles, g.board.lib)
+        assertTrue(code, code.endsWith("#$h = " + com.schwii.divvywood.engine.encodeLine(decodeGrid(quarter).tiles!!)))
+        val fresh = Game(Saves(MemoryStore()))
+        fresh.openBuilder(); fresh.updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
+        assertNull(fresh.buildFromText(code))
+        assertTrue(check(fresh).verdict.solved)
+        assertEquals("The text uses machine #abcdef without its build.", fresh.buildFromText("IR LR #abcdef.0"))
+    }
+
+    @Test fun `an outdated machine moves to its level's newer build at Check`() {
+        val store = MemoryStore()
+        Saves(store).apply {
+            // a worse solve of level 1 first, best at everything; then a better one
+            putBuild("Quarter back", decodeGrid(".. .. .. IB ..\nRL BL .. TB ..\n.. CT3 RL ST6 ..\n.. RT RL ST6 ..\n.. .. .. TR LR").tiles!!)
+            recordCheck("Quarter back", com.schwii.divvywood.engine.Metrics(11, 7, 2, 1, 5, 4), 50, solved = true)
+        }
+        val old = Saves(store).best("Quarter back")!!.piecesBuild!!
+        Saves(store).apply {
+            putBuild("Quarter back", decodeGrid(quarter).tiles!!)
+            recordCheck("Quarter back", com.schwii.divvywood.engine.Metrics(9, 6, 2, 1, 4, 4), 95, solved = true)
+        }
+        val g = Game(Saves(store))
+        g.openBuilder(); g.updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
+        assertNull(g.buildFromText(".. IB\n.. TB\n.. #$old.0"))
+        assertTrue(g.outdated(old))
+        assertTrue(check(g).verdict.solved)
+        val now = g.board.tiles.values.single { it.kind == Kind.MACHINE }.ref
+        assertEquals(com.schwii.divvywood.engine.machineOf(decodeGrid(quarter).tiles!!).first, now)
+        assertFalse(g.outdated(now!!))
     }
 
     @Test fun `level names are unique`() {

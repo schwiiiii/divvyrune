@@ -15,11 +15,12 @@ private fun pct(n: Int, of: Int) = if (of <= 0) "0%" else String.format(Locale.R
 fun readoutOf(board: BoardState, cell: Cell): ReadoutInfo? {
     val i = board.graph.idx[cell] ?: return null
     val n = board.graph.nodes[i]
+    n.machine?.let { m -> return machineReadout(board, cell, m) }
     val s = board.sim
     val level = board.level
     val title = when (n.kind) {
         Kind.BELT -> if (n.bridge != null) "Bridge" else "Belt"; Kind.SPLIT -> "Splitter"; Kind.MERGE -> "Converger"
-        Kind.BRIDGE -> "Bridge"
+        Kind.BRIDGE -> "Bridge"; Kind.MACHINE -> "Machine"
         Kind.SRC -> if (level.inputs.size == 1) "Input" else "Input ${n.inputId + 1}"
         Kind.OUT -> "Way out"
     }
@@ -51,4 +52,19 @@ fun readoutOf(board: BoardState, cell: Cell): ReadoutInfo? {
     }
     val errs = if (n.bridge != null) (n.errs + board.graph.nodes[i + 1].errs).distinct() else n.errs.toList()
     return ReadoutInfo(title, errs, rows, note)
+}
+
+/** A machine: where it's from, how many pieces it holds, whether it's outdated, and anything wrong with it here. */
+private fun machineReadout(board: BoardState, cell: Cell, m: com.schwii.divvywood.engine.Tile): ReadoutInfo {
+    val g = board.graph
+    val errs = g.nodes.filter { it.cell == cell && it.inside }.flatMap { it.errs }.distinct()
+    val rows = mutableListOf<Pair<String, String>>()
+    val h = m.ref
+    if (h != null) {
+        rows += "machine" to "#$h"
+        rows += "pieces" to com.schwii.divvywood.engine.machinePieces(h, board.lib).toString()
+        board.levelLabel(h)?.let { rows += "solves" to it }
+    }
+    val note = if (h != null && board.outdated(h)) "Its level has a better build now. Check moves this one to it, if its sides still match." else null
+    return ReadoutInfo("Machine", errs, rows, note)
 }

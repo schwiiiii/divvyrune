@@ -22,7 +22,7 @@ fun dirTo(a: Cell, b: Cell) = when {
 }
 
 /** [OUT] is never placed: it marks a way out of the build in the graph (see [Port]). */
-enum class Kind { BELT, SPLIT, MERGE, SRC, OUT, BRIDGE }
+enum class Kind { BELT, SPLIT, MERGE, SRC, OUT, BRIDGE, MACHINE }
 
 /**
  * One placed block.
@@ -34,6 +34,7 @@ enum class Kind { BELT, SPLIT, MERGE, SRC, OUT, BRIDGE }
  * - way out (graph only): takes marbles on [inSide]; [id] numbers the build's ways out
  * - bridge: two belts crossing without meeting: the across lane runs out of [out] (right or left), the up-and-down
  *   lane out of [inSide] (bottom or top)
+ * - machine: a solved build placed as one piece, named [ref] (see [MachineLib]), turned [out] quarter turns clockwise
  * [closed] holds a splitter's or converger's closed sides, one bit per side (1 shl side): nothing joins them and
  * nothing leaves through them. Every side starts open.
  */
@@ -44,6 +45,7 @@ data class Tile(
     val inSide: Int = NONE,
     val id: Int = NONE,
     val closed: Int = 0,
+    val ref: String? = null,
 ) {
     fun isOpen(d: Int) = closed and (1 shl d) == 0
     fun open(d: Int) = copy(closed = closed and (1 shl d).inv())
@@ -183,6 +185,7 @@ fun turnPiece(t: Tile): Tile = when (t.kind) {
     Kind.OUT -> t.copy(inSide = (t.inSide + 1) % 4)
     Kind.SRC -> t.copy(out = (t.out + 1) % 4)
     Kind.BRIDGE -> rotBridge(t)
+    Kind.MACHINE -> t.copy(out = (t.out + 1) % 4)
 }
 
 /** A splitter or converger lands on an empty square, or on a belt whose direction it takes over. */

@@ -40,7 +40,7 @@ fun rotateGroup(tiles: Tiles, cells: List<Cell>): List<Cell>? {
     val sx = (w - h) / 2; val sy = (h - w) / 2   // Kotlin's / truncates toward zero, like Math.trunc
     val moved = relocate(tiles, cells) { Cell(x0 + (y1 - it.y) + sx, y0 + (it.x - x0) + sy) } ?: return null
     return applyMoves(tiles, moved) { t ->
-        if (t.kind == Kind.BRIDGE) rotBridge(t) else t.copy(
+        if (t.kind == Kind.BRIDGE) rotBridge(t) else if (t.kind == Kind.MACHINE) turnPiece(t) else t.copy(
             from = if (t.from == NONE) NONE else rotDir(t.from),
             out = if (t.out == NONE) NONE else rotDir(t.out),
             inSide = if (t.inSide == NONE) NONE else rotDir(t.inSide),
