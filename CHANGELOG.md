@@ -21,6 +21,12 @@ First release.
   levels as a single piece, from the Machines button in the tray. A machine keeps the sides it was built with and
   turns like any piece; every piece inside counts. When its level gets a better build it shows an amber dot, and the
   next Check moves it to the new build if the sides still match. A level can't be solved with its own machine.
+- A machine shows its whole build inside its cell, edge to edge, and marbles run through it in view: they flare in
+  from the middle of a side to their own line and back out the same way.
+- Settings (the gear in the top strip): switch between the wood look and a wireframe look, white lines and dots on
+  dark across the whole app, where each splitter lights only the branch its next marble takes.
+- Blocks fill their cells, so neighbouring pieces meet without gaps.
+- Levels solved before machines arrived offer their solutions as machines too.
 - Build codes name machines by a hash of their build and carry those builds with them, so a shared code builds
   anywhere and adds its machines to yours.
 - Every rate is a share of a full belt (one marble a tick): inputs, targets, readouts and Check all use it.

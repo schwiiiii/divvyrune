@@ -210,7 +210,7 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f, li
         }
     }
 
-    fun sideTo(i: Int, j: Int) = dirTo(graph.nodes[i].cell, graph.nodes[j].cell)
+    fun sideTo(i: Int, j: Int) = sideBetween(graph, i, j)
 
     /** Where node [i] sends its marble next: a splitter, wherever its flipper points. */
     fun exitSide(i: Int): Int {
@@ -264,5 +264,19 @@ class BoardState(level: Level, tiles: Tiles, private val density: Float = 1f, li
         const val HIST = 120
         /** How long a single step takes to play out. */
         const val STEP_MS = 280f
+    }
+}
+
+/**
+ * The side of node [i] facing node [j], its neighbour in the graph. In one grid it's where [j]'s cell lies; across a
+ * machine's edge it's the side the machine's input or way out is on.
+ */
+fun sideBetween(g: com.schwii.divvywood.engine.Graph, i: Int, j: Int): Int {
+    val a = g.nodes[i]; val b = g.nodes[j]
+    return when {
+        a.frame == b.frame -> dirTo(a.local, b.local)
+        a.portView != null && a.portSide != NONE -> a.portSide
+        b.portView != null && b.portSide != NONE -> com.schwii.divvywood.engine.opp(b.portSide)
+        else -> dirTo(a.cell, b.cell)
     }
 }

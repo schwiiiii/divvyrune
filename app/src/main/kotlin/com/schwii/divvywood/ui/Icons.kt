@@ -61,3 +61,15 @@ fun DrawScope.stepIcon(c: Color) {
     drawPath(Path().apply { moveTo(6f, 5f); lineTo(15f, 12f); lineTo(6f, 19f); close() }, c)
     drawRect(c, Offset(16f, 5f), Size(3f, 14f))
 }
+
+/** Settings: a cog. */
+fun DrawScope.gearIcon(c: Color) {
+    for (k in 0 until 8) {
+        val a = Math.PI * k / 4
+        val cx = 12f; val cy = 12f
+        drawLine(c, Offset(cx + 6.5f * kotlin.math.cos(a).toFloat(), cy + 6.5f * kotlin.math.sin(a).toFloat()),
+            Offset(cx + 9.5f * kotlin.math.cos(a).toFloat(), cy + 9.5f * kotlin.math.sin(a).toFloat()), 2.6f, StrokeCap.Round)
+    }
+    drawCircle(c, 6.5f, Offset(12f, 12f), style = Stroke(2.4f))
+    drawCircle(c, 2.2f, Offset(12f, 12f), style = Stroke(2f))
+}

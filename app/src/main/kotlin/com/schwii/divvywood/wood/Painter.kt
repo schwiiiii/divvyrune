@@ -48,7 +48,7 @@ private fun routePath(p: Path, x: Float, y: Float, z: Float, a: Int, b: Int) {
 fun angleOf(d: Int) = atan2(DY[d].toFloat(), DX[d].toFloat())
 
 /** Draws walnut and maple blocks, carved channels, cups, flippers and glass marbles; a port of the prototype's renderer. */
-class Painter(private val labelFace: Typeface = Fonts.label, private val labelVariation: String? = Fonts.labelVariation) {
+open class Painter(private val labelFace: Typeface = Fonts.label, private val labelVariation: String? = Fonts.labelVariation) {
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -66,7 +66,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     private fun shaderOf(b: Bitmap) = shaders.getOrPut(b) { BitmapShader(b, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT) }
 
     /** The linen table, its grain anchored to the board so it pans and zooms with the blocks; plus faint pencil dots. */
-    fun table(c: Canvas, w: Float, h: Float, ox: Float, oy: Float, z: Float) {
+    open fun table(c: Canvas, w: Float, h: Float, ox: Float, oy: Float, z: Float) {
         val sh = shaderOf(Woods.table)
         matrix.reset(); matrix.setTranslate(ox, oy); matrix.preScale(z / 34f, z / 34f)
         sh.setLocalMatrix(matrix)
@@ -83,18 +83,18 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
         }
     }
 
-    fun blockShadow(c: Canvas, x: Float, y: Float, z: Float) {
-        val s = z * 0.95f
+    open fun blockShadow(c: Canvas, x: Float, y: Float, z: Float) {
+        val s = z
         fill.color = rgba(60, 38, 20, 0.10)
         rect.set(x - s / 2 + z * 0.01f, y - s / 2 + z * 0.06f, x - s / 2 + z * 0.01f + s + z * 0.05f, y - s / 2 + z * 0.06f + s + z * 0.04f)
-        c.drawRoundRect(rect, z * 0.1f, z * 0.1f, fill)
+        c.drawRect(rect, fill)
         fill.color = rgba(60, 38, 20, 0.16)
         rect.set(x - s / 2 + z * 0.025f, y - s / 2 + z * 0.045f, x + s / 2 + z * 0.025f, y + s / 2 + z * 0.045f)
-        c.drawRoundRect(rect, z * 0.08f, z * 0.08f, fill)
+        c.drawRect(rect, fill)
     }
 
     private fun blockBody(c: Canvas, x: Float, y: Float, z: Float, wood: Bitmap, seed: Int, stain: Int?) {
-        val s = z * 0.95f; val x0 = x - s / 2; val y0 = y - s / 2; val r = z * 0.07f
+        val s = z; val x0 = x - s / 2; val y0 = y - s / 2; val r = 0f   // blocks fill their cells: neighbours share an edge
         val rr = rand(seed)
         c.save()
         path.reset(); rect.set(x0, y0, x0 + s, y0 + s); path.addRoundRect(rect, r, r, Path.Direction.CW); c.clipPath(path)
@@ -146,7 +146,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
         c.drawPath(path, stroke)
     }
 
-    fun burnText(c: Canvas, s: String, x: Float, y: Float, size: Float, maxWidth: Float = Float.MAX_VALUE, light: Boolean = false) {
+    open fun burnText(c: Canvas, s: String, x: Float, y: Float, size: Float, maxWidth: Float = Float.MAX_VALUE, light: Boolean = false) {
         text.textSize = size
         text.color = if (light) rgba(255, 240, 215, 0.7) else rgba(59, 38, 22, 0.75)
         val w = text.measureText(s)
@@ -161,7 +161,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
      * One block. [ins] / [outs] are the sides its channels connect to; [bad] tints overloaded channels;
      * [label] is burned onto inputs and outputs ("IN", "A 1/2").
      */
-    fun tile(c: Canvas, x: Float, y: Float, z: Float, t: Tile, ins: List<Int>, outs: List<Int>, seed: Int, bad: Boolean = false, label: String? = null, labelScale: Float = 1f) {
+    open fun tile(c: Canvas, x: Float, y: Float, z: Float, t: Tile, ins: List<Int>, outs: List<Int>, seed: Int, bad: Boolean = false, label: String? = null, labelScale: Float = 1f) {
         val mech = t.kind == Kind.SPLIT || t.kind == Kind.MERGE
         val stain = when (t.kind) { Kind.SRC -> Palette.stainSrc; Kind.OUT -> Palette.stainOut; else -> null }
         blockBody(c, x, y, z, if (mech) Woods.walnut else Woods.maple, seed, stain)
@@ -211,28 +211,53 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     }
 
     /**
-     * A machine: a walnut block with a maple window, [inside] drawing its build into the window's square (left, top,
-     * size). An [outdated] machine wears an amber dot: its level has a better build now.
+     * A machine's block: walnut, with a pale floor its build is drawn onto, filling the square at ([x], [y]) of side
+     * [size] (top left). An [outdated] machine wears an amber dot: its level has a better build now.
      */
-    fun machine(c: Canvas, x: Float, y: Float, z: Float, seed: Int, outdated: Boolean, inside: (Canvas, Float, Float, Float) -> Unit) {
-        blockBody(c, x, y, z, Woods.walnut, seed, null)
-        val w = z * 0.78f; val l = x - w / 2; val t = y - w / 2
-        rect.set(l, t, l + w, t + w)
-        fill.color = rgba(236, 222, 194, 1.0); c.drawRoundRect(rect, z * 0.05f, z * 0.05f, fill)
-        c.withClip(rect) { inside(c, l, t, w) }
-        stroke.color = rgba(40, 24, 12, 0.55); stroke.strokeWidth = max(1f, z * 0.03f); stroke.pathEffect = null
-        c.drawRoundRect(rect, z * 0.05f, z * 0.05f, stroke)
+    open fun machineBlock(c: Canvas, x: Float, y: Float, size: Float, seed: Int, outdated: Boolean) {
+        // a pale floor filling the cell, its build drawn onto it, a walnut border on the cell's edge
+        rect.set(x, y, x + size, y + size)
+        fill.color = rgba(236, 222, 194, 1.0); c.drawRect(rect, fill)
+        stroke.color = machineEdge; stroke.strokeWidth = max(1f, size * 0.03f); stroke.pathEffect = null
+        rect.inset(stroke.strokeWidth / 2, stroke.strokeWidth / 2); c.drawRect(rect, stroke)
+        val cx = x + size / 2; val cy = y + size / 2
         if (outdated) {
-            fill.color = rgba(212, 162, 79, 1.0); c.drawCircle(x + z * 0.36f, y - z * 0.36f, z * 0.09f, fill)
-            stroke.color = rgba(59, 38, 22, 0.7); stroke.strokeWidth = max(1f, z * 0.02f); c.drawCircle(x + z * 0.36f, y - z * 0.36f, z * 0.09f, stroke)
+            fill.color = rgba(212, 162, 79, 1.0); c.drawCircle(cx + size * 0.38f, cy - size * 0.38f, size * 0.08f, fill)
+            stroke.color = rgba(59, 38, 22, 0.7); stroke.strokeWidth = max(1f, size * 0.02f); c.drawCircle(cx + size * 0.38f, cy - size * 0.38f, size * 0.08f, stroke)
         }
     }
+
+    /** A machine's border, and the flares where its sides become ports. */
+    private val machineEdge = rgba(98, 66, 44, 1.0)
+
+    /** A machine's input or way out: a channel along the points [pts] (x, y pairs) from its cell's edge, at cell size [z]. */
+    open fun connector(c: Canvas, pts: FloatArray, z: Float) {
+        val q = Path(); q.moveTo(pts[0], pts[1]); var k = 2
+        while (k < pts.size) { q.lineTo(pts[k], pts[k + 1]); k += 2 }
+        carve(c, z, q, false)
+    }
+
+    /** The flare where a machine's side becomes a port: [tri] as made by the board's layout, for a machine of size [z]. */
+    open fun taper(c: Canvas, tri: FloatArray, z: Float) {
+        val q = Path()
+        q.moveTo(tri[0], tri[1]); q.quadTo(tri[8], tri[9], tri[2], tri[3])       // out: the parent's line to one end
+        q.quadTo(tri[10], tri[11], tri[4], tri[5])                                // in: that end to the port's line
+        q.quadTo(tri[10], tri[11], tri[6], tri[7])                                // in: the port's line to the other end
+        q.quadTo(tri[8], tri[9], tri[0], tri[1]); q.close()                       // out: back to the parent's line
+        fill.color = machineEdge; c.drawPath(q, fill)
+    }
+
+    /**
+     * Where a splitter or converger sends or takes its next marble: [active] is that side, [angle] its direction
+     * eased for animation. Wood shows a flipper.
+     */
+    open fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float) = flipper(c, x, y, z, angle)
 
     /**
      * Where a way out leaves the build: a dotted line from the piece at ([x0], [y0]) to the box's edge at ([x1], [y1]),
      * then a small green tag past the edge with [label] ("A 1/4", "rest").
      */
-    fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {
+    open fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {
         stroke.color = rgba(95, 62, 32, 0.4); stroke.strokeWidth = max(1.5f, z * 0.05f); stroke.strokeCap = Paint.Cap.ROUND
         stroke.pathEffect = android.graphics.DashPathEffect(floatArrayOf(z * 0.02f, z * 0.12f), 0f)
         c.drawLine(x0, y0, x1, y1, stroke); stroke.pathEffect = null
@@ -245,7 +270,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     }
 
     /** The box around the machine, where ports sit: a faint dashed frame. */
-    fun machineBox(c: Canvas, l: Float, t: Float, r: Float, b: Float, z: Float) {
+    open fun machineBox(c: Canvas, l: Float, t: Float, r: Float, b: Float, z: Float) {
         stroke.color = rgba(95, 62, 32, 0.28); stroke.strokeWidth = max(1f, z * 0.03f); stroke.strokeCap = Paint.Cap.BUTT
         stroke.pathEffect = android.graphics.DashPathEffect(floatArrayOf(z * 0.16f, z * 0.1f), 0f)
         c.drawRect(l, t, r, b, stroke); stroke.pathEffect = null
@@ -260,7 +285,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     }
 
     /** Round robin: a maple paddle on a brass pin, pointing down the channel the next marble takes. */
-    fun flipper(c: Canvas, x: Float, y: Float, z: Float, angle: Float) {
+    open fun flipper(c: Canvas, x: Float, y: Float, z: Float, angle: Float) {
         val l = z * 0.3f; val t = z * 0.085f
         c.save(); c.translate(x, y); c.rotate(Math.toDegrees(angle.toDouble()).toFloat())
         fill.color = rgba(30, 18, 8, 0.35)
@@ -276,13 +301,13 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
 
     /** A clear glass marble with its shadow; [alpha] fades it as it drops into a cup. */
     /** A block where marbles are being held up: a red wash, stronger the more often lately ([heat], 0–1). */
-    fun heatGlow(c: Canvas, x: Float, y: Float, z: Float, heat: Float) {
-        val h = z * 0.475f
+    open fun heatGlow(c: Canvas, x: Float, y: Float, z: Float, heat: Float) {
+        val h = z * 0.5f
         fill.color = rgba(192, 84, 74, (0.12 + 0.45 * heat.coerceIn(0f, 1f)))
-        rect.set(x - h, y - h, x + h, y + h); c.drawRoundRect(rect, z * 0.07f, z * 0.07f, fill)
+        rect.set(x - h, y - h, x + h, y + h); c.drawRect(rect, fill)
     }
 
-    fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float = 1f, waiting: Boolean = false) {
+    open fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float = 1f, waiting: Boolean = false) {
         val a = (alpha * 255).toInt().coerceIn(0, 255)
         fill.color = rgba(50, 30, 15, 0.25); fill.alpha = (fill.alpha * alpha).toInt()
         rect.set(x + r * 0.25f - r * 0.95f, y + r * 0.45f - r * 0.55f, x + r * 0.25f + r * 0.95f, y + r * 0.45f + r * 0.55f); c.drawOval(rect, fill)
@@ -295,7 +320,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     }
 
     /** The belt being drawn: a soft stroke through cell centres, [color] red when it can't be placed. */
-    fun previewPath(c: Canvas, pts: List<Float>, width: Float, color: Int) {
+    open fun previewPath(c: Canvas, pts: List<Float>, width: Float, color: Int) {
         path.reset(); path.moveTo(pts[0], pts[1])
         for (k in 2 until pts.size step 2) path.lineTo(pts[k], pts[k + 1])
         stroke.color = color; stroke.alpha = (0.55 * 255).toInt(); stroke.strokeWidth = width
@@ -304,7 +329,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     }
 
     /** The Select-mode box: a faint fill with a dashed edge. */
-    fun box(c: Canvas, l: Float, t: Float, r: Float, b: Float, color: Int) {
+    open fun box(c: Canvas, l: Float, t: Float, r: Float, b: Float, color: Int) {
         fill.color = color; fill.alpha = (0.06 * 255).toInt(); c.drawRect(l, t, r, b, fill); fill.alpha = 255
         stroke.color = color; stroke.strokeWidth = 3f; stroke.strokeCap = Paint.Cap.BUTT
         stroke.pathEffect = android.graphics.DashPathEffect(floatArrayOf(12f, 8f), 0f)
@@ -312,7 +337,7 @@ class Painter(private val labelFace: Typeface = Fonts.label, private val labelVa
     }
 
     /** A selection or placement outline around one cell. */
-    fun outline(c: Canvas, x: Float, y: Float, z: Float, color: Int, width: Float, dashed: Boolean = false) {
+    open fun outline(c: Canvas, x: Float, y: Float, z: Float, color: Int, width: Float, dashed: Boolean = false) {
         stroke.color = color; stroke.strokeWidth = width; stroke.strokeCap = Paint.Cap.BUTT
         stroke.pathEffect = if (dashed) android.graphics.DashPathEffect(floatArrayOf(z * 0.12f, z * 0.08f), 0f) else null
         rect.set(x - z * 0.5f + 1, y - z * 0.5f + 1, x + z * 0.5f - 1, y + z * 0.5f - 1)

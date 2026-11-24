@@ -68,7 +68,7 @@ class GameScreenshotTest {
             buildFromText(q); startCheck(); board.finishCheck(); closeSheet()
             openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
             val h = com.schwii.divvywood.engine.machineOf(com.schwii.divvywood.engine.decodeGrid(q).tiles!!).first
-            pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.0 .."); editor.dismissNotice(); board.z = 96f * 3
+            pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.0 .."); editor.dismissNotice(); board.z = 150f * 3
         }
         g.run(300)
         compose.setContent { GameScreen(g, animate = false) }
@@ -76,6 +76,35 @@ class GameScreenshotTest {
         save("screen-machine")
         compose.runOnIdle { g.showMachines() }
         save("screen-machines-picker")
+    }
+
+    @Test fun wireframe() {
+        try {
+            val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), ".. .. BT .. .. ..\n.. .. RT CL6 BL ..\nIR LR LR LT BT ..\n.. .. RB SB5 LT ..\n.. RB CL3 SB3 .. ..\n.. TB .. RT RL IL2\n.. TB .. .. .. ..", 60f)
+            g.wire = true
+            g.run(600)
+            compose.setContent { GameScreen(g, animate = false) }
+            save("screen-wire")
+            compose.runOnIdle { g.showSettings() }
+            save("screen-settings")
+        } finally { com.schwii.divvywood.wood.Look.wire = false }
+    }
+
+    @Test fun machineWire() {
+        try {
+            val q = ".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR"
+            val g = Game(Saves(MemoryStore()), density = 3f).apply {
+                buildFromText(q); startCheck(); board.finishCheck(); closeSheet()
+                openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
+                val h = com.schwii.divvywood.engine.machineOf(com.schwii.divvywood.engine.decodeGrid(q).tiles!!).first
+                pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.0 .."); editor.dismissNotice(); board.z = 150f * 3
+                wire = true
+            }
+            g.run(300)
+            compose.setContent { GameScreen(g, animate = false) }
+            compose.runOnIdle { g.board.refit() }
+            save("screen-machine-wire")
+        } finally { com.schwii.divvywood.wood.Look.wire = false }
     }
 
     @Test fun selectedPiece() {

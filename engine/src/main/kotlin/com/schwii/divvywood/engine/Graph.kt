@@ -8,8 +8,12 @@ package com.schwii.divvywood.engine
 class Node(
     val cell: Cell, val tile: Tile, val bridge: Tile? = null,
     val machine: Tile? = null, val inPort: Int = NONE, val outPort: Int = NONE,
+    /** Where it's drawn: cell [local] of the grid [frame] places on the board (the board's own grid outside machines). */
+    val local: Cell = cell, val frame: Frame = Frame.BOARD,
+    /** A machine's input or way out, at any depth: the machine as drawn, and the side of it its line meets. */
+    val portView: MachineView? = null, val portSide: Int = NONE,
 ) {
-    /** Inside a machine: drawn as the machine, its marbles hidden. */
+    /** Inside a machine (drawn scaled down within the machine's cell). */
     val inside get() = machine != null
     val kind get() = tile.kind
     val id get() = tile.id
@@ -19,6 +23,21 @@ class Node(
     val pred = mutableListOf<Int>()
     val errs = mutableListOf<String>()
 }
+
+/**
+ * A grid drawn on the board: its cell (x, y) spans [ox] + x·[s] to [ox] + (x + 1)·[s] across, in board cells, and
+ * likewise down. The board's own grid is [BOARD]; a machine's build is drawn in a smaller grid within its cell.
+ */
+data class Frame(val ox: Double, val oy: Double, val s: Double) {
+    fun cx(c: Cell) = ox + (c.x + 0.5) * s
+    fun cy(c: Cell) = oy + (c.y + 0.5) * s
+    /** [inner] (a frame relative to a grid of unit cells) placed within this one. */
+    fun compose(inner: Frame) = Frame(ox + inner.ox * s, oy + inner.oy * s, inner.s * s)
+    companion object { val BOARD = Frame(0.0, 0.0, 1.0) }
+}
+
+/** A machine as drawn: [tile] filling the square at ([x], [y]) of side [size], in board cells. */
+class MachineView(val tile: Tile, val x: Double, val y: Double, val size: Double)
 
 /** The rectangle around everything built, corners included. */
 data class Box(val x0: Int, val y0: Int, val x1: Int, val y1: Int) {
@@ -41,6 +60,8 @@ class Port(val node: Int, val piece: Int, val side: Int, val line: List<Cell>, v
 val SIDE_NAMES = listOf("right", "bottom", "left", "top")
 
 class Graph(val nodes: List<Node>, val idx: Map<Cell, Int>, val ports: List<Port> = emptyList(), val box: Box? = null) {
+    /** Every machine in the build, nested ones after the one holding them, where each is drawn. */
+    val machines = mutableListOf<MachineView>()
     val errCount get() = nodes.count { it.errs.isNotEmpty() }
 
     /** The ways out: nodes where marbles leave the build, in board order. */
@@ -65,6 +86,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
     val links = mutableListOf<Pair<Int, Int>>()   // inside machines, already known
     val machineIn = HashMap<Cell, Map<Int, Int>>()   // a machine's cell → its input nodes by side
     val machineErr = HashMap<Int, String>()
+    val views = mutableListOf<MachineView>()
     for (c in cells) {
         val t = tiles.getValue(c)
         when (t.kind) {
@@ -72,7 +94,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
             Kind.BRIDGE -> bridgeLanes(t).forEach { nodes += Node(c, it, t) }
             Kind.MACHINE -> {
                 val base = nodes.size
-                val why = layMachine(c, t, level, lib, stack, nodes, links)
+                val why = layMachine(c, t, level, lib, stack, nodes, links, views)
                 if (why != null) { nodes.subList(base, nodes.size).clear(); links.removeAll { it.first >= base }; nodes += Node(c, t, machine = t); machineErr[base] = why }
                 else machineIn[c] = (base until nodes.size).filter { nodes[it].inPort != NONE }.associateBy { nodes[it].inPort }
             }
@@ -89,6 +111,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
     }
     val box = machineBox(tiles)
     val g = Graph(nodes, idx, mutableListOf(), box)
+    g.machines += views
     for ((a, b) in links) g.link(a, b)
     for ((i, why) in machineErr) nodes[i].errs += why
     val ports = g.ports as MutableList<Port>
@@ -181,31 +204,45 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
 }
 
 /**
- * Lays machine [t] at [c] into [nodes]: its build turned its way, each node on [c], links inside it added to [links].
- * Its inputs become belts taking marbles in on their sides, its ways out belts sending them out of theirs. Returns
- * why it can't be laid (unknown, itself inside itself, its own level's machine, or broken here), or null.
+ * Lays machine [t] at [c] into [nodes]: its build turned its way, each node on [c], links inside it added to [links],
+ * itself and any machines inside it to [views]. Its build is drawn within [c]: the square around its box fills the
+ * cell, and its inputs and ways out run straight to the cell's edges. Its inputs become belts taking marbles in on their sides, its
+ * ways out belts sending them out of theirs. Returns why it can't be laid (unknown, itself inside itself, its own
+ * level's machine, or broken here), or null.
  */
-private fun layMachine(c: Cell, t: Tile, level: Level, lib: MachineLib, stack: Set<String>, nodes: MutableList<Node>, links: MutableList<Pair<Int, Int>>): String? {
+private fun layMachine(
+    c: Cell, t: Tile, level: Level, lib: MachineLib, stack: Set<String>,
+    nodes: MutableList<Node>, links: MutableList<Pair<Int, Int>>, views: MutableList<MachineView>,
+): String? {
     val h = t.ref ?: return "This machine has no build."
     val def = lib[h] ?: return "Machine #$h isn't one of yours. Build it from a code that includes it."
     if (h in stack) return "A machine can't hold itself."
     if (def.level != null && def.level == level.name) return "A level can't be solved with its own machine."
     val inner = lib.tiles(h) ?: return "Machine #$h can't be read."
     val ins = inner.values.count { it.kind == Kind.SRC }
-    val cg = buildGraph(turned(inner, t.out), Level(level.name, List(ins) { Frac(1, 1) }, emptyList(), level.no3), lib, stack + h)
+    val tiles = turned(inner, t.out)
+    val cg = buildGraph(tiles, Level(level.name, List(ins) { Frac(1, 1) }, emptyList(), level.no3), lib, stack + h)
     cg.nodes.firstOrNull { it.errs.isNotEmpty() }?.let { return "This machine doesn't work here: ${it.errs.first()}" }
+    // the square around the machine's box fills the cell, the box centred in it; inputs and ways out reach its edges
+    val b = machineBox(tiles) ?: return "This machine is empty."
+    val w = b.x1 - b.x0 + 1; val hh = b.y1 - b.y0 + 1; val n = maxOf(w, hh)
+    val s = 1.0 / n
+    val fit = Frame(c.x + (n - w) / 2.0 * s - b.x0 * s, c.y + (n - hh) / 2.0 * s - b.y0 * s, s)
+    val me = MachineView(t, c.x.toDouble(), c.y.toDouble(), 1.0)
+    views += me
+    val inside = cg.machines.associateWith { v -> MachineView(v.tile, fit.ox + v.x * s, fit.oy + v.y * s, v.size * s) }
+    views += inside.values
     val base = nodes.size
     val portOf = cg.ports.associateBy { it.node }
-    cg.nodes.forEachIndexed { i, n ->
+    cg.nodes.forEachIndexed { i, nd ->
         val p = portOf[i]
+        val fr = fit.compose(nd.frame)
         nodes += when {
-            n.kind == Kind.SRC && p != null -> Node(c, Tile(Kind.BELT, from = p.side), machine = n.machine ?: t, inPort = p.side)
-            n.kind == Kind.OUT && p != null -> Node(c, Tile(Kind.BELT, from = opp(p.side), out = p.side), machine = n.machine ?: t, outPort = p.side)
-            else -> Node(c, n.tile, n.bridge, machine = n.machine ?: t)
+            nd.kind == Kind.SRC && p != null -> Node(c, Tile(Kind.BELT, from = p.side), machine = t, inPort = p.side, local = nd.local, frame = fr, portView = me, portSide = p.side)
+            nd.kind == Kind.OUT && p != null -> Node(c, Tile(Kind.BELT, from = opp(p.side), out = p.side), machine = t, outPort = p.side, local = nd.local, frame = fr, portView = me, portSide = p.side)
+            else -> Node(c, nd.tile, nd.bridge, machine = t, local = nd.local, frame = fr, portView = nd.portView?.let { inside[it] }, portSide = nd.portSide)
         }
     }
-    cg.nodes.forEachIndexed { i, n -> for (j in n.succ) links += (base + i) to (base + j) }
-    // a machine inside this one shows as this one
-    for (i in base until nodes.size) if (nodes[i].machine !== t) nodes[i] = Node(c, nodes[i].tile, nodes[i].bridge, t, nodes[i].inPort, nodes[i].outPort)
+    cg.nodes.forEachIndexed { i, nd -> for (j in nd.succ) links += (base + i) to (base + j) }
     return null
 }
