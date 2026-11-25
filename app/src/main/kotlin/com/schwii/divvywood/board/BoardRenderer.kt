@@ -198,7 +198,7 @@ class BoardRenderer(
             s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
             if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
         }
-        // the next way each splitter sends: a flipper, or a lit branch
+        // the next way each splitter sends: a gate or drum in wood, a lit branch in wireframe
         sim.n.forEachIndexed { i, sn ->
             if (sn.kind != Kind.SPLIT) return@forEachIndexed   // a converger takes whatever comes, so it shows no turn
             val list = sn.succ
@@ -209,7 +209,7 @@ class BoardRenderer(
             val d = (target - ang).let { atan2(sin(it), cos(it)) }
             ang += if (reduceMotion) d else d * 0.22f
             s.flipperAngles[i] = ang
-            if (list.size > 1 || painter is WirePainter) painter.turn(c, lay.x(i), lay.y(i), lay.size(i), nodes[i].tile, active, ang)
+            if (list.size > 1 || painter is WirePainter) painter.turn(c, lay.x(i), lay.y(i), lay.size(i), nodes[i].tile, active, ang, list.map { s.sideTo(i, it) })
         }
         // marbles: the first half of a tick finishes the old cell's route, the second half starts the new one
         sim.n.forEachIndexed { i, sn ->

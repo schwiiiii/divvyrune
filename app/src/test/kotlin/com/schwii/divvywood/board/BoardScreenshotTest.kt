@@ -53,4 +53,12 @@ class BoardScreenshotTest {
         val level = Level("blocks", listOf(Frac(1, 2), Frac(1, 4)), listOf(Frac(5, 8), Frac(1, 8)))
         render(BoardState(level, tiles, density).apply { z = 72 * density }, 7, "board-every-block")
     }
+
+    @Test fun splitterMechanisms() {
+        // a 3-way splitter (slim flipper) feeding a 2-way one (T-shaped flip-flop)
+        val code = ".. .. IB ..\nSR3 RL ST7 LR\nCB6 RL TL .."
+        val level = Level("mech", 2, listOf(null, null, null))
+        render(BoardState(level, decodeGrid(code).tiles!!, density).apply { z = 110 * density }, 9, "board-splitters")
+        render(BoardState(level, decodeGrid(code).tiles!!, density).apply { z = 110 * density }, 10, "board-splitters-next")
+    }
 }

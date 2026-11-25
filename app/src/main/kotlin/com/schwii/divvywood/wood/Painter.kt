@@ -186,7 +186,7 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         // on the board each piece is its own block; inside a machine its channels are carved into the machine's slab
         if (!slab) blockBody(c, x, y, z, if (mech) Woods.walnut else Woods.maple, seed, stain)
         val p = Path()
-        c.save(); c.clipRect(x - z / 2, y - z / 2, x + z / 2, y + z / 2)   // channels run on past the edge, cut at the block
+        c.withClip(x - z / 2, y - z / 2, x + z / 2, y + z / 2) {   // channels run on past the edge, cut at the block
         when (t.kind) {
             Kind.BELT -> {
                 routePath(p, x, y, z, t.from, t.out); carve(c, z, p, false, bad)
@@ -224,7 +224,7 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
                 val q = Path(); routePath(q, x, y, z, opp(t.inSide), t.inSide); carve(c, z * 0.8f, q, false, bad)
             }
         }
-        c.restore()
+        }
     }
 
     /**
@@ -258,10 +258,48 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
     }
 
     /**
-     * Where a splitter or converger sends or takes its next marble: [active] is that side, [angle] its direction
-     * eased for animation. Wood shows a flipper.
+     * Where a splitter sends its next marble: [active] is that side, of its ways out [outs], fed from [Tile.inSide].
+     * Wood shows the mechanism that decides it. A two-way splitter has a T-shaped flip-flop: it pivots on the divider
+     * between the ways out, its stem reaching back toward the input and leaning across the branch that's shut, its
+     * crossbar sticking into the open one, where the passing marble catches it and flips it over. A three-way one
+     * shows a slim flipper lying in the channel the next marble takes.
      */
-    open fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float) = flipper(c, x, y, z, angle)
+    open fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float, outs: List<Int> = emptyList()) {
+        if (outs.size == 2 && t.inSide != NONE) flipFlop(c, x, y, z, t.inSide, active, outs.first { it != active })
+        else if (outs.size >= 2) flipper(c, x, y, z, angle)
+    }
+
+    /** The two-way splitter's T-shaped flip-flop, open toward [open], shut across [shut], fed from side [inSide]. */
+    private fun flipFlop(c: Canvas, x: Float, y: Float, z: Float, inSide: Int, open: Int, shut: Int) {
+        val w = chan(z)
+        // the pivot: on the divider between the two ways out (straight across from the input, when they face apart)
+        var bx = (DX[open] + DX[shut]).toFloat(); var by = (DY[open] + DY[shut]).toFloat()
+        if (bx == 0f && by == 0f) { bx = -DX[inSide].toFloat(); by = -DY[inSide].toFloat() }
+        val bl = kotlin.math.hypot(bx, by)
+        val px = x + bx / bl * w * 0.95f; val py = y + by / bl * w * 0.95f
+        // the stem lies across the shut branch's mouth; the crossbar stands up into the open branch, for the marble to strike
+        val stem = angleOf(opp(open))
+        val len = w * 1.75f
+        val t = w * 0.42f; val bar = w * 1.6f
+        fun body(dx: Float, dy: Float, shadow: Boolean) {
+            c.save(); c.translate(px + dx, py + dy); c.rotate(Math.toDegrees(stem.toDouble()).toFloat())
+            if (shadow) fill.color = rgba(30, 18, 8, 0.28)
+            else shade(LinearGradient(0f, -bar / 2, 0f, bar / 2, 0xFFF6E7C6.toInt(), 0xFFD6B98A.toInt(), Shader.TileMode.CLAMP))
+            path.reset()
+            rect.set(-t / 2, -t / 2, len, t / 2); path.addRoundRect(rect, t / 2, t / 2, Path.Direction.CW)          // the stem
+            rect.set(-t / 2, -bar / 2, t / 2, bar / 2); path.addRoundRect(rect, t / 2, t / 2, Path.Direction.CW)    // the crossbar
+            path.op(Path().apply { addRoundRect(RectF(-t / 2, -t / 2, len, t / 2), t / 2, t / 2, Path.Direction.CW) }, Path.Op.UNION)
+            c.drawPath(path, fill); fill.shader = null
+            if (!shadow) { stroke.color = rgba(90, 60, 30, 0.55); stroke.strokeWidth = max(0.8f, w * 0.06f); c.drawPath(path, stroke) }
+            c.restore()
+        }
+        body(w * 0.14f, w * 0.18f, true)   // its shadow, falling to the bottom right
+        body(0f, 0f, false)
+        val pin = w * 0.26f
+        shade(RadialGradient(px - pin * 0.3f, py - pin * 0.3f, pin, intArrayOf(0xFFFFF2C8.toInt(), 0xFFCFA24E.toInt(), 0xFF7A561C.toInt()),
+            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP))
+        c.drawCircle(px, py, pin, fill); fill.shader = null
+    }
 
     /**
      * Where a way out leaves the build: a dotted line from the piece at ([x0], [y0]) to the box's edge at ([x1], [y1]),

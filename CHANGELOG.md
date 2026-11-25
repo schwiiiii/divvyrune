@@ -30,8 +30,9 @@ First release.
 - A new icon: the logo build's lines in the wireframe look, splitting, joining and winding out.
 - Blocks fill their cells, so neighbouring pieces meet without gaps.
 - The wood look follows the wireframe: wide carved channels and glass marbles that keep their size at every zoom, lit
-  softly from the top left; no arrows; machines as one maple slab with their channels carved in; slimmer flippers
-  on splitters, none on convergers (they take whatever comes, in either look).
+  softly from the top left; no arrows; machines as one maple slab with their channels carved in. A two-way
+  splitter shows a T-shaped flip-flop that shuts the branch its next marble won't take; three-way splitters keep a
+  slim flipper; convergers show none (they take whatever comes, in either look).
 - Levels solved before machines arrived offer their solutions as machines too.
 - Build codes name machines by a hash of their build and carry those builds with them, so a shared code builds
   anywhere and adds its machines to yours.

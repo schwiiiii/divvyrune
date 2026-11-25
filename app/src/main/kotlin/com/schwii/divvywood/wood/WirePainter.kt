@@ -111,7 +111,7 @@ class WirePainter : Painter() {
         }
     }
 
-    override fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float) {
+    override fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float, outs: List<Int>) {
         if (active == NONE) return
         val p = Path()
         if (t.kind == Kind.SPLIT) { route(p, x, y, z, t.inSide, active); stroke(c, p, z, white) }
