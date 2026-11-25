@@ -8,9 +8,9 @@ release (`1.0.0.3`); before 1.0.0 they were `0.9.N`. Plans for later releases ar
 First release.
 
 - 17 levels, from a quarter to one thirtieth, two of them with two inputs to split apart and recombine.
-- Marbles enter and leave on the sides of the build: an input sits at the edge and feeds the first piece in its row
-  or column, and whatever points out of the build with a clear line to the edge leaves there. Each side takes one
-  input or one way out, so a build has at most four; what no output needs leaves on a side of its own. Outputs ask
+- Marbles enter and leave on the sides of the build: an input stays where you put it, touching the build's edge, and
+  feeds the first piece in its row or column (anywhere else it says why it can't feed); whatever points out of the
+  build with a clear line to the edge leaves there. Each side takes one input or one way out, so a build has at most four; what no output needs leaves on a side of its own. Outputs ask
   for rates and Check matches them to the ways out.
 - An empty board shows a dashed start cell: an input dropped beside it faces into it, ready for the first piece.
 - Splitters and convergers can close sides: drag along a join or belt again to undo it, and drag a splitter's side

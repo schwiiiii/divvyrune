@@ -154,7 +154,7 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
             }
         }
     }
-    // an input sits outside the box and feeds the first piece in its lane
+    // an input sits just outside the box and feeds the first piece in its lane
     nodes.forEachIndexed { i, n ->
         if (n.kind != Kind.SRC || n.tile.out == NONE) return@forEachIndexed
         val d = n.tile.out
@@ -162,8 +162,12 @@ fun buildGraph(tiles: Map<Cell, Tile>, level: Level, lib: MachineLib = MachineLi
         var c = n.cell.step(d)
         while (box != null && c in box && c !in tiles) { line += c; c = c.step(d) }
         val j = if (box != null && c in box) nodeAt(c, opp(d)) else null
+        // does its lane run into the build further on?
+        fun reaches(): Boolean { var k = n.cell.step(d); repeat(200) { if (box != null && k in box) return true; k = k.step(d) }; return false }
         when {
             j == null && box == null -> Unit   // nothing built yet: nothing to complain about
+            box != null && n.cell in box -> n.errs += "This input is inside the build. Move it out beside the edge."
+            j == null && box != null && n.cell.step(d) !in box && reaches() -> n.errs += "This input doesn't touch the build. Move it up to the edge."
             j == null -> n.errs += "This input has nothing in its ${if (d % 2 == 0) "row" else "column"} to feed. Move it, or build in its way."
             !accepts(nodes[j].tile, opp(d)) -> n.errs += "The first piece in this input's way doesn't take marbles from this side."
             else -> { g.link(i, j); ports += Port(i, i, opp(d), line, n.cell) }

@@ -35,18 +35,19 @@ class EditorTest {
     }
     private fun drop(kind: Kind, x: Int, y: Int, id: Int = -1) = e.chipDrop(TrayItem(kind, id), cx(x), cx(y))
 
-    @Test fun `tray chips drop blocks that face what feeds them, an input at the machine's edge`() {
+    @Test fun `tray chips drop blocks that face what feeds them, an input where it's dropped`() {
         assertTrue(drop(Kind.SPLIT, 0, 0))
         assertEquals(Kind.SPLIT, at(0, 0)?.kind)
         assertTrue(drop(Kind.SRC, -3, 0))
-        assertEquals("it enters from the side it was dropped beyond", Tile(Kind.SRC, out = 0, id = 0), at(-1, 0))
+        assertEquals("it stays put, facing the build from the side it was dropped beyond", Tile(Kind.SRC, out = 0, id = 0), at(-3, 0))
+        assertTrue(e.board.graph.nodes.first { it.kind == Kind.SRC }.errs.single().contains("doesn't touch the build"))
         assertTrue(Haptic.DROP in haptics)
         assertTrue(e.isPlaced(TrayItem(Kind.SRC, 0)))
         assertFalse("each input is placed once", drop(Kind.SRC, 3, 3, 0))
     }
 
     @Test fun `on an empty board an input faces the start cell, so a splitter there takes its marbles`() {
-        assertTrue(drop(Kind.SRC, 0, -3))
+        assertTrue(drop(Kind.SRC, 0, -1))
         assertEquals(Tile(Kind.SRC, out = 1, id = 0), at(0, -1))
         assertTrue(drop(Kind.SPLIT, 0, 0))
         assertEquals(3, at(0, 0)!!.inSide)
@@ -74,7 +75,7 @@ class EditorTest {
     }
 
     @Test fun `Rotate turns the selected piece and Delete returns an input to the tray`() {
-        drop(Kind.SPLIT, 0, 0); drop(Kind.SRC, -3, 0, 0)
+        drop(Kind.SPLIT, 0, 0); drop(Kind.SRC, -1, 0, 0)
         val in0 = at(0, 0)!!.inSide
         tap(0, 0); e.rotateSelection()
         assertEquals((in0 + 1) % 4, at(0, 0)!!.inSide)
@@ -122,7 +123,7 @@ class EditorTest {
     }
 
     @Test fun `a belt is drawn from a piece only when it's valid`() {
-        drop(Kind.SPLIT, 2, 0); drop(Kind.SRC, -2, 0)
+        drop(Kind.SPLIT, 2, 0); drop(Kind.SRC, 1, 0)
         assertEquals(Kind.SRC, at(1, 0)?.kind)
         drag(1, 0, 4, 0)   // straight through the splitter: not allowed
         assertNull(at(4, 0))
@@ -250,5 +251,17 @@ class EditorTest {
         drop(Kind.SPLIT, 0, -2)
         drag(0, -2, 0, 0)
         assertNull(at(0, -1)); assertEquals("That side of the machine sends marbles out", e.notice)
+    }
+
+    @Test fun `a moved input stays where it's put and faces the build from there`() {
+        drop(Kind.SPLIT, 0, 0); drop(Kind.MERGE, 1, 0); drop(Kind.SRC, 0, -1)
+        tap(0, -1); drag(0, -1, -1, 0)   // from above to the left
+        assertEquals(Tile(Kind.SRC, out = 0, id = 0), at(-1, 0))
+        assertNull(at(0, -1))
+        drop(Kind.MERGE, 2, 0)
+        assertEquals("the build changing never moves it", Kind.SRC, at(-1, 0)?.kind)
+        drop(Kind.SPLIT, -1, 1); drop(Kind.SPLIT, -2, 0)
+        assertEquals(Kind.SRC, at(-1, 0)?.kind)
+        assertTrue(e.board.graph.nodes.first { it.kind == Kind.SRC }.errs.single().contains("inside the build"))
     }
 }

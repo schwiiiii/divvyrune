@@ -10,13 +10,11 @@ import com.schwii.divvywood.engine.accepts
 import com.schwii.divvywood.engine.bridgeOf
 import com.schwii.divvywood.engine.dirTo
 import com.schwii.divvywood.engine.edgeSide
-import com.schwii.divvywood.engine.edgeSpot
 import com.schwii.divvywood.engine.entrySide
 import com.schwii.divvywood.engine.eraseRetrace
 import com.schwii.divvywood.engine.isRetrace
 import com.schwii.divvywood.engine.opp
 import com.schwii.divvywood.engine.sends
-import com.schwii.divvywood.engine.settleInputs
 import com.schwii.divvywood.engine.toggleSide
 import com.schwii.divvywood.engine.Tile
 import com.schwii.divvywood.engine.commitPath
@@ -118,7 +116,6 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
     }
 
     private fun afterEdit() {
-        settleInputs(tiles)   // inputs follow the edge of the machine
         board.rebuild()
         selection = selection.filter { it in tiles }.toSet()
         onChange()
@@ -255,7 +252,12 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         move = null
         if (!m.shifted) return
         var moved: List<Cell>? = null
-        if (!edit { moved = moveGroup(tiles, m.cells, m.dx, m.dy); moved != null }) { notice = "No room here"; return }
+        if (!edit {
+                moved = moveGroup(tiles, m.cells, m.dx, m.dy)
+                // a moved input faces the build from where it now is
+                moved?.forEach { c -> tiles[c]?.takeIf { it.kind == Kind.SRC }?.let { tiles[c] = it.copy(out = opp(entrySide(tiles, c))) } }
+                moved != null
+            }) { notice = "No room here"; return }
         selection = moved!!.toSet()
         haptic(Haptic.DROP)
     }
@@ -339,7 +341,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     /**
      * What a chip would put on the board at [c], facing the way it will be placed (a belt there lends its direction).
-     * An input enters from the side of the machine [c] lies beyond, in [c]'s row or column.
+     * An input faces into the build from the side of it [c] lies beyond.
      */
     fun chipTile(item: TrayItem, c: Cell): Tile {
         val belt = tiles[c]?.takeIf { it.kind == Kind.BELT }
@@ -352,13 +354,10 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         }
     }
 
-    /** Where a chip dropped at [c] lands: an input goes to the edge of the machine, anything else where it's dropped. */
-    fun chipCell(item: TrayItem, c: Cell): Cell = if (item.kind == Kind.SRC) edgeSpot(tiles, c, entrySide(tiles, c)) else c
-
     /** A chip lands on an empty square or replaces a belt (an input only lands on an empty square). */
     fun chipFits(item: TrayItem, c: Cell): Boolean {
         if (isPlaced(item) || item.picker) return false
-        val ex = tiles[chipCell(item, c)]
+        val ex = tiles[c]
         return ex == null || (ex.kind == Kind.BELT && item.kind != Kind.SRC)
     }
 
@@ -374,7 +373,7 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
         if (locked() || !chipFits(item, c)) return false
         val tile = chipTile(item, c)
         val ok = edit {
-            if (item.kind == Kind.SPLIT || item.kind == Kind.MERGE) placePiece(tiles, c, item.kind) else { tiles[chipCell(item, c)] = tile; true }
+            if (item.kind == Kind.SPLIT || item.kind == Kind.MERGE) placePiece(tiles, c, item.kind) else { tiles[c] = tile; true }
         }
         if (ok) haptic(Haptic.DROP)
         return ok
