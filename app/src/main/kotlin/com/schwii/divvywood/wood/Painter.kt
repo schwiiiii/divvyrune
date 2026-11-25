@@ -314,7 +314,6 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         c.restore()
     }
 
-    /** A clear glass marble with its shadow; [alpha] fades it as it drops into a cup. */
     /** A block where marbles are being held up: a red wash, stronger the more often lately ([heat], 0–1). */
     open fun heatGlow(c: Canvas, x: Float, y: Float, z: Float, heat: Float) {
         val h = z * 0.5f
@@ -322,8 +321,9 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         rect.set(x - h, y - h, x + h, y + h); c.drawRect(rect, fill)
     }
 
-    open fun marble(c: Canvas, x: Float, y: Float, rz: Float, alpha: Float = 1f, waiting: Boolean = false) {
-        val r = 3.1f * unit   // the same size on screen at every zoom, like the channels
+    /** A clear glass marble with its shadow, as wide as the channels of a cell [z] across; [alpha] fades it out. */
+    open fun marble(c: Canvas, x: Float, y: Float, z: Float, alpha: Float = 1f, waiting: Boolean = false) {
+        val r = chan(z) * 0.5f   // it fills the channel it rolls in
         val a = (alpha * 255).toInt().coerceIn(0, 255)
         fill.color = rgba(50, 30, 15, 0.25); fill.alpha = (fill.alpha * alpha).toInt()
         rect.set(x + r * 0.25f - r * 0.95f, y + r * 0.45f - r * 0.55f, x + r * 0.25f + r * 0.95f, y + r * 0.45f + r * 0.55f); c.drawOval(rect, fill)

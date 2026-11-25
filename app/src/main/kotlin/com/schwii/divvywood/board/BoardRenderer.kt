@@ -220,12 +220,12 @@ class BoardRenderer(
                 else -> lay.at(i, it.curIn, s.exitSide(i), a - 0.5f)
             }
             val sz = if (a < 0.5f && it.pf != i) lay.size(it.pf) else lay.size(i)
-            painter.marble(c, p[0], p[1], max(1.5f, sz * 0.12f), waiting = sim.waiting[i])
+            painter.marble(c, p[0], p[1], sz, waiting = sim.waiting[i])
         }
         for (g in sim.ghosts) {
             val p = if (a < 0.5f) lay.at(g.from, g.item?.curIn ?: NONE, s.sideTo(g.from, g.to), 0.5f + a)
             else lay.at(g.to, s.sideTo(g.to, g.from), NONE, a - 0.5f)
-            painter.marble(c, p[0], p[1], max(1.5f, lay.size(g.from) * 0.12f), if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2))
+            painter.marble(c, p[0], p[1], lay.size(g.from), if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2))
         }
         editor?.let { drawOverlays(c, it) }
     }

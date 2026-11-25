@@ -157,7 +157,7 @@ class WirePainter : Painter() {
         rect.set(x - h, y - h, x + h, y + h); c.drawRect(rect, fill)
     }
 
-    override fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float, waiting: Boolean) {
+    override fun marble(c: Canvas, x: Float, y: Float, z: Float, alpha: Float, waiting: Boolean) {
         fill.color = rgba(191, 233, 255, alpha.toDouble())
         c.drawCircle(x, y, 3.4f * unit, fill)   // the same size on screen at every zoom, like the lines
         if (waiting) { line.color = Palette.bad; line.strokeWidth = 1.4f * unit; c.drawCircle(x, y, 4.8f * unit, line) }
