@@ -6,13 +6,16 @@ import androidx.compose.runtime.setValue
 import com.schwii.divvywood.engine.Cell
 import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.NONE
+import com.schwii.divvywood.engine.accepts
 import com.schwii.divvywood.engine.bridgeOf
+import com.schwii.divvywood.engine.dirTo
 import com.schwii.divvywood.engine.edgeSide
 import com.schwii.divvywood.engine.edgeSpot
 import com.schwii.divvywood.engine.entrySide
 import com.schwii.divvywood.engine.eraseRetrace
 import com.schwii.divvywood.engine.isRetrace
 import com.schwii.divvywood.engine.opp
+import com.schwii.divvywood.engine.sends
 import com.schwii.divvywood.engine.settleInputs
 import com.schwii.divvywood.engine.toggleSide
 import com.schwii.divvywood.engine.Tile
@@ -56,7 +59,7 @@ data class ChipGhost(val item: TrayItem, val cell: Cell)
  * - tap a piece: select it, which shows its numbers with Rotate and Delete (in Select mode: add it or take it out)
  * - tap the table: deselect everything
  * - drag a selected piece: move the selection; pieces landing on belts replace them, other pieces block the move
- * - drag from an unselected piece that sends marbles (input, splitter, converger, belt, bridge): draw a belt, placed
+ * - drag from an unselected piece that sends marbles (input, splitter, converger, belt, bridge, machine): draw a belt, placed
  *   on release if valid; drawn straight across a belt it bridges it. A drag that only retraces connections already
  *   there undoes them instead (belts go, a join between two pieces closes), and a drag from a splitter straight out
  *   past the edge of the build opens or closes that side
@@ -146,8 +149,42 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
 
     // ---------- pointer ----------
 
-    /** Pieces a belt can be drawn out of: everything that sends marbles. */
-    private fun sendsMarbles(c: Cell) = when (tiles[c]?.kind) { Kind.SRC, Kind.SPLIT, Kind.MERGE, Kind.BELT, Kind.BRIDGE -> true; else -> false }
+    /** Pieces a belt can be drawn out of: everything that sends marbles, machines included. */
+    private fun sendsMarbles(c: Cell) = when (tiles[c]?.kind) {
+        Kind.SRC, Kind.SPLIT, Kind.MERGE, Kind.BELT, Kind.BRIDGE, Kind.MACHINE -> true
+        else -> false
+    }
+
+    /** The sides the machine at [c] sends marbles out of, and those it takes them in by. */
+    private fun machineOuts(c: Cell) = board.graph.nodes.filter { it.cell == c && it.outPort != NONE }.map { it.outPort }.toSet()
+    private fun machineIns(c: Cell) = board.graph.nodes.filter { it.cell == c && it.inPort != NONE }.map { it.inPort }.toSet()
+
+    private fun isMachine(c: Cell) = tiles[c]?.kind == Kind.MACHINE
+
+    /** Does a step out of [a] by side [d] into [b] follow a connection already there, machines' ports included? */
+    private fun joined(a: Cell, b: Cell): Boolean {
+        val d = dirTo(a, b)
+        val out = if (isMachine(a)) d in machineOuts(a) else sends(tiles[a], d)
+        val into = if (isMachine(b)) opp(d) in machineIns(b) else accepts(tiles[b], opp(d))
+        return out && into
+    }
+
+    /** [isRetrace], with machines' ports counted as the connections they are. */
+    private fun retraces(path: List<Cell>) = path.size > 1 && path.all { it in tiles } && path.zipWithNext().all { (a, b) -> joined(a, b) }
+
+    /** Why a belt can't join a machine where [path] meets it, or null if it can. */
+    private fun machineProblem(path: List<Cell>): String? {
+        val a = path[0]; val b = path.last()
+        if (isMachine(a)) {
+            val d = dirTo(a, path[1])
+            if (d !in machineOuts(a)) return if (d in machineIns(a)) "That side of the machine takes marbles in" else "No way out on that side of the machine"
+        }
+        if (isMachine(b)) {
+            val s = opp(dirTo(path[path.size - 2], b))
+            if (s !in machineIns(b)) return if (s in machineOuts(b)) "That side of the machine sends marbles out" else "No input on that side of the machine"
+        }
+        return null
+    }
 
     fun down(x: Float, y: Float) {
         gesture = Tap(x, y, board.cellAt(x, y))
@@ -191,8 +228,10 @@ class Editor(val board: BoardState, private val haptic: (Haptic) -> Unit = {}) {
                         edit { toggleSide(tiles, g.path[0], side); true }
                         notice = if (wasOpen) "Side closed" else "Side opened"
                     }
-                    isRetrace(tiles, g.path) -> edit { eraseRetrace(tiles, g.path); true }
-                    pathValid(tiles, g.path) -> edit { commitPath(tiles, g.path); true }
+                    isRetrace(tiles, g.path) || retraces(g.path) -> edit { eraseRetrace(tiles, g.path); true }
+                    !pathValid(tiles, g.path) -> Unit
+                    machineProblem(g.path) != null -> notice = machineProblem(g.path)
+                    else -> edit { commitPath(tiles, g.path); true }
                 }
             }
             is Tap -> selection = when {

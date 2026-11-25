@@ -218,4 +218,37 @@ class EditorTest {
         e.down(cx(0), cx(0)); e.drag(cx(0), cx(2)); e.cancel(); e.up(cx(0), cx(2))
         assertEquals(Kind.SPLIT, at(0, 0)?.kind); assertNull(e.move)
     }
+
+    /** The even split as a machine at (0, 0): in from the left, out of the top and bottom. */
+    private fun machineBoard(): String {
+        val (h, code) = com.schwii.divvywood.engine.machineOf(com.schwii.divvywood.engine.decodeGrid("IR LR SL5").tiles!!)
+        val lib = com.schwii.divvywood.engine.MachineLib(mapOf(h to com.schwii.divvywood.engine.MachineDef(code)))
+        val t = linkedMapOf(Cell(0, 0) to Tile(Kind.MACHINE, ref = h, out = 0)) as Tiles
+        e = Editor(BoardState(LEVELS.last(), t, lib = lib).apply { ox = 0f; oy = 0f; z = 10f })
+        return h
+    }
+
+    @Test fun `belts draw out of a machine's ways out and into its inputs, and retrace away`() {
+        machineBoard()
+        drag(0, 0, 0, 2)
+        assertEquals(Tile(Kind.BELT, from = 3, out = 1), at(0, 1))
+        assertEquals(Kind.BELT, at(0, 2)?.kind)
+        drop(Kind.SPLIT, -2, 0)
+        drag(-2, 0, 0, 0)
+        assertEquals(Tile(Kind.BELT, from = 2, out = 0), at(-1, 0))
+        assertEquals(0, e.board.graph.nodes.count { it.errs.any { m -> "machine's input" in m } })
+        drag(0, 0, 0, 2)   // back over the belts it drew: they go
+        assertNull(at(0, 1)); assertNull(at(0, 2))
+    }
+
+    @Test fun `a belt can't leave a machine by its input or a side with no port`() {
+        machineBoard()
+        drag(0, 0, 2, 0)
+        assertNull(at(1, 0)); assertEquals("No way out on that side of the machine", e.notice)
+        drag(0, 0, -2, 0)
+        assertNull(at(-1, 0)); assertEquals("That side of the machine takes marbles in", e.notice)
+        drop(Kind.SPLIT, 0, -2)
+        drag(0, -2, 0, 0)
+        assertNull(at(0, -1)); assertEquals("That side of the machine sends marbles out", e.notice)
+    }
 }

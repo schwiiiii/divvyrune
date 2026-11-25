@@ -24,6 +24,8 @@ First release.
 - A machine shows its whole build inside its cell and marbles run through it in view. Only builds whose inputs and
   outputs line up across the middle (left and right on one row, top and bottom in one column) become machines, so
   their lines meet the middle of each side, straight on to the lines around them.
+- Belts draw out of a machine's ways out and into its inputs like any other piece, and retrace away the same; a
+  belt drawn to the wrong side of a machine says which way that side goes.
 - Settings (the gear in the top strip): switch between the wood look and a wireframe look, white lines and dots on
   dark across the whole app, with no arrows, just faint dots where grid lines meet (machines show their own finer grid): lines keep one width on screen at every zoom, and each splitter
   lights only the branch its next marble takes.
