@@ -263,7 +263,7 @@ class BoardRenderer(
             for (to in moved.keys) if (e.blockedAt(to)) painter.outline(c, s.screenX(to.x), s.screenY(to.y), z, Palette.bad, outlineW * 1.5f)
         }
         e.chipGhost?.let { gh ->
-            val at = e.chipCell(gh.item, gh.cell)
+            val at = gh.cell
             val fits = e.chipFits(gh.item, gh.cell)
             c.saveLayerAlpha(null, (0.9f * 255).toInt())
             drawTiles(c, mapOf(at to e.chipTile(gh.item, gh.cell)), s.ox, s.oy, z, lift = true,
