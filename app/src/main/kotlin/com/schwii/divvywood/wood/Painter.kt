@@ -282,14 +282,14 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
      * Where a way out leaves the build: a dotted line from the piece at ([x0], [y0]) to the box's edge at ([x1], [y1]),
      * then a small green tag past the edge with [label] ("A 1/4", "rest").
      */
-    open fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {
+    open fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, tone: ExitTone) {
         stroke.color = rgba(95, 62, 32, 0.4); stroke.strokeWidth = max(1.5f, z * 0.05f); stroke.strokeCap = Paint.Cap.ROUND
         stroke.strokeWidth = 1.2f * unit; stroke.color = rgba(95, 62, 32, 0.3)
         c.drawLine(x0, y0, x1, y1, stroke)
         text.textSize = z * 0.2f
         val w = max(z * 0.5f, text.measureText(label) + z * 0.2f); val h = z * 0.34f
         rect.set(tx - w / 2, ty - h / 2, tx + w / 2, ty + h / 2)
-        fill.color = if (rest) Palette.stainDump else Palette.stainOut
+        fill.color = when (tone) { ExitTone.OK -> Palette.stainOut; ExitTone.REST -> Palette.stainDump; ExitTone.BAD -> Palette.stainBad }
         c.drawRoundRect(rect, h / 2, h / 2, fill)
         burnText(c, label, tx, ty, z * 0.2f, w)
     }
@@ -356,3 +356,6 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         stroke.pathEffect = null
     }
 }
+
+/** How a way out's tag reads: it meets its output, it carries the rest, or it's not right yet. */
+enum class ExitTone { OK, REST, BAD }

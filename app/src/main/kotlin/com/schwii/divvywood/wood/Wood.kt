@@ -63,6 +63,7 @@ object Palette {
     val stainSrc = Color.rgb(0xd4, 0xa2, 0x4f)
     val stainOut = Color.rgb(0x8f, 0xae, 0x86)
     val stainDump = Color.rgb(0xb8, 0xb0, 0xa3)
+    val stainBad = Color.rgb(0xd9, 0x8e, 0x82)
 
     /** The prototype's rgba(r,g,b,a) as an Android colour int. */
     fun rgba(r: Int, g: Int, b: Int, a: Double) = Color.argb((a * 255).toInt().coerceIn(0, 255), r, g, b)

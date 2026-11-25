@@ -39,7 +39,7 @@ fun ColumnScope.BuilderSheet(game: Game) {
     val d = game.draft
     fun set(nd: LevelDef) = game.updateDraft(nd)
     Text("New level", style = Body, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-    Text("Rates are shares of a full belt, which carries one marble a tick.", style = Body, color = Dim, fontSize = 13.sp)
+    Text("Rates here are shares of a full belt, which carries one marble a tick. In play they read as shares of what the inputs send.", style = Body, color = Dim, fontSize = 13.sp)
 
     d.inputs.forEachIndexed { k, v ->
         FracSetting(if (d.inputs.size == 1) "Input" else "Input ${k + 1}", v, removable = d.inputs.size > 1,

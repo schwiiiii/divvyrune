@@ -80,8 +80,8 @@ fun judge(g: Graph, level: Level, sol: Solution, w0: Snapshot? = null, w1: Snaps
         val exactOk = target == null || exact == target
         val measOk = target == null || abs(measured - target.toDouble()) <= tolerance
         rows += Row(id, exact, target, measured, exactOk && measOk)
-        if (target != null && !exactOk) reasons += "Output ${LETTERS[id]} gets $exact of a belt. It needs $target."
-        else if (target != null && !measOk) reasons += "Output ${LETTERS[id]} measured ${f3(measured)} against $target. Something is jamming."
+        if (target != null && !exactOk) reasons += "Output ${LETTERS[id]} gets ${level.shown(exact)}. It needs ${level.shown(target)}."
+        else if (target != null && !measOk) reasons += "Output ${LETTERS[id]} measured ${f3(level.shown(measured))} against ${level.shown(target)}. Something is jamming."
     }
     val rest = g.exits.count { it !in assigned }
     if (rest > 1) reasons += "$rest belts leave the build with what no output needs. Join them with a converger: the rest leaves on one side."

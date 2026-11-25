@@ -52,6 +52,13 @@ class LevelsTest {
         assertFalse(Level("swap", listOf(Frac(1, 3), Frac(2, 3)), listOf(Frac(1, 2), Frac(1, 2))).onePiece)
     }
 
+    @Test fun `players see rates as shares of what the inputs send`() {
+        assertEquals("1 → 1/4 · 3/4", levelNamed("Quarter back").ratios)
+        assertEquals("2/3 + 1/3 → 1/2 · 1/2", levelNamed("Two streams").ratios)
+        assertEquals("1 → 1/7 · 6/7", levelNamed("Seventh").ratios)
+        assertEquals(Q.ONE, levelNamed("Sixth").shown(Frac(1, 2)))
+    }
+
     @Test fun `a single piece doesn't pass Check`() {
         val v = check(buildGraph(tiles("IR SL5"), HALF), HALF)
         assertFalse(v.solved); assertTrue("A machine needs at least two pieces." in v.reasons)

@@ -29,6 +29,14 @@ data class Level(
     /** All the inputs together, in marbles per tick. */
     val totalInput: Q get() = inputs.fold(Q.ZERO) { a, f -> a + f.q }
 
+    /**
+     * A rate as players see it: a share of everything the inputs send, so the inputs add up to 1 and the outputs
+     * to 1 with the rest. Pieces run on belt shares underneath ([inputs], [out], the solver and the sim).
+     */
+    fun shown(q: Q): Q = if (totalInput.isZero) q else q / totalInput
+    fun shown(f: Frac): Q = shown(f.q)
+    fun shown(x: Double): Double = if (totalInput.isZero) x else x / totalInput.toDouble()
+
     /** What the outputs leave over, in marbles per tick: it leaves the build on a side of its own. */
     val rest: Q get() = out.filterNotNull().fold(totalInput) { a, f -> a - f.q }
 
@@ -51,6 +59,12 @@ data class Level(
         }
         return (rest.isZero && out.size == 1 && ins.size <= 3) || (ins.size == 2 && rest.isZero && same(leaving, ins))
     }
+
+    /** Every rate leaving, as players count them: each output's target, then the rest if there is any. */
+    val leaving: List<Q> get() = out.filterNotNull().map { shown(it) } + if (rest > Q.ZERO) listOf(shown(rest)) else emptyList()
+
+    /** What goes in and what comes out, as players count rates: "1 → 1/4 · 3/4", "2/3 + 1/3 → 1/2 · 1/2". */
+    val ratios: String get() = inputs.joinToString(" + ") { "${shown(it)}" } + " → " + leaving.joinToString(" · ")
 
     /** Input [k]'s name on blocks and readouts: IN alone, IN1, IN2… when there are several. */
     fun inputLabel(k: Int) = if (inputs.size == 1) "IN" else "IN${k + 1}"

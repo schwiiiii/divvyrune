@@ -23,6 +23,7 @@ import com.schwii.divvywood.engine.MachineLib
 import com.schwii.divvywood.engine.dirTo
 import com.schwii.divvywood.engine.overloaded
 import com.schwii.divvywood.engine.solve
+import com.schwii.divvywood.wood.ExitTone
 
 /**
  * Everything the board shows: the level, its tiles and the derived graph, exact solution and live simulation,
@@ -36,6 +37,8 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
     var outdated: (String) -> Boolean = { false }
     /** The label of the level a machine solves ("05", "C2"), if known. */
     var levelLabel: (String) -> String? = { null }
+    /** The level a machine solves, if known: its rates are the machine's. */
+    var levelOf: (String) -> Level? = { null }
     var level = level; private set
     var tiles = tiles; private set
     lateinit var graph: Graph; private set
@@ -248,15 +251,26 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
         val n = graph.nodes[i]
         if (n.kind != Kind.SRC) return null
         val r = level.inputs.getOrNull(n.inputId)
-        return level.inputLabel(n.inputId) + if (r != null && z >= 34f * density) " $r" else ""
+        return level.inputLabel(n.inputId) + if (r != null && z >= 34f * density) " ${level.shown(r)}" else ""
     }
 
-    /** The tag on way out [i]: the output it serves and its target ("A 1/4"), or "rest" for what no output takes. */
-    fun exitLabel(i: Int): String {
+    /** Which output way out [i] serves ("A"), or "rest" for what no output takes. */
+    fun exitName(i: Int): String = outNode.indexOf(i).let { if (it < 0) "rest" else LETTERS[it].toString() }
+
+    /**
+     * The tag on way out [i]: what actually leaves there (as players count rates, "1/4"; "?" without an exact solve),
+     * and whether that's right: it meets the output it serves, or it's the one way out carrying exactly the rest.
+     */
+    fun exitTag(i: Int): Pair<String, ExitTone> {
+        if (!sol.ok) return "?" to ExitTone.BAD
+        val f = sol.flow[i]
         val id = outNode.indexOf(i)
-        if (id < 0) return "rest"
-        val tg = level.out.getOrNull(id)
-        return LETTERS[id] + if (tg != null && z >= 34f * density) " $tg" else ""
+        val tone = when {
+            id >= 0 -> if (level.out[id].let { it == null || it.q == f }) ExitTone.OK else ExitTone.BAD
+            graph.exits.count { it !in outNode } == 1 && f == level.rest && !f.isZero -> ExitTone.REST
+            else -> ExitTone.BAD
+        }
+        return level.shown(f).toString() to tone
     }
 
     companion object {

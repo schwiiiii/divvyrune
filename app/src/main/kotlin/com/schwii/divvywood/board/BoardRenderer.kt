@@ -166,15 +166,15 @@ class BoardRenderer(
         val b = com.schwii.divvywood.engine.portBox(s.tiles)
         if (!bare) painter.machineBox(c, s.ox + b.x0 * s.z, s.oy + b.y0 * s.z, s.ox + (b.x1 + 1) * s.z, s.oy + (b.y1 + 1) * s.z, s.z)
         paintBuild(c, painter, lay(), s.outdated, bad = { s.isOverloaded(it) }, label = { if (bare) "" else s.labelOf(it) }, dimmed = lifted ?: emptySet())
-        // ways out: a dotted line to the edge of the box, and a tag past it naming the output it serves
+        // ways out: a dotted line to the edge of the box, and a tag past it with what leaves there, red until it's right
         if (!bare) for (p in s.graph.ports) if (!p.isInput) {
             val from = nodes[p.piece].cell
             val half = s.z * 0.5f
             val ex = s.screenX(p.edge.x) - DX[p.side] * half
             val ey = s.screenY(p.edge.y) - DY[p.side] * half
-            val label = s.exitLabel(p.node)
+            val (label, tone) = s.exitTag(p.node)
             painter.exitTag(c, s.screenX(from.x) + DX[p.side] * half, s.screenY(from.y) + DY[p.side] * half,
-                ex, ey, s.screenX(p.edge.x), s.screenY(p.edge.y), s.z, label, label == "rest")
+                ex, ey, s.screenX(p.edge.x), s.screenY(p.edge.y), s.z, label, tone)
         }
         for (n in nodes) if (n.errs.isNotEmpty() && n.frame == Frame.BOARD) painter.outline(c, s.screenX(n.cell.x), s.screenY(n.cell.y), s.z, Palette.bad, 2f * max(1f, s.z / 44f), dashed = true)
     }

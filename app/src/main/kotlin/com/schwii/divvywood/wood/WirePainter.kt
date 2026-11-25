@@ -132,15 +132,16 @@ class WirePainter : Painter() {
         stroke(c, p, z, white)
     }
 
-    override fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, rest: Boolean) {
+    override fun exitTag(c: Canvas, x0: Float, y0: Float, x1: Float, y1: Float, tx: Float, ty: Float, z: Float, label: String, tone: ExitTone) {
         line.color = faint; line.strokeWidth = width(z); line.pathEffect = null
         c.drawLine(x0, y0, x1, y1, line)
         text.textSize = z * 0.2f
         val w = max(z * 0.5f, text.measureText(label) + z * 0.2f); val h = z * 0.34f
         rect.set(tx - w / 2, ty - h / 2, tx + w / 2, ty + h / 2)
-        line.color = if (rest) grey else green; line.strokeWidth = max(1f, z * 0.03f)
+        val col = when (tone) { ExitTone.OK -> green; ExitTone.REST -> grey; ExitTone.BAD -> Palette.bad }
+        line.color = col; line.strokeWidth = max(1f, z * 0.03f)
         c.drawRoundRect(rect, h / 2, h / 2, line)
-        label(c, label, tx, ty, z * 0.2f, if (rest) grey else green, w)
+        label(c, label, tx, ty, z * 0.2f, col, w)
     }
 
     override fun machineBox(c: Canvas, l: Float, t: Float, r: Float, b: Float, z: Float) {

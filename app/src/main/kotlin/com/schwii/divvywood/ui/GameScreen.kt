@@ -248,7 +248,7 @@ fun chipIcon(item: TrayItem, level: com.schwii.divvywood.engine.Level, px: Int, 
         Kind.SPLIT -> { val t = Tile(Kind.SPLIT, inSide = 2); p.tile(c, x, y, z, t, listOf(2), listOf(3, 1), 905); p.turn(c, x, y, z, t, 3, angleOf(3), listOf(3, 1)); p.burnText(c, "÷", x + z * 0.27f, y, z * 0.36f, light = true) }
         Kind.MERGE -> { val t = Tile(Kind.MERGE, out = 0); p.tile(c, x, y, z, t, listOf(3, 1), listOf(0), 906); p.burnText(c, "+", x - z * 0.27f, y, z * 0.36f, light = true) }
         Kind.SRC -> p.tile(c, x, y, z, Tile(Kind.SRC, out = 0), emptyList(), listOf(0), 903 + maxOf(item.id, 0),
-            label = level.inputLabel(maxOf(item.id, 0)) + (level.inputs.getOrNull(maxOf(item.id, 0))?.let { " $it" } ?: ""), labelScale = 1.5f)
+            label = level.inputLabel(maxOf(item.id, 0)) + (level.inputs.getOrNull(maxOf(item.id, 0))?.let { " ${level.shown(it)}" } ?: ""), labelScale = 1.5f)
         Kind.MACHINE -> if (item.ref == null) {
             // the machines button: a machine block with a plain split inside, and a plus
             p.machineBlock(c, x - z / 2, y - z / 2, z, 908, false)

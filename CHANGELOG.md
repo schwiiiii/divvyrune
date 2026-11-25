@@ -37,7 +37,10 @@ First release.
 - Levels solved before machines arrived offer their solutions as machines too.
 - Build codes name machines by a hash of their build and carry those builds with them, so a shared code builds
   anywhere and adds its machines to yours.
-- Every rate is a share of a full belt (one marble a tick): inputs, targets, readouts and Check all use it.
+- Rates read as shares of what the inputs send: one input shows as 1, and the outputs add up to 1 with the rest
+  (underneath, an input still runs at its own belt speed, shown when you tap it; the level builder sets belt shares).
+- Each way out's tag shows what actually leaves there, red until it meets an output (or carries exactly the rest).
+- Machine cards say what goes in and what comes out (1 → 1/4 · 3/4), and so does tapping a placed machine.
 - Walnut and maple blocks: belts, splitters, convergers and bridges, as many as you like; loops allowed.
 - Check works out every block's exact share as a fraction, then runs the build for 3000 ticks and measures it.
 - Three metrics for every solve, each with its own best: pieces (every cell but the inputs), footprint (the

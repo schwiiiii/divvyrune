@@ -85,6 +85,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     val board = BoardState(level, saves.build(level.name), density, saves.lib).also { b ->
         b.outdated = { outdated(it) }
         b.levelLabel = { h -> saves.machine(h)?.level?.let { name -> (0 until levelCount).firstOrNull { levelAt(it).name == name } }?.let { label(it) } }
+        b.levelOf = { h -> saves.machine(h)?.level?.let { name -> (0 until levelCount).firstOrNull { levelAt(it).name == name } }?.let { levelAt(it) } }
     }
     val editor = Editor(board, haptic)
 

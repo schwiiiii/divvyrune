@@ -76,7 +76,7 @@ class GameTest {
         g.buildFromText(halves)
         val r = check(g)
         assertFalse(r.verdict.solved)
-        assertEquals("Output A gets 1/4 of a belt. It needs 1/8.", r.verdict.reasons.first())
+        assertEquals("Output A gets 1/2. It needs 1/4.", r.verdict.reasons.first())
         assertEquals(0.25, r.verdict.rows[0].measured, 0.005)
     }
 

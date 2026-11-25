@@ -125,6 +125,7 @@ private fun RowScope.SheetButton(label: String, go: Boolean = false, onClick: ()
 @Composable
 private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     val v = r.verdict
+    val level = game.level
     val title = if (v.solved) "Solved" else "Not yet"
     Title(title, if (v.solved) Out else Src)
     if (v.rows.isNotEmpty()) {
@@ -132,7 +133,7 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
             TableRow(listOf("out", "exact", "target", "measured"), null, header = true)
             for (row in v.rows) {
                 TableRow(
-                    listOf(LETTERS[row.id].toString(), row.exact.toString(), row.target?.toString() ?: "–", if (row.measured.isNaN()) "–" else f3(row.measured)),
+                    listOf(LETTERS[row.id].toString(), "${level.shown(row.exact)}", row.target?.let { "${level.shown(it)}" } ?: "–", if (row.measured.isNaN()) "–" else f3(level.shown(row.measured))),
                     if (row.target == null) null else row.ok,
                 )
             }
@@ -340,7 +341,7 @@ private fun MachinesSheet(game: Game) {
             val shape = RoundedCornerShape(10.dp)
             Column(
                 modifier.background(Raise, shape).clip(shape).clickable { game.pickMachine(ch.hash) }.padding(6.dp)
-                    .semantics { contentDescription = "Machine from level ${game.label(ch.level)}, ${ch.best.joinToString()}" },
+                    .semantics { contentDescription = "Machine from level ${game.label(ch.level)}, ${game.levelAt(ch.level).ratios}, ${ch.best.joinToString()}" },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
@@ -348,6 +349,7 @@ private fun MachinesSheet(game: Game) {
                     val img = remember(ch.hash, px) { buildPreview(game.levelAt(ch.level), ch.tiles, px, density.density, game.board.lib).asImageBitmap() }
                     Image(img, null, Modifier.fillMaxSize())
                 }
+                Text(game.levelAt(ch.level).ratios, style = BodyTnum, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 2, textAlign = TextAlign.Center)
                 Text("best " + ch.best.joinToString(" · ") { it.substringAfterLast(' ') }, style = Body, color = Dim, fontSize = 11.sp, maxLines = 2, textAlign = TextAlign.Center)
                 Text(game.label(ch.level), style = BodyTnum, color = Ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
             }
