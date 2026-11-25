@@ -15,7 +15,7 @@ import com.schwii.divvywood.game.MemoryStore
 import com.schwii.divvywood.game.Saves
 import com.schwii.divvywood.ui.GameScreen
 import com.schwii.divvywood.wood.Fonts
-import com.schwii.divvywood.wood.Painter
+import com.schwii.divvywood.wood.Look
 import com.schwii.divvywood.wood.Palette
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -53,28 +53,33 @@ class StoreAssets {
 
     // ---------- icon ----------
 
-    /** Brett's logo build: the input drops into a converger, a splitter loops back to it and feeds three cups. */
-    private val logo = "..,IB,..,..,../BR,CB,FB,FB2,FB3/RT,ST,SL,SL,LT"
+    /**
+     * Brett's logo build, drawn in the wireframe look: the input splits; half splits again, a quarter leaving on the
+     * left; the rest joins the other half and winds out to the right.
+     */
+    private val logo = "..,..,IB,..,..,../..,..,TB,..,..,../SR3,RL,ST6,BR,LB,BR/TR,LR,CR7,CT7,TR,LT"
 
     /** The logo build on the board as the game draws it, [cell] pixels a cell, centred in [w] × [h], marbles rolling. */
     private fun board(w: Int, h: Int, cell: Float, dx: Float = 0f): Bitmap {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val level = com.schwii.divvywood.engine.Level("logo", 2, listOf(null, null, null))
-        val state = BoardState(level, decodeGrid(logo).tiles!!, 1f).apply { z = cell }
+        val level = com.schwii.divvywood.engine.Level("logo", 2, listOf(null, null))
+        Look.wire = true
+        val state = BoardState(level, decodeGrid(logo).tiles!!, cell / 24f).apply { z = cell }
         state.fit(w.toFloat(), h.toFloat())
         state.ox += dx
         repeat(41) { state.step() }
         state.advance(0f)
-        BoardRenderer(state, reduceMotion = true).draw(Canvas(bmp), w, h)
+        BoardRenderer(state, reduceMotion = true, bare = true).draw(Canvas(bmp), w, h)
+        Look.wire = false
         return bmp
     }
 
     /** The icon on a canvas [px] square that shows [viewDp] of the 108 dp adaptive-icon square; the build spans 62 dp. */
-    private fun icon(px: Int, viewDp: Float): Bitmap = board(px, px, 62f / 5 * px / viewDp)
+    private fun icon(px: Int, viewDp: Float): Bitmap = board(px, px, 62f / 6 * px / viewDp)
 
-    /** The bare linen table, for the adaptive icon's back layer. */
+    /** The bare dark ground, for the adaptive icon's back layer. */
     private fun table(px: Int): Bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).also {
-        Painter().table(Canvas(it), px.toFloat(), px.toFloat(), -px.toFloat(), -px.toFloat(), px.toFloat() * 2)
+        Canvas(it).drawColor(Palette.rgba(20, 22, 26, 1.0))
     }
 
     @Test fun launcherIcon() {
@@ -91,15 +96,15 @@ class StoreAssets {
 
     @Test fun featureGraphic() {
         val w = 1024; val h = 500
-        val bmp = board(w, h, 92f, dx = -250f)
+        val bmp = board(w, h, 70f, dx = -230f)
+        Look.wire = true
         val c = Canvas(bmp)
         val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Fonts.label; Fonts.labelVariation?.let { fontVariationSettings = it }
             color = Palette.ink; textSize = 84f; textAlign = Paint.Align.RIGHT
         }
-        c.drawText("Divvywood", w - 48f, h / 2f + 6f, title)
-        title.apply { textSize = 30f; color = Palette.dim; fontVariationSettings = "'wght' 600" }
-        c.drawText("Marbles, split exactly", w - 50f, h / 2f + 56f, title)
+        c.drawText("Divvywood", w - 48f, h / 2f + 30f, title)   // just the name, level with the logo's middle
+        Look.wire = false
         bmp.saveTo(File(store, "featureGraphic.png"))
     }
 

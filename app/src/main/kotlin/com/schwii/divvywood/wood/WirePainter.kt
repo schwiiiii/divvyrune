@@ -57,6 +57,7 @@ class WirePainter : Painter() {
 
     override fun table(c: Canvas, w: Float, h: Float, ox: Float, oy: Float, z: Float) {
         fill.color = ground; c.drawRect(0f, 0f, w, h, fill)
+        if (still) return
         // faint dots where grid lines meet, so the cells show
         var gx = Math.floor((-ox / z).toDouble()).toInt()
         while (ox + gx * z <= w) {
@@ -83,11 +84,11 @@ class WirePainter : Painter() {
             Kind.SPLIT -> {
                 // every branch dim (the next one is lit by [turn]); with none, a stub where marbles come in
                 if (outs.isEmpty()) { val e = edge(x, y, z, t.inSide, 0.5f); p.moveTo(e[0], e[1]); p.lineTo(x, y); stroke(c, p, z, col) }
-                for (o in outs) { val q = Path(); route(q, x, y, z, t.inSide, o); stroke(c, q, z, faint) }
+                for (o in outs) { val q = Path(); route(q, x, y, z, t.inSide, o); stroke(c, q, z, if (still) col else faint) }
             }
             Kind.MERGE -> {
                 if (ins.isEmpty()) { val e = edge(x, y, z, t.out, 0.5f); p.moveTo(x, y); p.lineTo(e[0], e[1]); stroke(c, p, z, col) }
-                for (i in ins) { val q = Path(); route(q, x, y, z, i, t.out); stroke(c, q, z, faint) }
+                for (i in ins) { val q = Path(); route(q, x, y, z, i, t.out); stroke(c, q, z, if (still) col else faint) }
             }
             Kind.SRC -> {
                 val e = edge(x, y, z, t.out, 0.5f); p.moveTo(x, y); p.lineTo(e[0], e[1]); stroke(c, p, z, amber)
