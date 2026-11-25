@@ -18,7 +18,7 @@ class Found(val tiles: Tiles, val code: String, val metrics: Metrics, val flow: 
  * Up to [want] different solutions of [level] within [attempts] tries. Each try synthesizes a random machine and lays
  * it out; only layouts that pass Check (exact shares, a clean measured run with no jam skips) count.
  */
-fun solveLevel(level: Level, seed: Long, want: Int = 100, attempts: Int = 8000): List<Found> {
+fun solveLevel(level: Level, seed: Long, want: Int = 100, attempts: Int = 60000): List<Found> {
     val rnd = Random(seed)
     val found = LinkedHashMap<String, Found>()
     repeat(attempts) {

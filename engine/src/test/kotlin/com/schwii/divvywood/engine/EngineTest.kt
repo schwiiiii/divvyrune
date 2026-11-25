@@ -52,11 +52,10 @@ class LevelsTest {
         assertFalse(Level("swap", listOf(Frac(1, 3), Frac(2, 3)), listOf(Frac(1, 2), Frac(1, 2))).onePiece)
     }
 
-    @Test fun `players see rates as shares of what the inputs send`() {
+    @Test fun `a level's ratios read what goes in and what comes out`() {
         assertEquals("1 → 1/4 · 3/4", levelNamed("Quarter back").ratios)
-        assertEquals("2/3 + 1/3 → 1/2 · 1/2", levelNamed("Two streams").ratios)
+        assertEquals("1 + 1/2 → 3/4 · 3/4", levelNamed("Two streams").ratios)
         assertEquals("1 → 1/7 · 6/7", levelNamed("Seventh").ratios)
-        assertEquals(Q.ONE, levelNamed("Sixth").shown(Frac(1, 2)))
     }
 
     @Test fun `a single piece doesn't pass Check`() {
@@ -125,7 +124,7 @@ class PortTest {
         val g = buildGraph(tiles(textRefs.getValue("Quarter back")), level)
         val v = check(g, level)
         assertTrue(v.solved, fmt(v))
-        assertEquals(listOf(Q.of(1, 8), Q.of(3, 8)), v.rows.sortedBy { it.id }.map { it.exact })
+        assertEquals(listOf(Q.of(1, 4), Q.of(3, 4)), v.rows.sortedBy { it.id }.map { it.exact })
     }
 
     @Test fun `an output with no way out is named`() {
@@ -470,8 +469,8 @@ class MultiInputTest {
         val g = buildGraph(tiles(textRefs.getValue("Two streams")), level)
         val s = Sim(g, level)
         repeat(1200) { s.step() }
-        assertEquals(600, s.emittedBy[0])
-        assertTrue(s.emittedBy[1] in 299..300, "the slower input can be a marble behind at a converger")
+        assertEquals(1200, s.emittedBy[0])
+        assertTrue(s.emittedBy[1] in 599..600, "the slower input can be a marble behind at a converger")
     }
 
     @Test fun `a missing input is named, and inputs past the level's count don't fit`() {

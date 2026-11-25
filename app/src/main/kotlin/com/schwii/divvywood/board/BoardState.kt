@@ -251,14 +251,14 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
         val n = graph.nodes[i]
         if (n.kind != Kind.SRC) return null
         val r = level.inputs.getOrNull(n.inputId)
-        return level.inputLabel(n.inputId) + if (r != null && z >= 34f * density) " ${level.shown(r)}" else ""
+        return level.inputLabel(n.inputId) + if (r != null && z >= 34f * density) " $r" else ""
     }
 
     /** Which output way out [i] serves ("A"), or "rest" for what no output takes. */
     fun exitName(i: Int): String = outNode.indexOf(i).let { if (it < 0) "rest" else LETTERS[it].toString() }
 
     /**
-     * The tag on way out [i]: what actually leaves there (as players count rates, "1/4"; "?" without an exact solve),
+     * The tag on way out [i]: what actually leaves there ("1/4"; "?" without an exact solve),
      * and whether that's right: it meets the output it serves, or it's the one way out carrying exactly the rest.
      */
     fun exitTag(i: Int): Pair<String, ExitTone> {
@@ -270,7 +270,7 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
             graph.exits.count { it !in outNode } == 1 && f == level.rest && !f.isZero -> ExitTone.REST
             else -> ExitTone.BAD
         }
-        return level.shown(f).toString() to tone
+        return f.toString() to tone
     }
 
     companion object {

@@ -104,7 +104,7 @@ private fun Stat(label: String, value: String) {
 
 /**
  * Each input's measured rate and each output's measured rate against its target, with a sparkline; every rate is a
- * share of everything the inputs send ([com.schwii.divvywood.engine.Level.shown]). Refreshed every 6 frames.
+ * share of one full belt. Refreshed every 6 frames.
  */
 @Composable
 private fun Readouts(board: BoardState) {
@@ -126,8 +126,8 @@ private fun Readouts(board: BoardState) {
                 ReadCard(
                     m,
                     tag = level.inputLabel(k), tagColor = Src,
-                    value = f3(level.shown(board.inputRate(k) ?: 0.0)),
-                    note = "rate ${level.shown(r)}",
+                    value = f3(board.inputRate(k) ?: 0.0),
+                    note = "rate $r",
                     blocked = board.inputBlocked(k),
                 )
             }
@@ -135,8 +135,8 @@ private fun Readouts(board: BoardState) {
                 ReadCard(
                     m,
                     tag = LETTERS[id].toString(), tagColor = Out,
-                    value = board.measured(id)?.let { f3(level.shown(it)) } ?: "–",
-                    note = if (tg != null) "target ${level.shown(tg)}" else "free",
+                    value = board.measured(id)?.let { f3(it) } ?: "–",
+                    note = if (tg != null) "target $tg" else "free",
                     spark = board.hist.getOrNull(id)?.toList() ?: emptyList(),
                     target = tg?.let { it.n.toFloat() / it.d },
                     top = top,

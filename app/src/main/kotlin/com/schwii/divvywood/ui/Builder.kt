@@ -39,7 +39,7 @@ fun ColumnScope.BuilderSheet(game: Game) {
     val d = game.draft
     fun set(nd: LevelDef) = game.updateDraft(nd)
     Text("New level", style = Body, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-    Text("Rates here are shares of a full belt, which carries one marble a tick. In play they read as shares of what the inputs send.", style = Body, color = Dim, fontSize = 13.sp)
+    Text("Rates are shares of a full belt, which carries one marble a tick: 1 is a full belt, and no piece can carry more.", style = Body, color = Dim, fontSize = 13.sp)
 
     d.inputs.forEachIndexed { k, v ->
         FracSetting(if (d.inputs.size == 1) "Input" else "Input ${k + 1}", v, removable = d.inputs.size > 1,
@@ -49,7 +49,7 @@ fun ColumnScope.BuilderSheet(game: Game) {
     // a build has four sides, one per input or output
     val room = d.inputs.size + d.out.size < MAX_PORTS
     if (d.inputs.size < 3 && room) Row(Modifier.fillMaxWidth()) {
-        SmallButton("+ Input ${d.inputs.size + 1}", "add an input") { set(d.copy(inputs = d.inputs + "1/2")) }
+        SmallButton("+ Input ${d.inputs.size + 1}", "add an input") { set(d.copy(inputs = d.inputs + "1/1")) }
     }
     d.out.forEachIndexed { k, v ->
         FracSetting("Output ${LETTERS[k]}", v, removable = d.out.size > 1,
@@ -78,7 +78,7 @@ private fun List<String>.replaced(k: Int, v: String) = toMutableList().also { it
 /** A rate n/q, at most a full belt, with steppers for each part and a remove button. */
 @Composable
 private fun FracSetting(label: String, value: String, removable: Boolean, onChange: (String) -> Unit, onRemove: () -> Unit) {
-    val (n, q) = value.split('/').map { it.toInt() }.let { it[0] to it[1] }
+    val (n, q) = (com.schwii.divvywood.game.parseFrac(value) ?: com.schwii.divvywood.engine.Frac(1, 1)).let { it.n to it.d }
     Setting(label) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Stepper("$n", n > 1, n < q, "numerator") { onChange("${n + it}/$q") }

@@ -70,8 +70,8 @@ import kotlinx.serialization.json.Json
  * [inputs], each final output's target in [out]; [no3] turns 3-way splits off.
  */
 @Serializable data class LevelDef(
-    val inputs: List<String> = listOf("1/2"),
-    val out: List<String> = listOf("1/8", "3/8"),
+    val inputs: List<String> = listOf("1/1"),
+    val out: List<String> = listOf("1/4", "3/4"),
     val no3: Boolean = false,
 ) {
     val rates: List<Frac> get() = inputs.mapNotNull { parseFrac(it) }
@@ -98,6 +98,7 @@ import kotlinx.serialization.json.Json
 }
 
 fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNull() }
+    .let { if (it.size == 1) it + 1 else it }   // "1" is a full belt
     .takeIf { it.size == 2 && it[1] > 0 && it[0] > 0 && it[0] <= it[1] }?.let { Frac(it[0], it[1]) }
 
 /** A saved custom level: its definition and the build that proved it solvable. */

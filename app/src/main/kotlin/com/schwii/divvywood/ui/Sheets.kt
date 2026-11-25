@@ -125,7 +125,6 @@ private fun RowScope.SheetButton(label: String, go: Boolean = false, onClick: ()
 @Composable
 private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
     val v = r.verdict
-    val level = game.level
     val title = if (v.solved) "Solved" else "Not yet"
     Title(title, if (v.solved) Out else Src)
     if (v.rows.isNotEmpty()) {
@@ -133,7 +132,7 @@ private fun ColumnScope.ResultSheet(game: Game, r: Sheet.Result) {
             TableRow(listOf("out", "exact", "target", "measured"), null, header = true)
             for (row in v.rows) {
                 TableRow(
-                    listOf(LETTERS[row.id].toString(), "${level.shown(row.exact)}", row.target?.let { "${level.shown(it)}" } ?: "–", if (row.measured.isNaN()) "–" else f3(level.shown(row.measured))),
+                    listOf(LETTERS[row.id].toString(), row.exact.toString(), row.target?.toString() ?: "–", if (row.measured.isNaN()) "–" else f3(row.measured)),
                     if (row.target == null) null else row.ok,
                 )
             }

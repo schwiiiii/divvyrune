@@ -15,7 +15,7 @@ class SolverTest {
     @TestFactory
     fun `every level gets at least ten different solutions that pass Check`(): List<DynamicTest> = LEVELS.mapIndexed { i, level ->
         DynamicTest.dynamicTest("L${i + 1} ${level.name}") {
-            val found = solveLevel(level, seed = 7L + i, want = 10, attempts = 3000)
+            val found = solveLevel(level, seed = 7L + i, want = 10, attempts = 30000)
             assertEquals(10, found.size, "only ${found.size}")
             // each is a real build: its text code decodes to a layout the game solves
             for (f in found) assertTrue(check(buildGraph(decodeGrid(f.code).tiles!!, level), level).solved, f.code)

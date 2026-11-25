@@ -80,7 +80,7 @@ class GameScreenshotTest {
 
     @Test fun wireframe() {
         try {
-            val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), ".. .. BT .. .. ..\n.. .. RT CL6 BL ..\nIR LR LR LT BT ..\n.. .. RB SB5 LT ..\n.. RB CL3 SB3 .. ..\n.. TB .. RT RL IL2\n.. TB .. .. .. ..", 60f)
+            val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), "IB2 .. .. .. .. .. .. ..\nX BL .. RB RL RL BL ..\nTB CT3 RL ST5 CR3 LR X LR\nTB RT RL SB5 LT .. BT ..\nTR LR LR LT .. .. BT ..\n.. .. .. .. .. .. IT ..", 60f)
             g.wire = true
             g.run(600)
             compose.setContent { GameScreen(g, animate = false) }
@@ -116,7 +116,7 @@ class GameScreenshotTest {
     }
 
     @Test fun selectAndMove() {
-        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "BT .. .. .. .. ..\nBT .. .. BR LR LR\nBT RB SB5 CT6 .. ..\nRT CL3 SR6 SR6 BL ..\n.. .. .. .. IT ..", 64f)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), ".. BT .. ..\n.. RT CL6 BL\n.. .. SB6 SL5\nIR LR SL3 CB3\n.. .. RB TL\n.. .. TB ..", 64f)
         val e = g.editor
         compose.setContent { GameScreen(g, animate = false) }   // a still board, so the screen goes idle
         compose.runOnIdle {
@@ -129,7 +129,7 @@ class GameScreenshotTest {
     }
 
     @Test fun groupSelected() {
-        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "BT .. .. .. .. ..\nBT .. .. BR LR LR\nBT RB SB5 CT6 .. ..\nRT CL3 SR6 SR6 BL ..\n.. .. .. .. IT ..", 64f)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), ".. BT .. ..\n.. RT CL6 BL\n.. .. SB6 SL5\nIR LR SL3 CB3\n.. .. RB TL\n.. .. TB ..", 64f)
         val e = g.editor
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { e.switchSelectMode(true); listOf(Cell(2, 2), Cell(2, 3), Cell(3, 3)).forEach { e.tapCell(it) } }
@@ -148,7 +148,7 @@ class GameScreenshotTest {
     }
 
     @Test fun readouts() {
-        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "BT .. .. .. .. ..\nBT .. .. BR LR LR\nBT RB SB5 CT6 .. ..\nRT CL3 SR6 SR6 BL ..\n.. .. .. .. IT ..", 64f)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), ".. BT .. ..\n.. RT CL6 BL\n.. .. SB6 SL5\nIR LR SL3 CB3\n.. .. RB TL\n.. .. TB ..", 64f)
         g.run(900)
         compose.setContent { GameScreen(g, animate = false) }
         save("screen-readouts")
@@ -173,7 +173,7 @@ class GameScreenshotTest {
     }
 
     @Test fun checking() {
-        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), "BT .. .. .. .. ..\nBT .. .. BR LR LR\nBT RB SB5 CT6 .. ..\nRT CL3 SR6 SR6 BL ..\n.. .. .. .. IT ..", 64f)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Eighths")), ".. BT .. ..\n.. RT CL6 BL\n.. .. SB6 SL5\nIR LR SL3 CB3\n.. .. RB TL\n.. .. TB ..", 64f)
         compose.setContent { GameScreen(g, animate = false) }
         compose.runOnIdle { g.startCheck(); repeat(30) { g.board.advance(16f) } }
         save("screen-checking")
@@ -184,7 +184,7 @@ class GameScreenshotTest {
         Game(Saves(store)).apply {
             buildFromText(".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR"); startCheck(); board.finishCheck()
             loadLevel(LEVELS.indexOf(levelNamed("Sixth"))); buildFromText("IR LR SL5"); startCheck(); board.finishCheck()
-            loadLevel(LEVELS.indexOf(levelNamed("Eighths"))); buildFromText("BT .. .. .. .. ..\nBT .. .. BR LR LR\nBT RB SB5 CT6 .. ..\nRT CL3 SR6 SR6 BL ..\n.. .. .. .. IT ..")
+            loadLevel(LEVELS.indexOf(levelNamed("Eighths"))); buildFromText(".. BT .. ..\n.. RT CL6 BL\n.. .. SB6 SL5\nIR LR SL3 CB3\n.. .. RB TL\n.. .. TB ..")
         }
         val g = Game(Saves(store), density = 3f).apply { board.z = 64f * 3 }
         compose.setContent { GameScreen(g, animate = false) }
@@ -224,7 +224,7 @@ class GameScreenshotTest {
     }
 
     @Test fun twoInputs() {
-        val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), ".. .. BT .. .. ..\n.. .. RT CL6 BL ..\nIR LR LR LT BT ..\n.. .. RB SB5 LT ..\n.. RB CL3 SB3 .. ..\n.. TB .. RT RL IL2\n.. TB .. .. .. ..", 60f)
+        val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), "IB2 .. .. .. .. .. .. ..\nX BL .. RB RL RL BL ..\nTB CT3 RL ST5 CR3 LR X LR\nTB RT RL SB5 LT .. BT ..\nTR LR LR LT .. .. BT ..\n.. .. .. .. .. .. IT ..", 40f)
         g.run(600)
         compose.setContent { GameScreen(g, animate = false) }
         save("screen-two-inputs")

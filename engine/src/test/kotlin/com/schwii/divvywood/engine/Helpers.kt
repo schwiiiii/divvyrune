@@ -78,32 +78,27 @@ val netRefs: Map<String, () -> Graph> = mapOf(
         link(s, a); link(a, b); link(a, mB); link(b, mA); link(b, c); link(c, mA); link(c, mB); link(mA, A); link(mB, B); g } },
     "One two three" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val t = add(Kind.SPLIT); val m = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1); val C = add(Kind.OUT, 2)
         link(s, a); link(a, C); link(a, t); link(t, A); link(t, m); link(t, m); link(m, B); g } },
-    "Seventh" to { Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val c = add(Kind.SPLIT); val r = add(Kind.MERGE); val R = add(Kind.OUT); val A = add(Kind.OUT, 0)
-        link(s, m); link(m, a); link(a, r); link(a, b); link(b, r); link(b, c); link(c, A); link(c, m); link(r, R); g } },
     "Full belt" to { Net().run { val s = add(Kind.SRC); val a = add(Kind.SPLIT); val b = add(Kind.SPLIT); val mA = add(Kind.MERGE); val mB = add(Kind.MERGE); val A = add(Kind.OUT, 0); val B = add(Kind.OUT, 1)
         link(s, a); link(a, b); link(a, mB); link(a, mB); link(b, mA); link(b, mA); link(b, mB); link(mA, A); link(mB, B); g } },
-    "Seventeenth" to { Net().run { val s = add(Kind.SRC); val m = add(Kind.MERGE); val h = add(Kind.SPLIT); val t1 = add(Kind.SPLIT); val t2 = add(Kind.SPLIT)
-        val r = add(Kind.MERGE); val r2 = add(Kind.MERGE); val R = add(Kind.OUT); val A = add(Kind.OUT, 0)
-        link(s, m); link(m, h); link(h, r); link(h, t1); link(t1, r); link(t1, r2); link(t1, t2); link(t2, A); link(t2, m); link(t2, r2); link(r, r2); link(r2, R); g } },
 )
 
 /** Grid solutions as text codes, by level name (found by the solver, fewest pieces). */
 val textRefs: Map<String, String> = mapOf(
-    "Quarter back" to ".. .. IB ..\nRL BL TB ..\n.. CT3 ST6 ..\n.. RT ST6 ..\n.. .. TR LR",
-    "Sixth" to ".. .. .. BT\nRL RL BL BT\n.. BR CT6 BT\n.. CT3 SB7 LT\n.. RT SR6 BL\n.. .. .. IT",
-    "Eighths" to "BT .. .. .. .. ..\nBT .. .. BR LR LR\nBT RB SB5 CT6 .. ..\nRT CL3 SR6 SR6 BL ..\n.. .. .. .. IT ..",
-    "Two streams" to ".. .. .. .. IB ..\n.. RB SR3 SR3 TL ..\n.. TB TR CR6 LR LR\n.. TR LR LB .. ..\nRL RL RL CL3 BL ..\n.. .. .. .. IT2 ..",
-    "Ninths" to ".. .. .. BT ..\nRL BL .. BT ..\n.. CT3 BL BT ..\n.. RT SB7 LT ..\n.. RB SR7 RL IL\n.. TR CR6 LB ..\n.. .. .. TB ..",
-    "One two three" to ".. .. .. BT ..\nIR LR SL6 LT ..\n.. RB ST7 LR LR\n.. TR CR6 LB ..\n.. .. .. TB ..",
-    "Twelfths" to "BT .. .. .. ..\nBT .. BR LR LR\nBT BR CT7 BL ..\nBT SR5 SB7 LT ..\nRT CL3 SR6 BL ..\n.. .. .. IT ..",
-    "Swap" to ".. .. BT .. .. ..\n.. .. RT CL6 BL ..\nIR LR LR LT BT ..\n.. .. RB SB5 LT ..\n.. RB CL3 SB3 .. ..\n.. TB .. RT RL IL2\n.. TB .. .. .. ..",
-    "Thirds by halves" to "RL BL .. ..\n.. SB6 LB ..\n.. SR5 CL5 ..\n.. TB RT IL\n.. TB .. ..",
-    "Fifth" to "RL RL RL CL6 BL ..\n.. RB SR3 SB7 LT ..\n.. TB TR CT5 RL IL\n.. TB .. .. .. ..",
-    "Seventh" to "BT .. .. .. .. ..\nBT .. BR CR3 LR CR3\nBT BR CT6 SB6 SL6 LT\nBT SR5 SR6 SR6 CL5 ..\nRT TL .. .. BT ..\n.. .. .. .. IT ..",
-    "One two four" to ".. .. .. BT ..\nRL BL .. BT ..\n.. SR5 SB5 LT ..\n.. CR5 SL5 .. ..\n.. BT TR LR LR\n.. IT .. .. ..",
-    "Tenth" to ".. .. .. BT .. ..\nRL BL .. BT .. ..\n.. CT3 SB5 CT6 .. ..\n.. RT SR7 SB3 .. ..\n.. .. TR CT5 RL BL\n.. .. .. .. .. IT",
-    "Full belt" to ".. .. .. .. IB .. ..\n.. .. RB BL TB .. ..\nRB RL CL3 SR7 ST7 LB ..\nTB .. .. TR CB7 TL ..\nTB .. .. .. TR LR LR\nTB .. .. .. .. .. ..",
-    "Fifths by halves" to ".. .. .. .. IB\n.. BR LR LB TB\n.. SR5 SB5 CB3 TB\n.. TB SR5 CL3 TL\n.. CB6 ST5 LB ..\nRL TL .. TB ..\n.. .. .. TB ..",
-    "Seventeenth" to "RL RL CL6 CL6 CL6 CL6 CL6 BL ..\n.. BR CT6 SR5 SB7 SL3 SL7 LT ..\n.. BT RT ST7 CT5 BL TR LR LR\n.. RT RL TL .. BT .. .. ..\n.. .. .. .. .. IT .. .. ..",
-    "Thirtieth" to ".. .. .. .. IB ..\n.. BR CB5 RL TL ..\nRB SR6 ST7 SL6 LB ..\nTB .. CB6 TL TB ..\nTR CB5 CL3 SR3 TL ..\n.. CB6 RL ST7 LR LR\n.. CB6 RL TL .. ..",
+    "Quarter back" to ".. BT .. .. ..\n.. RT SB5 LB ..\nIR LR SL5 TB ..\n.. .. CB6 TL ..\n.. .. TR LR LR",
+    "Sixth" to "IR LR LB BR LR\n.. RB ST7 SL5 ..\n.. TR CB7 TL ..\n.. RB TL .. ..\n.. TB .. .. ..",
+    "Eighths" to ".. BT .. ..\n.. RT CL6 BL\n.. .. SB6 SL5\nIR LR SL3 CB3\n.. .. RB TL\n.. .. TB ..",
+    "Two streams" to ".. IB .. .. ..\nRL X RL BL ..\n.. TB BR CT6 ..\n.. TB SR5 SB3 ..\n.. TR X LT ..\n.. .. TB .. ..\n.. BR X LR LR\n.. RT CL3 BL ..\n.. .. .. IT2 ..",
+    "Ninths" to ".. BT .. .. .. ..\n.. RT BL .. .. ..\n.. BR CT6 BR LR LR\n.. RT SB7 SL7 LB ..\nRL BL BT CB6 TL ..\n.. RT X TL .. ..\n.. .. IT .. .. ..",
+    "One two three" to ".. .. .. BT ..\n.. BR CR3 LT ..\n.. SR5 SR7 BL ..\n.. TB TR X LR\nIR X LR LT ..",
+    "Twelfths" to ".. BT .. .. ..\n.. RT BL .. ..\n.. BR CT7 BL ..\n.. SR5 SB7 LT ..\nRB CL3 SR6 RL IL\nTB .. .. .. ..",
+    "Swap" to "IB2 .. .. .. .. .. .. ..\nX BL .. RB RL RL BL ..\nTB CT3 RL ST5 CR3 LR X LR\nTB RT RL SB5 LT .. BT ..\nTR LR LR LT .. .. BT ..\n.. .. .. .. .. .. IT ..",
+    "Thirds by halves" to ".. BT .. .. ..\nBR X LB .. ..\nBT BT TB .. ..\nSR5 SB3 TB .. ..\nTR CT6 CR5 LB ..\n.. RT SB3 TB ..\n.. .. RT X IL\n.. .. .. TB ..",
+    "Fifth" to ".. .. .. .. RB RL X IL\n.. .. .. RB X BL BT ..\n.. BR LR CB3 TR SL5 BT ..\nRL X RL ST7 CR3 CB3 BT ..\n.. RT RL ST5 LT TR LT ..",
+    "Seventh" to "CL6 RL RL RL RL BL .. ..\nCT3 SB5 LB .. BR X LR LR\nRT SR6 X SB5 SL3 CT6 .. ..\n.. .. TR CT6 .. RT BL ..\n.. .. .. RT BL .. BT ..\n.. .. .. RB SR6 BL BT ..\n.. .. .. TR LR X LT ..\n.. .. .. .. .. IT .. ..",
+    "One two four" to ".. BT .. .. .. .. ..\nIR X LR LR LB BR LB\n.. BT .. .. ST3 CT6 TB\n.. RT SR3 CL6 TL BT TB\n.. .. ST3 SL3 LR LT TB\n.. .. TR LR LR LR X\n.. .. .. .. .. .. TB",
+    "Tenth" to "BT .. .. RB RL RL IL\nBT .. BR X CR3 LB ..\nBT .. BT TR SL5 TB ..\nRT CL6 SR7 CL6 TL TB ..\n.. RT ST5 LT .. TB ..\n.. .. .. .. .. TB ..",
+    "Full belt" to ".. BT .. .. .. .. ..\n.. BT RB BL RB RL IL\n.. RT CL3 SR7 ST7 LB ..\n.. .. .. TR CB7 TL ..\nRL RL RL RL TL .. ..",
+    "Fifths by halves" to ".. .. .. .. .. .. IB\n.. BR LR LB .. .. TB\n.. CT3 BL TR LB .. TB\n.. SR5 SR6 SR3 CL3 RL ST6\nRL X RL TL RB CL6 TL\n.. TR LR LR X LT ..\n.. .. .. .. TB .. ..",
+    "Seventeenth" to ".. .. .. .. .. .. IB ..\n.. BR LR LR LR LB TB ..\n.. BT RB RL BL TB TB ..\n.. CT3 CL3 BL BT TB TB ..\nBR CT5 SB5 SL7 LT CR5 X LB\nRT RL SR7 CL5 RB SR7 TL TB\n.. RB ST6 RT X TL .. TB\n.. TB TR LR CR6 LR LR CR6\n.. TB .. .. .. .. .. ..",
+    "Thirtieth" to ".. .. .. .. .. BT .. ..\n.. .. RB CL6 CL6 X BL ..\nRB RL CL3 SB7 SL3 LT BT ..\nTB .. RB SB3 BR CR3 LT ..\nTB RB ST7 CT5 SB7 LT .. ..\nCL3 CL3 TL .. RT RL RL IL",
 )

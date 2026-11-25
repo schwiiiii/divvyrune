@@ -136,9 +136,8 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     /** A random single target the builder can always meet, the rest leaving on a side of its own. */
     fun surpriseMe() {
-        val half = Frac(1, 2)   // the targets are proved solvable with the input at half a belt
-        val f = randomTarget(not = draft.targets.singleOrNull()?.let { (it.q / half.q).toFrac() })
-        updateDraft(LevelDef(listOf(half.toString()), listOf((f * half).toString())))
+        val f = randomTarget(not = draft.targets.singleOrNull())
+        updateDraft(LevelDef(listOf("1/1"), listOf(f.toString())))
     }
 
     /** Saves the builder's design as a custom level, once its current build has passed Check. */

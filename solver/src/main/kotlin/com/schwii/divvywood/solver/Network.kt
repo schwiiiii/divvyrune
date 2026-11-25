@@ -38,7 +38,9 @@ private fun lcm(a: java.math.BigInteger, b: java.math.BigInteger) = a / a.gcd(b)
  * Each input's marbles are first shared out between the outputs (whatever no output needs goes to bypasses). An input
  * then splits into N equal shares, N made of 2s and 3s and at least the shares' common denominator q: N − q shares loop
  * back to a converger at the input, so each remaining share is exactly 1/q of the input, and those go to the outputs
- * and the rest. Branches whose shares all go to one place collapse into a single line. Lines into an output join
+ * and the rest. An input may first split into P equal lines (P = 2, 3 or 4), each shared out as an input of its own:
+ * with a full belt in, a loop's converger only fits on one belt this way. Branches whose shares all go to one place
+ * collapse into a single line. Lines into an output join
  * through converger trees. Each leftover line ends in a [Kind.OUT] with no target (id NONE); the layout joins them
  * into one belt leaving on one side (see [openPorts]).
  */
@@ -51,11 +53,21 @@ private fun synthesizeOnce(level: Level, rnd: Random): Net? {
     val outs = level.out.indices.map { net.add(Kind.OUT, it) }
     val need = level.out.map { it?.q ?: Q.ZERO }.toMutableList()
     val lines = LinkedHashMap<Int, MutableList<Int>>()   // destination node → nodes each sending it one line
-    val inputOrder = level.inputs.indices.shuffled(rnd)
-    // share the outputs' needs among the inputs, greedily in a random order
-    val give = Array(level.inputs.size) { Array(level.out.size) { Q.ZERO } }
-    for (k in inputOrder) {
-        var left = level.inputs[k].q
+    // each input, or the P equal lines it splits into first: a line's root node and its rate
+    val roots = mutableListOf<Pair<Int, Q>>()
+    for (k in level.inputs.indices) {
+        val ps = if (level.no3) listOf(1, 1, 2, 2, 4) else listOf(1, 1, 2, 2, 3, 4)
+        val p = ps[rnd.nextInt(ps.size)]
+        var line = listOf(net.add(Kind.SRC, k))
+        for (f in if (p == 4) listOf(2, 2) else if (p == 1) emptyList() else listOf(p)) {
+            line = line.flatMap { from -> val s = net.add(Kind.SPLIT); net.link(from, s); List(f) { s } }
+        }
+        line.forEach { roots += it to level.inputs[k].q / Q.of(p.toLong()) }
+    }
+    // share the outputs' needs among the lines, greedily in a random order
+    val give = Array(roots.size) { Array(level.out.size) { Q.ZERO } }
+    for (k in roots.indices.shuffled(rnd)) {
+        var left = roots[k].second
         for (j in level.out.indices.shuffled(rnd)) {
             if (left.isZero) break
             val take = if (need[j] < left) need[j] else left
@@ -63,9 +75,8 @@ private fun synthesizeOnce(level: Level, rnd: Random): Net? {
         }
     }
     if (need.any { !it.isZero }) return null
-    for (k in level.inputs.indices) {
-        val r = level.inputs[k].q
-        val src = net.add(Kind.SRC, k)
+    for (k in roots.indices) {
+        val (src, r) = roots[k]
         val parts = level.out.indices.map { give[k][it] / r }
         val rest = Q.ONE - parts.fold(Q.ZERO) { a, p -> a + p }
         val q = (parts + rest).filter { !it.isZero }.fold(java.math.BigInteger.ONE) { a, p -> lcm(a, p.d) }.toLong()

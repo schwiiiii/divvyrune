@@ -29,22 +29,22 @@ fun readoutOf(board: BoardState, cell: Cell): ReadoutInfo? {
     when (n.kind) {
         Kind.SRC -> {
             val k = n.inputId
-            level.inputs.getOrNull(k)?.let { rows += "sends" to "${level.shown(it)}"; rows += "belt" to "$it full" }
-            board.inputRate(k)?.let { rows += "measured" to f3(level.shown(it)) }
+            level.inputs.getOrNull(k)?.let { rows += "sends" to "$it of a belt" }
+            board.inputRate(k)?.let { rows += "measured" to "${f3(it)} / tick" }
             val held = s.blockedBy.getOrElse(k) { 0 }
             if (held > 0) rows += "held up" to pct(held, s.tick)
         }
-        Kind.OUT -> if (s.tick > 0) rows += "measured" to f3(level.shown(s.n[i].sunk.toDouble() / s.tick))
+        Kind.OUT -> if (s.tick > 0) rows += "measured" to "${f3(s.n[i].sunk.toDouble() / s.tick)} / tick"
         else -> {
             // a bridge shows both its lanes
             val lanes = if (n.bridge != null) listOf(i, i + 1) else listOf(i)
             val errs = lanes.flatMap { board.graph.nodes[it].errs }
             if (errs.isEmpty() && board.sol.ok) {
-                rows += "carries" to lanes.joinToString(" and ") { "${level.shown(board.sol.flow[it])}" }
+                rows += "carries" to lanes.joinToString(" and ") { "${board.sol.flow[it]}" } + " of a belt"
                 // a way out it leads to
                 lanes.flatMap { board.graph.nodes[it].succ }.filter { board.graph.nodes[it].kind == Kind.OUT }.forEach { rows += "leaves as" to board.exitName(it) }
             } else if (errs.isEmpty()) note = board.sol.why
-            if (s.tick > 0) rows += "measured" to f3(level.shown(s.n[i].pass.toDouble() / s.tick))
+            if (s.tick > 0) rows += "measured" to "${f3(s.n[i].pass.toDouble() / s.tick)} / tick"
             if (n.kind == Kind.SPLIT && s.n[i].skips > 0) rows += "jam skips" to s.n[i].skips.toString()
             if (s.waits[i] > 0) rows += "waits" to pct(s.waits[i], s.tick)
             if (n.kind == Kind.MERGE && s.turnAways[i] > 0) rows += "turns away" to pct(s.turnAways[i], s.tick)

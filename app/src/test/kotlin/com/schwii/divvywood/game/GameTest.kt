@@ -3,8 +3,6 @@ package com.schwii.divvywood.game
 import com.schwii.divvywood.board.TrayItem
 import com.schwii.divvywood.engine.Kind
 import com.schwii.divvywood.engine.Frac
-import com.schwii.divvywood.engine.Q
-import com.schwii.divvywood.engine.toFrac
 import com.schwii.divvywood.engine.LEVELS
 import com.schwii.divvywood.engine.RANDOM_TARGETS
 import com.schwii.divvywood.engine.levelNamed
@@ -39,7 +37,7 @@ class GameTest {
         assertNull(g.buildFromText(quarter))
         val r = check(g)
         assertTrue(r.verdict.reasons.toString(), r.verdict.solved)
-        assertEquals(listOf("1/8", "3/8"), r.verdict.rows.sortedBy { it.id }.map { it.exact.toString() })
+        assertEquals(listOf("1/4", "3/4"), r.verdict.rows.sortedBy { it.id }.map { it.exact.toString() })
         val m = metricsOf(decodeGrid(quarter).tiles!!)
         assertEquals(Best(m.pieces, m.area, r.flow!!.score), r.best!!.copy(piecesBuild = null, areaBuild = null, flowBuild = null))
         assertTrue(r.next)
@@ -76,8 +74,8 @@ class GameTest {
         g.buildFromText(halves)
         val r = check(g)
         assertFalse(r.verdict.solved)
-        assertEquals("Output A gets 1/2. It needs 1/4.", r.verdict.reasons.first())
-        assertEquals(0.25, r.verdict.rows[0].measured, 0.005)
+        assertEquals("Output A gets 1/2 of a belt. It needs 1/4.", r.verdict.reasons.first())
+        assertEquals(0.5, r.verdict.rows[0].measured, 0.005)
     }
 
     @Test fun `builds and the current level survive a restart`() {
@@ -196,8 +194,8 @@ class GameTest {
         val g = Game(Saves(MemoryStore()))
         g.openBuilder(); g.surpriseMe()
         assertEquals(1, g.draft.out.size)
-        assertEquals(listOf(Frac(1, 2)), g.draft.rates)
-        assertTrue("the target is half of a proved one", (g.draft.targets.single().q * Q.of(2)).toFrac() in RANDOM_TARGETS)
+        assertEquals(listOf(Frac(1, 1)), g.draft.rates)
+        assertTrue("the target is a proved one", g.draft.targets.single() in RANDOM_TARGETS)
         assertNull(g.draft.problem())
     }
 
