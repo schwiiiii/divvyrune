@@ -143,6 +143,8 @@ class BoardRenderer(
     private val fixedPainter: Painter? = null,
     private val reduceMotion: Boolean = false,
     private val editor: Editor? = null,
+    /** Just the build's lines, every branch lit: no box, labels, tags, grid or marbles (for the icon). */
+    private val bare: Boolean = false,
 ) {
     private val painter get() = fixedPainter ?: lookPainter()
     private var layer: Bitmap? = null
@@ -162,10 +164,10 @@ class BoardRenderer(
         val nodes = s.graph.nodes
         // the machine's box, or the start cell while there's no machine: inputs sit around it
         val b = com.schwii.divvywood.engine.portBox(s.tiles)
-        painter.machineBox(c, s.ox + b.x0 * s.z, s.oy + b.y0 * s.z, s.ox + (b.x1 + 1) * s.z, s.oy + (b.y1 + 1) * s.z, s.z)
-        paintBuild(c, painter, lay(), s.outdated, bad = { s.isOverloaded(it) }, label = { s.labelOf(it) }, dimmed = lifted ?: emptySet())
+        if (!bare) painter.machineBox(c, s.ox + b.x0 * s.z, s.oy + b.y0 * s.z, s.ox + (b.x1 + 1) * s.z, s.oy + (b.y1 + 1) * s.z, s.z)
+        paintBuild(c, painter, lay(), s.outdated, bad = { s.isOverloaded(it) }, label = { if (bare) "" else s.labelOf(it) }, dimmed = lifted ?: emptySet())
         // ways out: a dotted line to the edge of the box, and a tag past it naming the output it serves
-        for (p in s.graph.ports) if (!p.isInput) {
+        if (!bare) for (p in s.graph.ports) if (!p.isInput) {
             val from = nodes[p.piece].cell
             val half = s.z * 0.5f
             val ex = s.screenX(p.edge.x) - DX[p.side] * half
@@ -180,8 +182,10 @@ class BoardRenderer(
     fun draw(c: Canvas, w: Int, h: Int) {
         if (w <= 0 || h <= 0) return
         painter.unit = state.density
+        painter.still = bare
         drawLayer(w, h)
         c.drawBitmap(layer!!, 0f, 0f, null)
+        if (bare) { painter.still = false; return }   // the icon: just the lines
         val s = state
         val nodes = s.graph.nodes
         val sim = s.sim

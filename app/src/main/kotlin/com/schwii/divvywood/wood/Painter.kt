@@ -51,6 +51,8 @@ fun angleOf(d: Int) = atan2(DY[d].toFloat(), DX[d].toFloat())
 open class Painter(private val labelFace: Typeface = Fonts.label, private val labelVariation: String? = Fonts.labelVariation) {
     /** Screen pixels per dp, for lines drawn at a fixed width on screen. */
     var unit = 1f
+    /** A still picture (the icon): every branch drawn alike, no grid. */
+    var still = false
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {

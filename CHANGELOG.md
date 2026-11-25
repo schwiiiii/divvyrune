@@ -27,6 +27,7 @@ First release.
 - Settings (the gear in the top strip): switch between the wood look and a wireframe look, white lines and dots on
   dark across the whole app, with no arrows, just faint dots where grid lines meet (machines show their own finer grid): lines keep one width on screen at every zoom, and each splitter
   lights only the branch its next marble takes.
+- A new icon: the logo build's lines in the wireframe look, splitting, joining and winding out.
 - Blocks fill their cells, so neighbouring pieces meet without gaps.
 - Levels solved before machines arrived offer their solutions as machines too.
 - Build codes name machines by a hash of their build and carry those builds with them, so a shared code builds
