@@ -130,7 +130,7 @@ fun paintBuild(
             continue
         }
         val (ins, outs, seed) = args(i)
-        painter.tile(c, lay.x(i), lay.y(i), lay.size(i), n.bridge ?: n.tile, ins, outs, seed, bad(i))
+        painter.tile(c, lay.x(i), lay.y(i), lay.size(i), n.bridge ?: n.tile, ins, outs, seed, bad(i), slab = true)
     }
 }
 
@@ -198,10 +198,10 @@ class BoardRenderer(
             s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
             if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
         }
-        // the next way each splitter sends and each converger takes: a flipper, or a lit branch
+        // the next way each splitter sends: a flipper, or a lit branch
         sim.n.forEachIndexed { i, sn ->
-            if (sn.kind != Kind.SPLIT && sn.kind != Kind.MERGE) return@forEachIndexed
-            val list = if (sn.kind == Kind.SPLIT) sn.succ else sn.pred
+            if (sn.kind != Kind.SPLIT) return@forEachIndexed   // a converger takes whatever comes, so it shows no turn
+            val list = sn.succ
             if (list.isEmpty()) return@forEachIndexed
             val active = s.sideTo(i, list[sn.rr % list.size])
             val target = angleOf(active)
