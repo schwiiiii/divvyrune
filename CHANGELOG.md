@@ -1,12 +1,14 @@
 # Changelog
 
-What changes in each release of Divvywood. Development builds between releases are numbered after the last
+What changes in each release of Divvyrune. Development builds between releases are numbered after the last
 release (`1.0.0.3`); before 1.0.0 they were `0.9.N`. Plans for later releases are in [ROADMAP.md](ROADMAP.md).
 
 ## 1.0.0 (unreleased)
 
 First release.
 
+- The game is called Divvyrune: you scrawl runes that divvy. It installs as a new app (`com.schwii.divvyrune`), so
+  builds from before the rename don't carry over.
 - 17 levels, from a quarter to one thirtieth, two of them with two inputs to split apart and recombine.
 - Marbles enter and leave on the sides of the build: an input stays where you put it, touching the build's edge, and
   feeds the first piece in its row or column (anywhere else it says why it can't feed); whatever points out of the

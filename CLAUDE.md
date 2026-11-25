@@ -1,6 +1,6 @@
-# Divvywood
+# Divvyrune
 
-Open-source (GPL-3.0-or-later) Android puzzle game for F-Droid. Package `com.schwii.divvywood` (final).
+Open-source (GPL-3.0-or-later) Android puzzle game for F-Droid. Package `com.schwii.divvyrune` (final; renamed from Divvywood / `com.schwii.divvywood` before 1.0.0). The GitHub repo keeps its old name until Brett renames it; links already use `schwiiiii/divvyrune`.
 
 ## The game
 Walnut and maple blocks on an open grid. Belts, splitters, convergers and bridges are unlimited; each input is placed once. Belts carry marbles; splitters (one input on a marked side, outputs on their other open sides,
@@ -42,9 +42,9 @@ https://claude.ai/artifact/JXxqz55jj7Nxgy8mvNbFgH
 
 ## Release
 - Version: `versionName`/`versionCode` in `app/build.gradle.kts` are the release (1.0.0 / 1000000 = major·10⁶ + minor·10⁴ + patch·100). To release: bump both, add `fastlane/metadata/android/en-US/changelogs/<code>.txt`, merge, tag `v<name>` on main.
-- `release.yml`: a `v*` tag builds from source unchanged, signs with Brett's key (Actions secrets DIVVYWOOD_KEYSTORE_BASE64 / _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD) and publishes `divvywood-<name>.apk`. Each merge to main publishes a prerelease `<last release>.K`, code = last release + K (commits since its tag, ≤ 99). Before the first tag: `0.9.N`, code 900000 + N (commits on main). Don't tag until Brett says so. Brett updates via Obtainium.
-- Reproducible: two clean builds at different paths give identical unsigned APKs (no vcsInfo, engine compiled with -Xjdk-release=17). F-Droid's recipe draft is `fdroid/com.schwii.divvywood.yml` (Binaries + AllowedAPKSigningKeys).
-- Store listing: `fastlane/metadata/android/en-US`. Icon (Brett's logo build `..,..,IB,..,..,../..,..,TB,..,..,../SR3,RL,ST6,BR,LB,BR/TR,LR,CR7,CT7,TR,LT`, drawn in the wireframe look as bare lines: `BoardRenderer(bare = true)`), feature graphic (logo and name, no tagline) and screenshots are drawn by `StoreAssets`; the themed icon `drawable/ic_launcher_monochrome.xml` traces the same lines on the game's curves (`DIVVYWOOD_ASSETS=1 gradle :app:testDebugUnitTest --tests '*StoreAssets*'`; move `res/mipmap-anydpi/ic_launcher.xml` aside the first time, it needs the PNGs to link).
+- `release.yml`: a `v*` tag builds from source unchanged, signs with Brett's key (Actions secrets DIVVYRUNE_KEYSTORE_BASE64 / _KEYSTORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD) and publishes `divvyrune-<name>.apk`. Each merge to main publishes a prerelease `<last release>.K`, code = last release + K (commits since its tag, ≤ 99). Before the first tag: `0.9.N`, code 900000 + N (commits on main). Don't tag until Brett says so. Brett updates via Obtainium.
+- Reproducible: two clean builds at different paths give identical unsigned APKs (no vcsInfo, engine compiled with -Xjdk-release=17). F-Droid's recipe draft is `fdroid/com.schwii.divvyrune.yml` (Binaries + AllowedAPKSigningKeys).
+- Store listing: `fastlane/metadata/android/en-US`. Icon (Brett's logo build `..,..,IB,..,..,../..,..,TB,..,..,../SR3,RL,ST6,BR,LB,BR/TR,LR,CR7,CT7,TR,LT`, drawn in the wireframe look as bare lines: `BoardRenderer(bare = true)`), feature graphic (logo and name, no tagline) and screenshots are drawn by `StoreAssets`; the themed icon `drawable/ic_launcher_monochrome.xml` traces the same lines on the game's curves (`DIVVYRUNE_ASSETS=1 gradle :app:testDebugUnitTest --tests '*StoreAssets*'`; move `res/mipmap-anydpi/ic_launcher.xml` aside the first time, it needs the PNGs to link).
 
 ## Workflow
 - One PR per milestone-sized chunk on a branch; Brett merges (merge = approval). Report verified results with real output and show screenshots of UI changes.

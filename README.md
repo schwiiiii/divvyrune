@@ -1,4 +1,4 @@
-# Divvywood
+# Divvyrune
 
 A puzzle game about splitting a stream of marbles into exact fractions.
 
@@ -12,8 +12,8 @@ Press **Check** to have the exact flow worked out and the build run, then chase 
 
 ## Install
 
-Divvywood is headed for [F-Droid](https://f-droid.org). Until it's there, install the signed APK from the
-[releases](https://github.com/schwiiiii/divvywood/releases): add `https://github.com/schwiiiii/divvywood` to
+Divvyrune is headed for [F-Droid](https://f-droid.org). Until it's there, install the signed APK from the
+[releases](https://github.com/schwiiiii/divvyrune/releases): add `https://github.com/schwiiiii/divvyrune` to
 [Obtainium](https://github.com/ImranR98/Obtainium) to get each new version as an update.
 
 Releases (`v1.0.0`) and the development builds published after every merge to `main` (prereleases, `1.0.0.3`) are

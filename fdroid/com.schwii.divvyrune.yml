@@ -1,0 +1,35 @@
+# Draft recipe for fdroiddata (metadata/com.schwii.divvyrune.yml). Store text, icon and screenshots come from
+# fastlane/metadata/android in the source repository.
+Categories:
+  - Games
+License: GPL-3.0-or-later
+SourceCode: https://github.com/schwiiiii/divvyrune
+IssueTracker: https://github.com/schwiiiii/divvyrune/issues
+Changelog: https://github.com/schwiiiii/divvyrune/releases
+
+AutoName: Divvyrune
+
+RepoType: git
+Repo: https://github.com/schwiiiii/divvyrune.git
+# Reproducible builds: F-Droid compares its build with this signed APK and publishes the signed copy when they match.
+Binaries: https://github.com/schwiiiii/divvyrune/releases/download/v%v/divvyrune-%v.apk
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1000000
+    commit: v1.0.0
+    subdir: app
+    sudo:
+      - apt-get update
+      - apt-get install -y openjdk-21-jdk-headless
+      - update-java-alternatives -a
+    gradle:
+      - yes
+
+# SHA-256 of the signing certificate: apksigner verify --print-certs divvyrune-1.0.0.apk
+AllowedAPKSigningKeys: TODO
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v[0-9.]+$
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1000000
