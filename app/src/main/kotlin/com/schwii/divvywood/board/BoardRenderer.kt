@@ -198,12 +198,18 @@ class BoardRenderer(
             s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
             if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
         }
-        // the next way each splitter sends: a gate or drum in wood, a lit branch in wireframe
+        // the way each splitter sends: its branches but one dimmed. A marble still rolling out (the first half of a
+        // tick) keeps its branch open until it has left; then the splitter shows where the next one goes.
+        val leaving = HashMap<Int, Int>()
+        if (a < 0.5f) {
+            sim.n.forEachIndexed { j, sn -> sn.item?.let { if (it.pf != j) leaving[it.pf] = j } }
+            for (g in sim.ghosts) leaving[g.from] = g.to
+        }
         sim.n.forEachIndexed { i, sn ->
             if (sn.kind != Kind.SPLIT) return@forEachIndexed   // a converger takes whatever comes, so it shows no turn
             val list = sn.succ
             if (list.isEmpty()) return@forEachIndexed
-            val active = s.sideTo(i, list[sn.rr % list.size])
+            val active = s.sideTo(i, leaving[i] ?: list[sn.rr % list.size])
             val target = angleOf(active)
             var ang = s.flipperAngles[i] ?: target
             val d = (target - ang).let { atan2(sin(it), cos(it)) }
