@@ -130,7 +130,7 @@ fun paintBuild(
             continue
         }
         val (ins, outs, seed) = args(i)
-        painter.tile(c, lay.x(i), lay.y(i), lay.size(i), n.bridge ?: n.tile, ins, outs, seed, bad(i))
+        painter.tile(c, lay.x(i), lay.y(i), lay.size(i), n.bridge ?: n.tile, ins, outs, seed, bad(i), slab = true)
     }
 }
 
@@ -198,18 +198,24 @@ class BoardRenderer(
             s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
             if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
         }
-        // the next way each splitter sends and each converger takes: a flipper, or a lit branch
+        // the way each splitter sends: its branches but one dimmed. A marble still rolling out (the first half of a
+        // tick) keeps its branch open until it has left; then the splitter shows where the next one goes.
+        val leaving = HashMap<Int, Int>()
+        if (a < 0.5f) {
+            sim.n.forEachIndexed { j, sn -> sn.item?.let { if (it.pf != j) leaving[it.pf] = j } }
+            for (g in sim.ghosts) leaving[g.from] = g.to
+        }
         sim.n.forEachIndexed { i, sn ->
-            if (sn.kind != Kind.SPLIT && sn.kind != Kind.MERGE) return@forEachIndexed
-            val list = if (sn.kind == Kind.SPLIT) sn.succ else sn.pred
+            if (sn.kind != Kind.SPLIT) return@forEachIndexed   // a converger takes whatever comes, so it shows no turn
+            val list = sn.succ
             if (list.isEmpty()) return@forEachIndexed
-            val active = s.sideTo(i, list[sn.rr % list.size])
+            val active = s.sideTo(i, leaving[i] ?: list[sn.rr % list.size])
             val target = angleOf(active)
             var ang = s.flipperAngles[i] ?: target
             val d = (target - ang).let { atan2(sin(it), cos(it)) }
             ang += if (reduceMotion) d else d * 0.22f
             s.flipperAngles[i] = ang
-            if (list.size > 1 || painter is WirePainter) painter.turn(c, lay.x(i), lay.y(i), lay.size(i), nodes[i].tile, active, ang)
+            if (list.size > 1 || painter is WirePainter) painter.turn(c, lay.x(i), lay.y(i), lay.size(i), nodes[i].tile, active, ang, list.map { s.sideTo(i, it) })
         }
         // marbles: the first half of a tick finishes the old cell's route, the second half starts the new one
         sim.n.forEachIndexed { i, sn ->
@@ -220,12 +226,12 @@ class BoardRenderer(
                 else -> lay.at(i, it.curIn, s.exitSide(i), a - 0.5f)
             }
             val sz = if (a < 0.5f && it.pf != i) lay.size(it.pf) else lay.size(i)
-            painter.marble(c, p[0], p[1], max(1.5f, sz * 0.12f), waiting = sim.waiting[i])
+            painter.marble(c, p[0], p[1], sz, waiting = sim.waiting[i])
         }
         for (g in sim.ghosts) {
             val p = if (a < 0.5f) lay.at(g.from, g.item?.curIn ?: NONE, s.sideTo(g.from, g.to), 0.5f + a)
             else lay.at(g.to, s.sideTo(g.to, g.from), NONE, a - 0.5f)
-            painter.marble(c, p[0], p[1], max(1.5f, lay.size(g.from) * 0.12f), if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2))
+            painter.marble(c, p[0], p[1], lay.size(g.from), if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2))
         }
         editor?.let { drawOverlays(c, it) }
     }

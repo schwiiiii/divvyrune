@@ -76,7 +76,7 @@ class WirePainter : Painter() {
     override fun burnText(c: Canvas, s: String, x: Float, y: Float, size: Float, maxWidth: Float, light: Boolean) =
         label(c, s, x, y, size, white, maxWidth)
 
-    override fun tile(c: Canvas, x: Float, y: Float, z: Float, t: Tile, ins: List<Int>, outs: List<Int>, seed: Int, bad: Boolean, label: String?, labelScale: Float) {
+    override fun tile(c: Canvas, x: Float, y: Float, z: Float, t: Tile, ins: List<Int>, outs: List<Int>, seed: Int, bad: Boolean, label: String?, labelScale: Float, slab: Boolean) {
         val col = if (bad) Palette.bad else white
         val p = Path()
         when (t.kind) {
@@ -88,7 +88,7 @@ class WirePainter : Painter() {
             }
             Kind.MERGE -> {
                 if (ins.isEmpty()) { val e = edge(x, y, z, t.out, 0.5f); p.moveTo(x, y); p.lineTo(e[0], e[1]); stroke(c, p, z, col) }
-                for (i in ins) { val q = Path(); route(q, x, y, z, i, t.out); stroke(c, q, z, if (still) col else faint) }
+                for (i in ins) { val q = Path(); route(q, x, y, z, i, t.out); stroke(c, q, z, col) }   // a converger takes whatever comes: every input lit
             }
             Kind.SRC -> {
                 val e = edge(x, y, z, t.out, 0.5f); p.moveTo(x, y); p.lineTo(e[0], e[1]); stroke(c, p, z, amber)
@@ -111,14 +111,11 @@ class WirePainter : Painter() {
         }
     }
 
-    override fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float) {
+    override fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float, outs: List<Int>) {
         if (active == NONE) return
         val p = Path()
         if (t.kind == Kind.SPLIT) { route(p, x, y, z, t.inSide, active); stroke(c, p, z, white) }
-        else if (t.kind == Kind.MERGE) { route(p, x, y, z, active, t.out); stroke(c, p, z, white) }
     }
-
-    override fun flipper(c: Canvas, x: Float, y: Float, z: Float, angle: Float) = Unit
 
     override fun machineBlock(c: Canvas, x: Float, y: Float, size: Float, seed: Int, outdated: Boolean) {
         // the border on the cell's edge
@@ -158,7 +155,7 @@ class WirePainter : Painter() {
         rect.set(x - h, y - h, x + h, y + h); c.drawRect(rect, fill)
     }
 
-    override fun marble(c: Canvas, x: Float, y: Float, r: Float, alpha: Float, waiting: Boolean) {
+    override fun marble(c: Canvas, x: Float, y: Float, z: Float, alpha: Float, waiting: Boolean) {
         fill.color = rgba(191, 233, 255, alpha.toDouble())
         c.drawCircle(x, y, 3.4f * unit, fill)   // the same size on screen at every zoom, like the lines
         if (waiting) { line.color = Palette.bad; line.strokeWidth = 1.4f * unit; c.drawCircle(x, y, 4.8f * unit, line) }
