@@ -117,8 +117,6 @@ class WirePainter : Painter() {
         if (t.kind == Kind.SPLIT) { route(p, x, y, z, t.inSide, active); stroke(c, p, z, white) }
     }
 
-    override fun flipper(c: Canvas, x: Float, y: Float, z: Float, angle: Float) = Unit
-
     override fun machineBlock(c: Canvas, x: Float, y: Float, size: Float, seed: Int, outdated: Boolean) {
         // the border on the cell's edge
         rect.set(x, y, x + size, y + size)

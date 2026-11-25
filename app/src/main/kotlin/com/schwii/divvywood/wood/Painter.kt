@@ -53,7 +53,7 @@ private fun routePath(p: Path, x: Float, y: Float, z: Float, a: Int, b: Int) {
 
 fun angleOf(d: Int) = atan2(DY[d].toFloat(), DX[d].toFloat())
 
-/** Draws walnut and maple blocks, carved channels, cups, flippers and glass marbles; a port of the prototype's renderer. */
+/** Draws walnut and maple blocks, carved channels, cups and glass marbles; a port of the prototype's renderer. */
 open class Painter(private val labelFace: Typeface = Fonts.label, private val labelVariation: String? = Fonts.labelVariation) {
     /** Screen pixels per dp, for lines drawn at a fixed width on screen. */
     var unit = 1f
@@ -258,47 +258,24 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
     }
 
     /**
-     * Where a splitter sends its next marble: [active] is that side, of its ways out [outs], fed from [Tile.inSide].
-     * Wood shows the mechanism that decides it. A two-way splitter has a T-shaped flip-flop: it pivots on the divider
-     * between the ways out, its stem reaching back toward the input and leaning across the branch that's shut, its
-     * crossbar sticking into the open one, where the passing marble catches it and flips it over. A three-way one
-     * shows a slim flipper lying in the channel the next marble takes.
+     * Where a splitter sends its next marble: [active] is that side, of its ways out [outs]. As in the wireframe
+     * look, every other branch is dimmed, so the open path swaps as marbles pass; the input and the open branch stay
+     * clear.
      */
     open fun turn(c: Canvas, x: Float, y: Float, z: Float, t: Tile, active: Int, angle: Float, outs: List<Int> = emptyList()) {
-        if (outs.size == 2 && t.inSide != NONE) flipFlop(c, x, y, z, t.inSide, active, outs.first { it != active })
-        else if (outs.size >= 2) flipper(c, x, y, z, angle)
-    }
-
-    /** The two-way splitter's T-shaped flip-flop, open toward [open], shut across [shut], fed from side [inSide]. */
-    private fun flipFlop(c: Canvas, x: Float, y: Float, z: Float, inSide: Int, open: Int, shut: Int) {
+        if (still || active == NONE || t.inSide == NONE || outs.size < 2) return
         val w = chan(z)
-        // the pivot: on the divider between the two ways out (straight across from the input, when they face apart)
-        var bx = (DX[open] + DX[shut]).toFloat(); var by = (DY[open] + DY[shut]).toFloat()
-        if (bx == 0f && by == 0f) { bx = -DX[inSide].toFloat(); by = -DY[inSide].toFloat() }
-        val bl = kotlin.math.hypot(bx, by)
-        val px = x + bx / bl * w * 0.95f; val py = y + by / bl * w * 0.95f
-        // the stem lies across the shut branch's mouth; the crossbar stands up into the open branch, for the marble to strike
-        val stem = angleOf(opp(open))
-        val len = w * 1.75f
-        val t = w * 0.42f; val bar = w * 1.6f
-        fun body(dx: Float, dy: Float, shadow: Boolean) {
-            c.save(); c.translate(px + dx, py + dy); c.rotate(Math.toDegrees(stem.toDouble()).toFloat())
-            if (shadow) fill.color = rgba(30, 18, 8, 0.28)
-            else shade(LinearGradient(0f, -bar / 2, 0f, bar / 2, 0xFFF6E7C6.toInt(), 0xFFD6B98A.toInt(), Shader.TileMode.CLAMP))
-            path.reset()
-            rect.set(-t / 2, -t / 2, len, t / 2); path.addRoundRect(rect, t / 2, t / 2, Path.Direction.CW)          // the stem
-            rect.set(-t / 2, -bar / 2, t / 2, bar / 2); path.addRoundRect(rect, t / 2, t / 2, Path.Direction.CW)    // the crossbar
-            path.op(Path().apply { addRoundRect(RectF(-t / 2, -t / 2, len, t / 2), t / 2, t / 2, Path.Direction.CW) }, Path.Op.UNION)
-            c.drawPath(path, fill); fill.shader = null
-            if (!shadow) { stroke.color = rgba(90, 60, 30, 0.55); stroke.strokeWidth = max(0.8f, w * 0.06f); c.drawPath(path, stroke) }
+        c.withClip(x - z / 2, y - z / 2, x + z / 2, y + z / 2) {
+            c.saveLayer(x - z / 2, y - z / 2, x + z / 2, y + z / 2, null)
+            stroke.strokeCap = Paint.Cap.BUTT; stroke.strokeJoin = Paint.Join.ROUND; stroke.pathEffect = null
+            stroke.color = rgba(24, 14, 6, 0.62); stroke.strokeWidth = w * 1.12f
+            val p = Path(); outs.filter { it != active }.forEach { routePath(p, x, y, z, t.inSide, it) }; c.drawPath(p, stroke)
+            // keep the way the marble takes clear
+            stroke.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
+            val q = Path(); routePath(q, x, y, z, t.inSide, active); stroke.strokeWidth = w * 1.14f; c.drawPath(q, stroke)
+            stroke.xfermode = null
             c.restore()
         }
-        body(w * 0.14f, w * 0.18f, true)   // its shadow, falling to the bottom right
-        body(0f, 0f, false)
-        val pin = w * 0.26f
-        shade(RadialGradient(px - pin * 0.3f, py - pin * 0.3f, pin, intArrayOf(0xFFFFF2C8.toInt(), 0xFFCFA24E.toInt(), 0xFF7A561C.toInt()),
-            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP))
-        c.drawCircle(px, py, pin, fill); fill.shader = null
     }
 
     /**
@@ -330,26 +307,6 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         if (inward) { p.moveTo(e[0], e[1]); p.lineTo(x, y) } else { p.moveTo(x, y); p.lineTo(e[0], e[1]) }
         carve(c, z, p, true)
         hollow(c, x, y, z * 0.2f, false)
-    }
-
-    /** Round robin: a maple paddle on a brass pin, pointing down the channel the next marble takes. */
-    /**
-     * Round robin: a slim maple paddle on a brass pin at the fork, sized to the channels, lying in the channel the
-     * next marble takes.
-     */
-    open fun flipper(c: Canvas, x: Float, y: Float, z: Float, angle: Float) {
-        val w = chan(z); val l = w * 1.9f; val t = w * 0.36f
-        c.save(); c.translate(x, y); c.rotate(Math.toDegrees(angle.toDouble()).toFloat())
-        fill.color = rgba(30, 18, 8, 0.3)
-        rect.set(w * 0.05f, -t / 2 + w * 0.12f, l + w * 0.05f, t / 2 + w * 0.12f); c.drawRoundRect(rect, t / 2, t / 2, fill)
-        shade(LinearGradient(0f, -t / 2, 0f, t / 2, 0xFFF6E7C6.toInt(), 0xFFD6B98A.toInt(), Shader.TileMode.CLAMP))
-        rect.set(0f, -t / 2, l, t / 2); c.drawRoundRect(rect, t / 2, t / 2, fill); fill.shader = null
-        stroke.color = rgba(90, 60, 30, 0.5); stroke.strokeWidth = max(0.8f, w * 0.06f); c.drawRoundRect(rect, t / 2, t / 2, stroke)
-        val pin = w * 0.28f
-        shade(RadialGradient(-pin * 0.3f, -pin * 0.3f, pin, intArrayOf(0xFFFFF2C8.toInt(), 0xFFCFA24E.toInt(), 0xFF7A561C.toInt()),
-            floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP))
-        c.drawCircle(0f, 0f, pin, fill); fill.shader = null
-        c.restore()
     }
 
     /** A block where marbles are being held up: a red wash, stronger the more often lately ([heat], 0–1). */
