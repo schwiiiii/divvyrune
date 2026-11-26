@@ -117,7 +117,7 @@ fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNul
     val nextCustom: Int = 1,
     val draft: LevelDef = LevelDef(),
     val machines: Map<String, MachineSave> = emptyMap(),
-    /** How the game looks: "wood" or "wire". */
+    /** How the game looks: "wood", "wire" or "rune". */
     val look: String = "wood",
 )
 
@@ -167,7 +167,7 @@ class Saves(private val store: SaveStore) {
         return d.copy(levels = levels, machines = machines)
     }
 
-    /** How the game looks: "wood" or "wire". */
+    /** How the game looks: "wood", "wire" or "rune". */
     var look: String
         get() = data.look
         set(v) { if (v != data.look) put(data.copy(look = v)) }

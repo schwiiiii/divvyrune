@@ -269,7 +269,7 @@ private fun Tray(editor: Editor, boardBounds: androidx.compose.ui.geometry.Rect,
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         for (item in editor.trayItems()) {
-            val icon = remember(item, board.level, com.schwii.divvyrune.wood.Look.wire) { chipIcon(item, board.level, px, board.lib).asImageBitmap() }
+            val icon = remember(item, board.level, com.schwii.divvyrune.wood.Look.style) { chipIcon(item, board.level, px, board.lib).asImageBitmap() }
             val placed = editor.isPlaced(item)
             var origin by remember { mutableStateOf(Offset.Zero) }
             Image(icon, null,

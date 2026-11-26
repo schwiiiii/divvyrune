@@ -17,35 +17,35 @@ import kotlin.math.max
  * channels, all one width on screen at every zoom, and marbles as small balls. A splitter's branches are dim but for the one its next marble takes (drawn by [turn]), so the
  * bright branch swaps as marbles pass; a converger's inputs likewise.
  */
-class WirePainter : Painter() {
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
-    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; typeface = Fonts.label; Fonts.labelVariation?.let { fontVariationSettings = it } }
-    private val rect = RectF()
+open class WirePainter : Painter() {
+    protected val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    protected val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
+    protected val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; typeface = Fonts.label; Fonts.labelVariation?.let { fontVariationSettings = it } }
+    protected val rect = RectF()
 
-    private val ground = rgba(20, 22, 26, 1.0)
-    private val white = rgba(237, 239, 242, 1.0)
-    private val faint = rgba(237, 239, 242, 0.22)
-    private val amber = rgba(242, 193, 78, 1.0)
-    private val green = rgba(123, 211, 137, 1.0)
-    private val grey = rgba(154, 160, 168, 1.0)
+    protected open val ground = rgba(20, 22, 26, 1.0)
+    protected open val white = rgba(237, 239, 242, 1.0)
+    protected open val faint = rgba(237, 239, 242, 0.22)
+    protected open val amber = rgba(242, 193, 78, 1.0)
+    protected open val green = rgba(123, 211, 137, 1.0)
+    protected open val grey = rgba(154, 160, 168, 1.0)
 
     /** Every line is the same width on screen, whatever the zoom and however deep inside machines. */
     @Suppress("UNUSED_PARAMETER")
-    private fun width(z: Float) = 2.2f * unit
+    protected open fun width(z: Float) = 2.2f * unit
 
-    private fun stroke(c: Canvas, p: Path, z: Float, color: Int, w: Float = width(z)) {
+    protected open fun stroke(c: Canvas, p: Path, z: Float, color: Int, w: Float = width(z)) {
         line.color = color; line.strokeWidth = w; line.pathEffect = null
         c.drawPath(p, line)
     }
 
-    private fun route(p: Path, x: Float, y: Float, z: Float, a: Int, b: Int) {
+    protected open fun route(p: Path, x: Float, y: Float, z: Float, a: Int, b: Int) {
         val e0 = edge(x, y, z, a, 0.5f); val e1 = edge(x, y, z, b, 0.5f)
         p.moveTo(e0[0], e0[1])
         if (a == opp(b)) p.lineTo(e1[0], e1[1]) else p.quadTo(x, y, e1[0], e1[1])
     }
 
-    private fun label(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int, maxWidth: Float = Float.MAX_VALUE) {
+    protected fun label(c: Canvas, s: String, x: Float, y: Float, size: Float, color: Int, maxWidth: Float = Float.MAX_VALUE) {
         text.textSize = size; text.color = color
         val w = text.measureText(s)
         c.withSave {

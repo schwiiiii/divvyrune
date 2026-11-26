@@ -30,7 +30,12 @@ import kotlin.math.sin
 /** The painter for the current look. */
 private val woodPainter by lazy { Painter() }
 private val wirePainter by lazy { WirePainter() }
-fun lookPainter(): Painter = if (Look.wire) wirePainter else woodPainter
+private val runePainter by lazy { com.schwii.divvyrune.wood.RunePainter() }
+fun lookPainter(): Painter = when (Look.style) {
+    com.schwii.divvyrune.wood.Style.WOOD -> woodPainter
+    com.schwii.divvyrune.wood.Style.WIRE -> wirePainter
+    com.schwii.divvyrune.wood.Style.RUNE -> runePainter
+}
 
 /**
  * Where a graph's nodes are drawn: node i's cell centre and size on screen, for a board whose cell (0, 0) has its
@@ -155,7 +160,7 @@ class BoardRenderer(
     private fun drawLayer(w: Int, h: Int) {
         val s = state
         val lifted = editor?.move?.takeIf { it.shifted }?.cells?.toSet()
-        val key = "${s.version}|${s.ox}|${s.oy}|${s.z}|$w|$h|${lifted?.joinToString(";")}|${Look.wire}"
+        val key = "${s.version}|${s.ox}|${s.oy}|${s.z}|$w|$h|${lifted?.joinToString(";")}|${Look.style}"
         if (key == layerKey && layer != null) return
         layerKey = key
         val bmp = layer?.takeIf { it.width == w && it.height == h } ?: Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { layer = it }

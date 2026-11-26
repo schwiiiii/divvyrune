@@ -28,6 +28,8 @@ First release.
   their lines meet the middle of each side, straight on to the lines around them.
 - Belts draw out of a machine's ways out and into its inputs like any other piece, and retrace away the same; a
   belt drawn to the wrong side of a machine says which way that side goes.
+- A rune look (Settings → Runes): the build scrawled on dark slate as glowing blue strokes that turn on sharp
+  chamfers, diamond knots on splitters and convergers, glowing motes for marbles and machines as engraved tablets.
 - Settings (the gear in the top strip): switch between the wood look and a wireframe look, white lines and dots on
   dark across the whole app, with no arrows, just faint dots where grid lines meet (machines show their own finer grid): lines keep one width on screen at every zoom, and each splitter
   lights only the branch its next marble takes.

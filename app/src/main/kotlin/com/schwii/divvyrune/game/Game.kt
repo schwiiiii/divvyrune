@@ -92,7 +92,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     var sheet by mutableStateOf<Sheet?>(null); private set
 
     init {
-        Look.wire = saves.look == "wire"
+        Look.style = com.schwii.divvyrune.wood.Style.of(saves.look)
         editor.onChange = { saves.putBuild(level.name, board.tiles) }
         editor.locked = { board.checking }
         board.onCheckDone = { w0, w1 -> finishCheck(w0, w1) }
@@ -198,10 +198,10 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     fun showMachines() { if (!board.checking) sheet = Sheet.Machines }
     fun showSettings() { sheet = Sheet.Settings }
 
-    /** Wireframe (white lines on dark) or wood; saved. */
-    var wire: Boolean
-        get() = Look.wire
-        set(v) { Look.wire = v; saves.look = if (v) "wire" else "wood"; board.rebuild() }
+    /** How the game looks: wood, wireframe or runes; saved. */
+    var style: com.schwii.divvyrune.wood.Style
+        get() = Look.style
+        set(v) { Look.style = v; saves.look = v.id; board.rebuild() }
     fun closeSheet() { sheet = null }
 
     /** Builds from a text code in place of this level's build; returns an error message, or null when built. */

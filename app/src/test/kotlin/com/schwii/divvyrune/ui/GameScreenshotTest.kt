@@ -80,14 +80,14 @@ class GameScreenshotTest {
 
     @Test fun wireframe() {
         try {
-            val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), "IB2 .. .. .. .. .. .. ..\nX BL .. RB RL RL BL ..\nTB CT3 RL ST5 CR3 LR X LR\nTB RT RL SB5 LT .. BT ..\nTR LR LR LT .. .. BT ..\n.. .. .. .. .. .. IT ..", 60f)
-            g.wire = true
+            val g = gameFor(LEVELS.indexOf(levelNamed("Swap")), "CL6 RL RL RL RL BL .. ..\nCT3 SB5 LB .. BR X LR LR\nRT SR6 X SB5 SL3 CT6 .. ..\n.. .. TR CT6 .. RT BL ..\n.. .. .. RT BL .. BT ..\n.. .. .. RB SR6 BL BT ..\n.. .. .. TR LR X LT ..\n.. .. .. .. .. IT .. ..", 44f)
+            g.style = com.schwii.divvyrune.wood.Style.WIRE
             g.run(600)
             compose.setContent { GameScreen(g, animate = false) }
             save("screen-wire")
             compose.runOnIdle { g.showSettings() }
             save("screen-settings")
-        } finally { com.schwii.divvyrune.wood.Look.wire = false }
+        } finally { com.schwii.divvyrune.wood.Look.style = com.schwii.divvyrune.wood.Style.WOOD }
     }
 
     @Test fun machineWire() {
@@ -98,13 +98,42 @@ class GameScreenshotTest {
                 openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
                 val h = com.schwii.divvyrune.engine.machineOf(com.schwii.divvyrune.engine.decodeGrid(q).tiles!!).first
                 pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.1 .."); editor.dismissNotice(); board.z = 150f * 3
-                wire = true
+                style = com.schwii.divvyrune.wood.Style.WIRE
             }
             g.run(300)
             compose.setContent { GameScreen(g, animate = false) }
             compose.runOnIdle { g.board.refit() }
             save("screen-machine-wire")
-        } finally { com.schwii.divvyrune.wood.Look.wire = false }
+        } finally { com.schwii.divvyrune.wood.Look.style = com.schwii.divvyrune.wood.Style.WOOD }
+    }
+
+    @Test fun runes() {
+        try {
+            val g = gameFor(LEVELS.indexOf(levelNamed("Seventh")), "CL6 RL RL RL RL BL .. ..\nCT3 SB5 LB .. BR X LR LR\nRT SR6 X SB5 SL3 CT6 .. ..\n.. .. TR CT6 .. RT BL ..\n.. .. .. RT BL .. BT ..\n.. .. .. RB SR6 BL BT ..\n.. .. .. TR LR X LT ..\n.. .. .. .. .. IT .. ..", 44f)
+            g.style = com.schwii.divvyrune.wood.Style.RUNE
+            g.run(600)
+            compose.setContent { GameScreen(g, animate = false) }
+            save("screen-rune")
+            compose.runOnIdle { g.showSettings() }
+            save("screen-settings-rune")
+        } finally { com.schwii.divvyrune.wood.Look.style = com.schwii.divvyrune.wood.Style.WOOD }
+    }
+
+    @Test fun machineRune() {
+        try {
+            val q = "IR SL6 LR CR3\n.. ST3 LR LT\n.. TB .. .."
+            val g = Game(Saves(MemoryStore()), density = 3f).apply {
+                buildFromText(q); startCheck(); board.finishCheck(); closeSheet()
+                openBuilder(); updateDraft(LevelDef(listOf("1/2"), listOf("1/8", "3/8")))
+                val h = com.schwii.divvyrune.engine.machineOf(com.schwii.divvyrune.engine.decodeGrid(q).tiles!!).first
+                pickMachine(h); buildFromText(".. IB ..\n.. TB ..\n.. #$h.1 .."); editor.dismissNotice(); board.z = 150f * 3
+                style = com.schwii.divvyrune.wood.Style.RUNE
+            }
+            g.run(300)
+            compose.setContent { GameScreen(g, animate = false) }
+            compose.runOnIdle { g.board.refit() }
+            save("screen-machine-rune")
+        } finally { com.schwii.divvyrune.wood.Look.style = com.schwii.divvyrune.wood.Style.WOOD }
     }
 
     @Test fun selectedPiece() {
