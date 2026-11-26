@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "divvywood"
+rootProject.name = "divvyrune"
 include(":engine", ":app", ":solver")

@@ -1,12 +1,14 @@
 # Changelog
 
-What changes in each release of Divvywood. Development builds between releases are numbered after the last
+What changes in each release of Divvyrune. Development builds between releases are numbered after the last
 release (`1.0.0.3`); before 1.0.0 they were `0.9.N`. Plans for later releases are in [ROADMAP.md](ROADMAP.md).
 
 ## 1.0.0 (unreleased)
 
 First release.
 
+- The game is called Divvyrune: you scrawl runes that divvy. It installs as a new app (`com.schwii.divvyrune`), so
+  builds from before the rename don't carry over.
 - 17 levels, from a quarter to one thirtieth, two of them with two inputs to split apart and recombine.
 - Marbles enter and leave on the sides of the build: an input stays where you put it, touching the build's edge, and
   feeds the first piece in its row or column (anywhere else it says why it can't feed); whatever points out of the
@@ -38,6 +40,11 @@ First release.
 - Build codes name machines by a hash of their build and carry those builds with them, so a shared code builds
   anywhere and adds its machines to yours.
 - Every rate is a share of a full belt (one marble a tick): inputs, targets, readouts and Check all use it.
+- Inputs send a full belt: 1, so divisions read plainly (1 in, 1/4 and 3/4 out). Nothing carries more than 1, so
+  loops, and two inputs joined, need splitting first to stay clear of blockages. Two streams is now 1 + 1/2 into
+  3/4 and 3/4; Swap 2/3 + 1 into 5/6 and 5/6.
+- Each way out's tag shows what actually leaves there, red until it meets an output (or carries exactly the rest).
+- Machine cards say what goes in and what comes out (1 → 1/4 · 3/4), and so does tapping a placed machine.
 - Walnut and maple blocks: belts, splitters, convergers and bridges, as many as you like; loops allowed.
 - Check works out every block's exact share as a fraction, then runs the build for 3000 ticks and measures it.
 - Three metrics for every solve, each with its own best: pieces (every cell but the inputs), footprint (the

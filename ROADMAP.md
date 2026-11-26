@@ -5,7 +5,7 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
 ## Next
 - [ ] **1.0.0 release** on GitHub, after the current round of playtesting.
       Before tagging: redraw the store screenshots with `StoreAssets` (the metrics and levels changed since they
-      were drawn), and fill `AllowedAPKSigningKeys` in `fdroid/com.schwii.divvywood.yml` with the SHA-256 of the
+      were drawn), and fill `AllowedAPKSigningKeys` in `fdroid/com.schwii.divvyrune.yml` with the SHA-256 of the
       release signing certificate (Brett supplies it from his keystore).
 - [ ] **F-Droid**: submit the recipe in `fdroid/`; F-Droid ships the same signed APK, so copies from F-Droid and
       GitHub update each other.
@@ -14,6 +14,9 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
 - [ ] **A level generator** (a developer tool) to grow the set from 17 to about 100, from simple to complex, with
       more levels using several inputs. Players see them as ordinary numbered levels. Builds on the solver, which
       proves each new level solvable.
+
+- [ ] **A rune look** to go with the name: the build's lines drawn as scrawled runes, a third look beside Wood and
+      Wireframe.
 
 ## Later
 - [ ] **Share custom levels**: send a level made in the builder as a short code or link, and play levels others made.

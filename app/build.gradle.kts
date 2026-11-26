@@ -6,27 +6,27 @@ plugins {
 }
 
 android {
-    namespace = "com.schwii.divvywood"
+    namespace = "com.schwii.divvyrune"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.schwii.divvywood"
+        applicationId = "com.schwii.divvyrune"
         minSdk = 26
         targetSdk = 36
         // The release version, as tagged (v1.0.0) and built by F-Droid. versionCode is major·10⁶ + minor·10⁴ + patch·100.
         // CI's development builds of main pass the last release's values plus the commits since its tag (1.0.0.3).
-        versionCode = System.getenv("DIVVYWOOD_VERSION_CODE")?.toInt() ?: 1_000_000
-        versionName = System.getenv("DIVVYWOOD_VERSION_NAME") ?: "1.0.0"
+        versionCode = System.getenv("DIVVYRUNE_VERSION_CODE")?.toInt() ?: 1_000_000
+        versionName = System.getenv("DIVVYRUNE_VERSION_NAME") ?: "1.0.0"
     }
 
     // Release builds are signed only when CI provides the key; without it they build unsigned, as F-Droid expects.
-    val keystore = System.getenv("DIVVYWOOD_KEYSTORE")
+    val keystore = System.getenv("DIVVYRUNE_KEYSTORE")
     signingConfigs {
         if (keystore != null) create("release") {
             storeFile = file(keystore)
-            storePassword = System.getenv("DIVVYWOOD_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("DIVVYWOOD_KEY_ALIAS")
-            keyPassword = System.getenv("DIVVYWOOD_KEY_PASSWORD")
+            storePassword = System.getenv("DIVVYRUNE_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("DIVVYRUNE_KEY_ALIAS")
+            keyPassword = System.getenv("DIVVYRUNE_KEY_PASSWORD")
         }
     }
 

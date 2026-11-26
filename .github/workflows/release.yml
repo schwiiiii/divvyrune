@@ -23,6 +23,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
+      # the signing secrets keep the names they were saved under before the rename
       HAS_KEY: ${{ secrets.DIVVYWOOD_KEYSTORE_BASE64 != '' }}
     steps:
       - name: Check for the signing key
@@ -36,8 +37,8 @@ jobs:
         if: env.HAS_KEY == 'true'
         id: v
         run: |
-          src_name=$(sed -n 's/.*DIVVYWOOD_VERSION_NAME") ?: "\(.*\)"/\1/p' app/build.gradle.kts)
-          src_code=$(sed -n 's/.*DIVVYWOOD_VERSION_CODE")?.toInt() ?: \([0-9_]*\)/\1/p' app/build.gradle.kts | tr -d _)
+          src_name=$(sed -n 's/.*DIVVYRUNE_VERSION_NAME") ?: "\(.*\)"/\1/p' app/build.gradle.kts)
+          src_code=$(sed -n 's/.*DIVVYRUNE_VERSION_CODE")?.toInt() ?: \([0-9_]*\)/\1/p' app/build.gradle.kts | tr -d _)
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             if [ "$GITHUB_REF_NAME" != "v$src_name" ]; then
               echo "::error::Tag $GITHUB_REF_NAME doesn't match versionName $src_name in app/build.gradle.kts"; exit 1
@@ -74,19 +75,19 @@ jobs:
         if: env.HAS_KEY == 'true' && steps.v.outputs.kind != 'none'
         env:
           KEYSTORE_BASE64: ${{ secrets.DIVVYWOOD_KEYSTORE_BASE64 }}
-          DIVVYWOOD_KEYSTORE_PASSWORD: ${{ secrets.DIVVYWOOD_KEYSTORE_PASSWORD }}
-          DIVVYWOOD_KEY_ALIAS: ${{ secrets.DIVVYWOOD_KEY_ALIAS }}
-          DIVVYWOOD_KEY_PASSWORD: ${{ secrets.DIVVYWOOD_KEY_PASSWORD }}
+          DIVVYRUNE_KEYSTORE_PASSWORD: ${{ secrets.DIVVYWOOD_KEYSTORE_PASSWORD }}
+          DIVVYRUNE_KEY_ALIAS: ${{ secrets.DIVVYWOOD_KEY_ALIAS }}
+          DIVVYRUNE_KEY_PASSWORD: ${{ secrets.DIVVYWOOD_KEY_PASSWORD }}
           KIND: ${{ steps.v.outputs.kind }}
           NAME: ${{ steps.v.outputs.name }}
           CODE: ${{ steps.v.outputs.code }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/divvywood.jks"
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/divvyrune.jks"
           # a release builds from the source's own version, exactly as F-Droid does
-          if [ "$KIND" = dev ]; then export DIVVYWOOD_VERSION_NAME="$NAME" DIVVYWOOD_VERSION_CODE="$CODE"; fi
-          DIVVYWOOD_KEYSTORE="$RUNNER_TEMP/divvywood.jks" ./gradlew --no-daemon :app:assembleRelease
-          rm -f "$RUNNER_TEMP/divvywood.jks"
-          cp app/build/outputs/apk/release/app-release.apk "divvywood-$NAME.apk"
+          if [ "$KIND" = dev ]; then export DIVVYRUNE_VERSION_NAME="$NAME" DIVVYRUNE_VERSION_CODE="$CODE"; fi
+          DIVVYRUNE_KEYSTORE="$RUNNER_TEMP/divvyrune.jks" ./gradlew --no-daemon :app:assembleRelease
+          rm -f "$RUNNER_TEMP/divvyrune.jks"
+          cp app/build/outputs/apk/release/app-release.apk "divvyrune-$NAME.apk"
       - name: Publish
         if: env.HAS_KEY == 'true' && steps.v.outputs.kind != 'none'
         env:
@@ -97,10 +98,10 @@ jobs:
         run: |
           if [ "$KIND" = release ]; then
             notes=fastlane/metadata/android/en-US/changelogs/$CODE.txt
-            gh release create "v$NAME" "divvywood-$NAME.apk" --verify-tag --latest \
-              --title "Divvywood $NAME" --notes-file "$notes"
+            gh release create "v$NAME" "divvyrune-$NAME.apk" --verify-tag --latest \
+              --title "Divvyrune $NAME" --notes-file "$notes"
           else
-            gh release create "dev-$NAME" "divvywood-$NAME.apk" --prerelease --latest=false \
+            gh release create "dev-$NAME" "divvyrune-$NAME.apk" --prerelease --latest=false \
               --title "Development build $NAME" \
               --notes "Development build of ${GITHUB_SHA::7}: $(git log -1 --format=%s)" \
               --target "$GITHUB_SHA"

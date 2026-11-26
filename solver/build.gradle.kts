@@ -25,6 +25,6 @@ tasks.test {
 tasks.register<JavaExec>("baselines") {
     description = "Finds solutions for every level and writes their metrics to the app's baselines.json"
     classpath = sourceSets["main"].runtimeClasspath
-    mainClass.set("com.schwii.divvywood.solver.BaselinesKt")
+    mainClass.set("com.schwii.divvyrune.solver.BaselinesKt")
     args(rootProject.file("app/src/main/assets/baselines.json").absolutePath)
 }

@@ -1,0 +1,182 @@
+package com.schwii.divvyrune
+
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import com.schwii.divvyrune.board.BoardRenderer
+import com.schwii.divvyrune.board.BoardState
+import com.schwii.divvyrune.engine.LEVELS
+import com.schwii.divvyrune.engine.decodeGrid
+import com.schwii.divvyrune.engine.levelNamed
+import com.schwii.divvyrune.game.Game
+import com.schwii.divvyrune.game.MemoryStore
+import com.schwii.divvyrune.game.Saves
+import com.schwii.divvyrune.ui.GameScreen
+import com.schwii.divvyrune.wood.Fonts
+import com.schwii.divvyrune.wood.Look
+import com.schwii.divvyrune.wood.Palette
+import org.junit.Assume.assumeTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+
+/**
+ * Draws the launcher icon, the store icon, the feature graphic and the store screenshots with the game's own
+ * renderer. Runs only when asked: `DIVVYRUNE_ASSETS=1 gradle :app:testDebugUnitTest --tests '*StoreAssets*'`.
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "w411dp-h891dp-xxhdpi")
+class StoreAssets {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    private val res = File("src/main/res")
+    private val store = File("../fastlane/metadata/android/en-US/images")
+
+    @Before fun onlyWhenAsked() {
+        assumeTrue("set DIVVYRUNE_ASSETS=1 to draw the store assets", System.getenv("DIVVYRUNE_ASSETS") != null)
+        Fonts.load(RuntimeEnvironment.getApplication())
+    }
+
+    private fun Bitmap.saveTo(f: File) {
+        f.parentFile!!.mkdirs()
+        f.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    // ---------- icon ----------
+
+    /**
+     * Brett's logo build, drawn in the wireframe look: the input splits; half splits again, a quarter leaving on the
+     * left; the rest joins the other half and winds out to the right.
+     */
+    private val logo = "..,..,IB,..,..,../..,..,TB,..,..,../SR3,RL,ST6,BR,LB,BR/TR,LR,CR7,CT7,TR,LT"
+
+    /** The logo build on the board as the game draws it, [cell] pixels a cell, centred in [w] × [h], marbles rolling. */
+    private fun board(w: Int, h: Int, cell: Float, dx: Float = 0f): Bitmap {
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val level = com.schwii.divvyrune.engine.Level("logo", 2, listOf(null, null))
+        Look.wire = true
+        val state = BoardState(level, decodeGrid(logo).tiles!!, cell / 24f).apply { z = cell }
+        state.fit(w.toFloat(), h.toFloat())
+        state.ox += dx
+        repeat(41) { state.step() }
+        state.advance(0f)
+        BoardRenderer(state, reduceMotion = true, bare = true).draw(Canvas(bmp), w, h)
+        Look.wire = false
+        return bmp
+    }
+
+    /** The icon on a canvas [px] square that shows [viewDp] of the 108 dp adaptive-icon square; the build spans 62 dp. */
+    private fun icon(px: Int, viewDp: Float): Bitmap = board(px, px, 62f / 6 * px / viewDp)
+
+    /** The bare dark ground, for the adaptive icon's back layer. */
+    private fun table(px: Int): Bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888).also {
+        Canvas(it).drawColor(Palette.rgba(20, 22, 26, 1.0))
+    }
+
+    @Test fun launcherIcon() {
+        for ((dir, scale) in listOf("mdpi" to 1f, "hdpi" to 1.5f, "xhdpi" to 2f, "xxhdpi" to 3f, "xxxhdpi" to 4f)) {
+            val px = (108 * scale).toInt()
+            icon(px, 108f).saveTo(File(res, "mipmap-$dir/ic_launcher_foreground.png"))
+            table(px).saveTo(File(res, "mipmap-$dir/ic_launcher_background.png"))
+        }
+        // the store icon shows the 72 dp an adaptive icon's mask keeps
+        icon(512, 72f).saveTo(File(store, "icon.png"))
+    }
+
+    // ---------- feature graphic ----------
+
+    @Test fun featureGraphic() {
+        val w = 1024; val h = 500
+        val bmp = board(w, h, 70f, dx = -230f)
+        Look.wire = true
+        val c = Canvas(bmp)
+        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Fonts.label; Fonts.labelVariation?.let { fontVariationSettings = it }
+            color = Palette.ink; textSize = 84f; textAlign = Paint.Align.RIGHT
+        }
+        c.drawText("Divvyrune", w - 48f, h / 2f + 30f, title)   // just the name, level with the logo's middle
+        Look.wire = false
+        bmp.saveTo(File(store, "featureGraphic.png"))
+    }
+
+    // ---------- screenshots ----------
+
+    private fun shoot(n: Int) {
+        compose.waitForIdle()
+        val view = compose.activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnUiThread { view.draw(Canvas(bmp)) }
+        bmp.saveTo(File(store, "phoneScreenshots/$n.png"))
+    }
+
+    private fun game(level: String, build: String?, z: Float, saves: Saves = Saves(MemoryStore())): Game {
+        val g = Game(saves, density = 3f)
+        g.loadLevel(LEVELS.indexOf(levelNamed(level)))
+        build?.let { g.buildFromText(it); g.editor.dismissNotice() }
+        g.board.z = z * 3f
+        return g
+    }
+
+    /** Runs the live simulation for about [ticks] ticks, then on to a moment the input isn't held up. */
+    private fun Game.run(ticks: Int) {
+        board.speed = 16
+        repeat(ticks / 9) { board.advance(100f) }
+        var guard = 0
+        while (board.inputBlocked && guard++ < 200) board.advance(100f)   // some loops hold the input up often
+    }
+
+    private fun Game.tap(x: Int, y: Int) { editor.down(board.screenX(x), board.screenY(y)); editor.up(board.screenX(x), board.screenY(y)) }
+
+    private val oneTwoFour = ".. BT .. .. .. .. ..\nIR X LR LR LB BR LB\n.. BT .. .. ST3 CT6 TB\n.. RT SR3 CL6 TL BT TB\n.. .. ST3 SL3 LR LT TB\n.. .. TR LR LR LR X\n.. .. .. .. .. .. TB"
+    private val ninths = ".. BT .. .. .. ..\n.. RT BL .. .. ..\n.. BR CT6 BR LR LR\n.. RT SB7 SL7 LB ..\nRL BL BT CB6 TL ..\n.. RT X TL .. ..\n.. .. IT .. .. .."
+    private val thirtieth = ".. .. .. .. .. BT .. ..\n.. .. RB CL6 CL6 X BL ..\nRB RL CL3 SB7 SL3 LT BT ..\nTB .. RB SB3 BR CR3 LT ..\nTB RB ST7 CT5 SB7 LT .. ..\nCL3 CL3 TL .. RT RL RL IL"
+
+    @Test fun screenshot1Running() {
+        val g = game("Ninths", ninths, 60f).apply { run(900) }
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.tap(3, 0) }
+        shoot(1)
+    }
+
+    @Test fun screenshot2Solved() {
+        val g = game("One two four", oneTwoFour, 60f)
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.startCheck(); g.board.finishCheck() }
+        shoot(2)
+    }
+
+    @Test fun screenshot3Thirtieth() {
+        val g = game("Thirtieth", thirtieth, 62f).apply { run(1200) }
+        compose.setContent { GameScreen(g, animate = false) }
+        shoot(3)
+    }
+
+    @Test fun screenshot4Levels() {
+        val saves = Saves(MemoryStore())
+        for ((name, build) in listOf(
+            "Quarter back" to ".. BT .. .. ..\n.. RT SB5 LB ..\nIR LR SL5 TB ..\n.. .. CB6 TL ..\n.. .. TR LR LR",
+            "Sixth" to "IR LR LB BR LR\n.. RB ST7 SL5 ..\n.. TR CB7 TL ..\n.. RB TL .. ..\n.. TB .. .. ..",
+            "One two four" to oneTwoFour,
+        )) Game(saves).apply { loadLevel(LEVELS.indexOf(levelNamed(name))); buildFromText(build); startCheck(); board.finishCheck() }
+        val g = game("Eighths", null, 60f, saves = saves)
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.showLevels() }
+        shoot(4)
+    }
+
+    @Test fun screenshot5Text() {
+        val g = game("One two four", oneTwoFour, 60f)
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.showText() }
+        shoot(5)
+    }
+}
