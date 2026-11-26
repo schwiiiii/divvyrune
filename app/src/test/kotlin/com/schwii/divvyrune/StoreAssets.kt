@@ -63,14 +63,14 @@ class StoreAssets {
     private fun board(w: Int, h: Int, cell: Float, dx: Float = 0f): Bitmap {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val level = com.schwii.divvyrune.engine.Level("logo", 2, listOf(null, null))
-        Look.wire = true
+        Look.style = com.schwii.divvyrune.wood.Style.WIRE
         val state = BoardState(level, decodeGrid(logo).tiles!!, cell / 24f).apply { z = cell }
         state.fit(w.toFloat(), h.toFloat())
         state.ox += dx
         repeat(41) { state.step() }
         state.advance(0f)
         BoardRenderer(state, reduceMotion = true, bare = true).draw(Canvas(bmp), w, h)
-        Look.wire = false
+        Look.style = com.schwii.divvyrune.wood.Style.WOOD
         return bmp
     }
 
@@ -97,14 +97,14 @@ class StoreAssets {
     @Test fun featureGraphic() {
         val w = 1024; val h = 500
         val bmp = board(w, h, 70f, dx = -230f)
-        Look.wire = true
+        Look.style = com.schwii.divvyrune.wood.Style.WIRE
         val c = Canvas(bmp)
         val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             typeface = Fonts.label; Fonts.labelVariation?.let { fontVariationSettings = it }
             color = Palette.ink; textSize = 84f; textAlign = Paint.Align.RIGHT
         }
         c.drawText("Divvyrune", w - 48f, h / 2f + 30f, title)   // just the name, level with the logo's middle
-        Look.wire = false
+        Look.style = com.schwii.divvyrune.wood.Style.WOOD
         bmp.saveTo(File(store, "featureGraphic.png"))
     }
 

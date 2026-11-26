@@ -1,5 +1,6 @@
 package com.schwii.divvyrune.ui
 
+import com.schwii.divvyrune.wood.Style
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -310,10 +311,13 @@ private fun SettingsSheet(game: Game) {
     Title("Settings")
     Text("Look", style = Body, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     Buttons {
-        SheetButton(if (!game.wire) "✓ Wood" else "Wood", go = !game.wire) { game.wire = false }
-        SheetButton(if (game.wire) "✓ Wireframe" else "Wireframe", go = game.wire) { game.wire = true }
+        for ((st, name) in listOf(Style.WOOD to "Wood", Style.WIRE to "Wireframe", Style.RUNE to "Runes")) {
+            val on = game.style == st
+            SheetButton(if (on) "✓ $name" else name, go = on) { game.style = st }
+        }
     }
-    Text("Wood: walnut and maple blocks. Wireframe: white lines on dark, a splitter's next branch lit.", style = Body, color = Dim, fontSize = 13.sp)
+    Text("Wood: walnut and maple blocks. Wireframe: white lines on dark. Runes: glowing strokes on slate. " +
+        "In wireframe and runes a splitter lights its next branch.", style = Body, color = Dim, fontSize = 13.sp)
     Buttons { SheetButton("Close") { game.closeSheet() } }
 }
 

@@ -15,8 +15,6 @@ Planned work, roughly in order. Nothing here has a date; items move to the [chan
       more levels using several inputs. Players see them as ordinary numbered levels. Builds on the solver, which
       proves each new level solvable.
 
-- [ ] **A rune look** to go with the name: the build's lines drawn as scrawled runes, a third look beside Wood and
-      Wireframe.
 
 ## Later
 - [ ] **Share custom levels**: send a level made in the builder as a short code or link, and play levels others made.
