@@ -23,7 +23,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      HAS_KEY: ${{ secrets.DIVVYRUNE_KEYSTORE_BASE64 != '' }}
+      # the signing secrets keep the names they were saved under before the rename
+      HAS_KEY: ${{ secrets.DIVVYWOOD_KEYSTORE_BASE64 != '' }}
     steps:
       - name: Check for the signing key
         if: env.HAS_KEY != 'true'
@@ -73,10 +74,10 @@ jobs:
       - name: Build the signed APK
         if: env.HAS_KEY == 'true' && steps.v.outputs.kind != 'none'
         env:
-          KEYSTORE_BASE64: ${{ secrets.DIVVYRUNE_KEYSTORE_BASE64 }}
-          DIVVYRUNE_KEYSTORE_PASSWORD: ${{ secrets.DIVVYRUNE_KEYSTORE_PASSWORD }}
-          DIVVYRUNE_KEY_ALIAS: ${{ secrets.DIVVYRUNE_KEY_ALIAS }}
-          DIVVYRUNE_KEY_PASSWORD: ${{ secrets.DIVVYRUNE_KEY_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.DIVVYWOOD_KEYSTORE_BASE64 }}
+          DIVVYRUNE_KEYSTORE_PASSWORD: ${{ secrets.DIVVYWOOD_KEYSTORE_PASSWORD }}
+          DIVVYRUNE_KEY_ALIAS: ${{ secrets.DIVVYWOOD_KEY_ALIAS }}
+          DIVVYRUNE_KEY_PASSWORD: ${{ secrets.DIVVYWOOD_KEY_PASSWORD }}
           KIND: ${{ steps.v.outputs.kind }}
           NAME: ${{ steps.v.outputs.name }}
           CODE: ${{ steps.v.outputs.code }}
