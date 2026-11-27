@@ -326,7 +326,7 @@ class Score(private val random: Random = Random.Default) {
             echo = ((if (solved) 0.3 else 0.05) * sp).toFloat(),
             echoFeedback = (0.28 + 0.2 * v[4]).toFloat(),
             echoTime = echoTime,
-            flange = (0.4 * max(0.0, v[3])).toFloat(),
+            flange = (FLANGE_MAX * max(0.0, v[3])).toFloat(),
             flangeRate = (0.08 + 0.06 * (1 + v[3])).toFloat(),
             lift = Recipe.LIFT * 1.2f,
         )
@@ -480,6 +480,8 @@ class Score(private val random: Random = Random.Default) {
     companion object {
         /** The background tides, in order: filter, swell, spread, flange, echo; the ensemble's voices follow. */
         val BG = listOf("filter", "swell", "spread", "flange", "echo")
+        /** The flange's mix at the top of its tide. */
+        const val FLANGE_MAX = 0.4f
         /** How many glyphs there are for the ensemble's voices, after the background tides' five. */
         const val LAYER_GLYPHS = 7
         internal const val TIDE_SCALE = 0.4   // 0.4 × 10^TIDE: Recipe.TIDE = 0, the quickest tides

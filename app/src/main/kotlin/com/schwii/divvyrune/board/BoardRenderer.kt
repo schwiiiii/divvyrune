@@ -185,9 +185,12 @@ class BoardRenderer(
         painter.unit = state.density
         painter.still = bare
         drawLayer(w, h)
-        c.drawBitmap(layer!!, 0f, 0f, null)
-        if (bare) { painter.still = false; return }   // the icon: just the lines
         val s = state
+        // the warble: while the flange sweeps, the board ripples with it, a few pixels at most
+        amp = if (bare || reduceMotion) 0f else s.warble * WARBLE * s.z
+        theta = 2 * Math.PI * s.warblePhase
+        if (amp > 0.2f) drawWarped(c, layer!!, w, h) else { amp = 0f; c.drawBitmap(layer!!, 0f, 0f, null) }
+        if (bare) { painter.still = false; return }   // the icon: just the lines
         val nodes = s.graph.nodes
         val sim = s.sim
         val lay = lay()
@@ -196,8 +199,8 @@ class BoardRenderer(
         nodes.forEachIndexed { i, n ->
             if (n.kind == Kind.OUT || n.kind == Kind.MACHINE) return@forEachIndexed
             val x = lay.x(i); val y = lay.y(i); val z = lay.size(i)
-            s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
-            if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
+            s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { h -> warped(c, x, y) { painter.heatGlow(c, x, y, z, h) } }
+            if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { h -> warped(c, x, y) { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + h)) } }
         }
         // what just sounded: the piece flashes in its sound's colour, as big and bright as it was loud
         val now = s.clockMs
@@ -206,7 +209,7 @@ class BoardRenderer(
             if (age < 0f || age > PULSE_MS || i >= nodes.size) continue
             val t = age / PULSE_MS
             val loud = min(1f, p.gain * 4f)
-            painter.pulse(c, lay.x(i), lay.y(i), lay.size(i) * (0.28f + 0.18f * loud + 0.14f * t), pulseColor(p.role), (1 - t) * min(0.55f, 0.2f + p.gain * 2f))
+            warped(c, lay.x(i), lay.y(i)) { painter.pulse(c, lay.x(i), lay.y(i), lay.size(i) * (0.28f + 0.18f * loud + 0.14f * t), pulseColor(p.role), (1 - t) * min(0.55f, 0.2f + p.gain * 2f)) }
         }
         // the way each splitter sends: its branches but one dimmed. A marble still rolling out (the first half of a
         // tick) keeps its branch open until it has left; then the splitter shows where the next one goes.
@@ -225,7 +228,7 @@ class BoardRenderer(
             val d = (target - ang).let { atan2(sin(it), cos(it)) }
             ang += if (reduceMotion) d else d * 0.22f
             s.flipperAngles[i] = ang
-            if (list.size > 1 || painter is WirePainter) painter.turn(c, lay.x(i), lay.y(i), lay.size(i), nodes[i].tile, active, ang, list.map { s.sideTo(i, it) })
+            if (list.size > 1 || painter is WirePainter) warped(c, lay.x(i), lay.y(i)) { painter.turn(c, lay.x(i), lay.y(i), lay.size(i), nodes[i].tile, active, ang, list.map { s.sideTo(i, it) }) }
         }
         // marbles: the first half of a tick finishes the old cell's route, the second half starts the new one
         sim.n.forEachIndexed { i, sn ->
@@ -236,17 +239,61 @@ class BoardRenderer(
                 else -> lay.at(i, it.curIn, s.exitSide(i), a - 0.5f)
             }
             val sz = if (a < 0.5f && it.pf != i) lay.size(it.pf) else lay.size(i)
-            marbleFlash(c, it.id, p[0], p[1], sz, now)
-            painter.marble(c, p[0], p[1], sz, waiting = sim.waiting[i])
+            warped(c, p[0], p[1]) {
+                marbleFlash(c, it.id, p[0], p[1], sz, now)
+                painter.marble(c, p[0], p[1], sz, waiting = sim.waiting[i])
+            }
         }
         for (g in sim.ghosts) {
             val p = if (a < 0.5f) lay.at(g.from, g.item?.curIn ?: NONE, s.sideTo(g.from, g.to), 0.5f + a)
             else lay.at(g.to, s.sideTo(g.to, g.from), NONE, a - 0.5f)
             val fade = if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2)
-            marbleFlash(c, g.id, p[0], p[1], lay.size(g.from), now, fade)
-            painter.marble(c, p[0], p[1], lay.size(g.from), fade)
+            warped(c, p[0], p[1]) {
+                marbleFlash(c, g.id, p[0], p[1], lay.size(g.from), now, fade)
+                painter.marble(c, p[0], p[1], lay.size(g.from), fade)
+            }
         }
         editor?.let { drawOverlays(c, it) }
+    }
+
+    // the warble this frame: how far the board ripples (pixels) and where the sweep is (radians)
+    private var amp = 0f
+    private var theta = 0.0
+    private var mesh = FloatArray(0)
+
+    /**
+     * How far the ripple moves the point at ([x], [y]): a slow wave across the rows sways it sideways, a longer one
+     * across the columns nods it up and down, both travelling with the flange's sweep. The waves are fixed to the
+     * board, so they pan and zoom with it.
+     */
+    private fun warpX(y: Float) = amp * sin(2 * Math.PI * (y - state.oy) / (state.z * 3.1) + theta).toFloat()
+    private fun warpY(x: Float) = amp * 0.6f * sin(2 * Math.PI * (x - state.ox) / (state.z * 3.9) - theta).toFloat()
+
+    /** Draws [block] moved with the ripple at ([x], [y]), so what moves stays on its channel. */
+    private inline fun warped(c: Canvas, x: Float, y: Float, block: () -> Unit) {
+        if (amp == 0f) { block(); return }
+        c.save(); c.translate(warpX(y), warpY(x)); block(); c.restore()
+    }
+
+    /** The table and blocks through a mesh rippled by [warpX] and [warpY]; still at the screen's edges. */
+    private fun drawWarped(c: Canvas, bmp: Bitmap, w: Int, h: Int) {
+        val step = max(12f, state.z * 0.4f)
+        val cols = (w / step).toInt().coerceIn(4, 64); val rows = (h / step).toInt().coerceIn(4, 96)
+        val n = (cols + 1) * (rows + 1) * 2
+        if (mesh.size != n) mesh = FloatArray(n)
+        var k = 0
+        val fade = 2 * step   // the ripple eases out towards the screen's edges
+        for (j in 0..rows) {
+            val y = h * j / rows.toFloat()
+            val dx = warpX(y)
+            for (i in 0..cols) {
+                val x = w * i / cols.toFloat()
+                val f = min(1f, min(min(x, w - x), min(y, h - y)) / fade)
+                mesh[k++] = x + dx * f
+                mesh[k++] = y + warpY(x) * f
+            }
+        }
+        c.drawBitmapMesh(bmp, cols, rows, mesh, 0, null, 0, null)
     }
 
     /** The marble that just made a sound catches the light in its sound's colour. */
@@ -315,6 +362,9 @@ fun drawBuild(c: Canvas, painter: Painter, tiles: Map<Cell, Tile>, lib: MachineL
     val g = buildGraph(tiles, ins, lib)
     paintBuild(c, painter, Layout(g, l + (size - w * z) / 2 - x0 * z, t + (size - h * z) / 2 - y0 * z, z), outdated)
 }
+
+/** How far the board ripples at the flange's strongest, in cells. */
+private const val WARBLE = 0.04f
 
 /** How long a piece's flash lasts, and a marble's. */
 private const val PULSE_MS = 350f
