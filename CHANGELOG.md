@@ -22,7 +22,8 @@ First release.
   unfinished build plays in a darker scale and resolves to major once every way out is right. Slow runes turn
   underneath (filter, room, echo, flange, which instruments play), drawn from the build's pieces, numbers and loop, so
   it never plays quite the same way twice. Wood sounds woody, wireframe glassy. Sound can be turned off in Settings.
-- Runes: tap a rune to hold it where it is and hear what it moves; held runes stay held on that level.
+- Runes: lit runes turn as the build plays; tap one to hold it where it is (it dims) and hear what it moves. Held
+  runes stay held on that level.
 - A slower speed, ×½, is the new default; the speed button runs ×½, ×1, ×4, ×16. ×16 plays silently.
 - A build needs at least two pieces to pass; levels a single piece could solve are gone.
 - Machines: a level's best builds (fewest pieces, smallest area, best flow) become machines you can place in other
