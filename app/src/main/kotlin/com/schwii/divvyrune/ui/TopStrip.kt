@@ -85,6 +85,10 @@ fun TopStrip(game: Game) {
             Stat("pieces", m.pieces.toString())
             Stat("footprint", if (m.area > 0) "${m.w}×${m.h}" else "0")
             val ink = Dim
+            androidx.compose.foundation.Canvas(Modifier.size(36.dp).clickable { game.showRunes() }.padding(6.dp)
+                .semantics { contentDescription = "Runes" }) {
+                scale(size.minDimension / 24f, pivot = Offset.Zero) { runesIcon(ink) }
+            }
             androidx.compose.foundation.Canvas(Modifier.size(36.dp).clickable { game.showSettings() }.padding(6.dp)
                 .semantics { contentDescription = "Settings" }) {
                 scale(size.minDimension / 24f, pivot = Offset.Zero) { gearIcon(ink) }

@@ -128,7 +128,7 @@ class StoreAssets {
 
     /** Runs the live simulation for about [ticks] ticks, then on to a moment the input isn't held up. */
     private fun Game.run(ticks: Int) {
-        board.speed = 16
+        board.speed = 16f
         repeat(ticks / 9) { board.advance(100f) }
         var guard = 0
         while (board.inputBlocked && guard++ < 200) board.advance(100f)   // some loops hold the input up often

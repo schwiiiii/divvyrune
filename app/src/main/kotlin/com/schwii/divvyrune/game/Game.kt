@@ -28,6 +28,9 @@ import com.schwii.divvyrune.engine.Tile
 import com.schwii.divvyrune.engine.buildGraph
 import com.schwii.divvyrune.engine.machinesUsed
 import com.schwii.divvyrune.wood.Look
+import com.schwii.divvyrune.sound.Recipe
+import com.schwii.divvyrune.sound.Score
+import com.schwii.divvyrune.sound.SoundOut
 
 /** The sheet over the game, if any. */
 sealed interface Sheet {
@@ -42,8 +45,10 @@ sealed interface Sheet {
     data object Builder : Sheet
     /** The machines to place: the best builds of solved levels. */
     data object Machines : Sheet
-    /** The app's settings: the look. */
+    /** The app's settings: the look and the sound. */
     data object Settings : Sheet
+    /** The runes turning under the sound, to hold or let turn. */
+    data object Runes : Sheet
 }
 
 /**
@@ -51,7 +56,10 @@ sealed interface Sheet {
  * level builder. The levels are the numbered ones, then the player's custom levels, then the builder.
  * Every change to the build is saved at once.
  */
-class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}, private val baselines: Baselines = Baselines()) {
+class Game(
+    private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Unit = {}, private val baselines: Baselines = Baselines(),
+    private val out: SoundOut? = null,
+) {
     var customs by mutableStateOf(saves.custom); private set
     var draft by mutableStateOf(saves.draft); private set
     private val builderLevel get() = draft.toLevel(BUILDER)
@@ -91,12 +99,36 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
 
     var sheet by mutableStateOf<Sheet?>(null); private set
 
+    /** The sound: the live build's score, played while the app is in front and the sound is on. */
+    val score = Score()
+    private var resumed = false
+
     init {
         Look.wire = saves.look == "wire"
         editor.onChange = { saves.putBuild(level.name, board.tiles) }
         editor.locked = { board.checking }
         board.onCheckDone = { w0, w1 -> finishCheck(w0, w1) }
+        score.setHolds(saves.runes(level.name))
+        score.onHolds = { saves.putRunes(level.name, it) }
+        board.onLiveTick = { tickSound() }
     }
+
+    /** One tick of live play, heard: quietly thinner at ×4, silent at ×16. */
+    private fun tickSound() {
+        val notes = score.tick(board.sim, board.graph, board.level, board.cycles.cycle, board.exitsRight, Look.wire,
+            1f / (BoardState.TICKS_PER_SECOND * board.speed), if (board.speed > 1f) 3 else Recipe.MAX_VOICES)
+        val synth = out?.synth ?: return
+        if (soundOn && board.speed < 16f) synth.play(notes, score.mix) else synth.steer(score.mix)
+    }
+
+    /** Whether the game plays its sound; saved. */
+    var soundOn by mutableStateOf(saves.sound); private set
+    fun switchSound(on: Boolean) { soundOn = on; saves.sound = on; if (on && resumed) out?.start() else out?.stop() }
+
+    /** The app came to the front: the sound starts, if it's on. */
+    fun resume() { resumed = true; if (soundOn) out?.start() }
+    /** The app went to the back: the sound stops. */
+    fun pause() { resumed = false; out?.stop() }
 
     fun best(i: Int) = saves.best(levelAt(i).name)
 
@@ -111,6 +143,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
         saves.cur = levelAt(i).name
         sheet = null
         editor.reset()
+        score.setHolds(saves.runes(levelAt(i).name))
         board.setBuild(levelAt(i), saves.build(levelAt(i).name))
         board.refit()
     }
@@ -197,6 +230,7 @@ class Game(private val saves: Saves, density: Float = 1f, haptic: (Haptic) -> Un
     fun showBuilder() { if (inBuilder && !board.checking) sheet = Sheet.Builder }
     fun showMachines() { if (!board.checking) sheet = Sheet.Machines }
     fun showSettings() { sheet = Sheet.Settings }
+    fun showRunes() { sheet = Sheet.Runes }
 
     /** Wireframe (white lines on dark) or wood; saved. */
     var wire: Boolean

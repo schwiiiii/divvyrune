@@ -99,6 +99,7 @@ fun SheetHost(game: Game) {
                 Sheet.Builder -> BuilderSheet(game)
                 Sheet.Machines -> MachinesSheet(game)
                 Sheet.Settings -> SettingsSheet(game)
+                Sheet.Runes -> RunesSheet(game)
             }
         }
     }
@@ -314,6 +315,12 @@ private fun SettingsSheet(game: Game) {
         SheetButton(if (game.wire) "✓ Wireframe" else "Wireframe", go = game.wire) { game.wire = true }
     }
     Text("Wood: walnut and maple blocks. Wireframe: white lines on dark, a splitter's next branch lit.", style = Body, color = Dim, fontSize = 13.sp)
+    Text("Sound", style = Body, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+    Buttons {
+        SheetButton(if (game.soundOn) "✓ On" else "On", go = game.soundOn) { game.switchSound(true) }
+        SheetButton(if (!game.soundOn) "✓ Off" else "Off", go = !game.soundOn) { game.switchSound(false) }
+    }
+    Text("Your build plays as it runs, at the media volume. Wood sounds woody, wireframe glassy.", style = Body, color = Dim, fontSize = 13.sp)
     Buttons { SheetButton("Close") { game.closeSheet() } }
 }
 

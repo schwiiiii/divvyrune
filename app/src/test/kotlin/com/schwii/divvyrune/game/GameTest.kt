@@ -274,4 +274,28 @@ class GameTest {
         assertEquals(0, g.levelIndex)
         assertTrue(g.board.tiles.isEmpty())
     }
+
+    @Test fun `held runes and the sound switch are saved, held runes per level`() {
+        val store = MemoryStore()
+        val g = Game(Saves(store))
+        assertNull(g.buildFromText(quarter))
+        g.board.speed = 1f
+        repeat(40) { g.board.advance(200f) }
+        assertTrue(g.score.tides.isNotEmpty())
+        assertTrue("its exits are right", g.board.exitsRight)
+        g.score.toggle("echo")
+        val at = g.score.tides.first { it.key == "echo" }.angle
+        g.switchSound(false)
+        val again = Game(Saves(store))
+        assertFalse(again.soundOn)
+        again.board.speed = 1f
+        repeat(10) { again.board.advance(200f) }
+        val t = again.score.tides.first { it.key == "echo" }
+        assertTrue(t.held)
+        assertEquals(at, t.angle, 0.0)
+        // another level holds nothing
+        again.loadLevel(1)
+        repeat(10) { again.board.advance(200f) }
+        assertFalse(again.score.tides.first { it.key == "echo" }.held)
+    }
 }
