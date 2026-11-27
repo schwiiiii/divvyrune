@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.schwii.divvyrune.board.BoardState
 import com.schwii.divvyrune.game.Game
 import com.schwii.divvyrune.sound.Score
 import com.schwii.divvyrune.sound.Tide
@@ -70,27 +73,31 @@ fun DrawScope.runesIcon(c: Color) {
 
 /**
  * One rune's ring: the tide's position as a dot going round, how hard it pulls now as an arc from the top, the
- * rune in the middle. A held rune is drawn solid, its dot squared off.
+ * rune in the middle. A turning rune is lit in the accent colour and glides between ticks; a held one goes dim and
+ * stops. It redraws every board frame.
  */
 @Composable
-private fun RuneRing(score: Score, index: Int, tide: Tide, modifier: Modifier) {
+private fun RuneRing(board: BoardState, score: Score, index: Int, tide: Tide, modifier: Modifier) {
     val layer = index >= Score.BG.size
-    val gain = if (layer) score.layerGain(index - Score.BG.size) else abs(tide.value).toFloat()
-    val held = tide.held
-    val ink = Ink; val dim = Dim; val line = Line; val accent = Src
+    val dim = Dim; val line = Line; val accent = Src
     Canvas(modifier) {
+        board.frame   // read while drawing: the ring redraws every frame without recomposing
+        val held = tide.held
+        val a = tide.angleAt(if (board.playing) board.alpha else 0f)
+        val v = sin(a).toFloat()
+        val gain = if (layer) score.layerGain(index - Score.BG.size) else abs(v)
+        val ink = if (held) dim else accent
         val r = size.minDimension * 0.4f
         val c = Offset(size.width / 2, size.height / 2)
-        drawCircle(if (held) ink else line, r, c, style = Stroke(if (held) 2.5.dp.toPx() else 1.5.dp.toPx()))
-        if (layer) drawCircle(accent, r, c, alpha = 0.15f * gain)
-        val sweep = (tide.value * 180).toFloat()
-        drawArc(accent, -90f, sweep, false, Offset(c.x - r, c.y - r), Size(2 * r, 2 * r), alpha = 0.3f + 0.7f * gain, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
-        val a = tide.angle
+        drawCircle(if (held) line else accent, r, c, alpha = if (held) 1f else 0.45f, style = Stroke(1.5.dp.toPx()))
+        if (layer) drawCircle(ink, r, c, alpha = (if (held) 0.08f else 0.15f) * gain)
+        drawArc(ink, -90f, v * 180, false, Offset(c.x - r, c.y - r), Size(2 * r, 2 * r),
+            alpha = if (held) 0.35f else 0.3f + 0.7f * gain, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
         val p = Offset(c.x + cos(a).toFloat() * r, c.y + sin(a).toFloat() * r)
-        val dot = (3f + 3f * gain).dp.toPx()
-        if (held) drawRect(ink, Offset(p.x - dot, p.y - dot), Size(2 * dot, 2 * dot)) else drawCircle(accent, dot, p)
+        val dot = (if (held) 3f else 3f + 3f * gain).dp.toPx()
+        drawCircle(ink, dot, p)
         val s = r * 0.95f
-        rune(tide.glyph, c.x - s / 2, c.y - s / 2, s, if (held) ink else dim, 2.dp.toPx())
+        rune(tide.glyph, c.x - s / 2, c.y - s / 2, s, ink.copy(alpha = if (held) 0.6f else 1f), 2.dp.toPx())
     }
 }
 
@@ -98,16 +105,17 @@ private fun RuneRing(score: Score, index: Int, tide: Tide, modifier: Modifier) {
 @Composable
 fun ColumnScope.RunesSheet(game: Game) {
     val score = game.score
-    game.board.frame   // turn with the board
     Text("Runes", style = Body, color = Ink, fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
     Text(
         "Your build plays itself. These runes turn slowly underneath, each moving one part of the sound, and come from " +
-            "the build: its pieces, its numbers, its loop. Tap a rune to hold it where it is; tap it again to let it turn. " +
-            "Held runes stay held on this level.",
+            "the build: its pieces, its numbers, its loop. Lit runes are turning; tap one to hold it where it is and it " +
+            "dims. Tap it again to let it turn. Held runes stay held on this level.",
         style = Body, color = Dim, fontSize = 14.sp,
     )
     if (!game.soundOn) Text("The sound is off. Turn it on in Settings.", style = Body, color = Bad, fontSize = 14.sp)
+    if (!game.board.playing) Text("Paused: the runes turn while the build plays.", style = Body, color = Dim, fontSize = 14.sp)
     val tides = score.tides
+    var taps by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }   // re-reads held states after a tap
     if (tides.isEmpty()) { Text("Press play to wake them.", style = Body, color = Dim, fontSize = 14.sp); return }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val cols = (maxWidth / 76.dp).toInt().coerceIn(3, 6)
@@ -116,14 +124,12 @@ fun ColumnScope.RunesSheet(game: Game) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     for (i in row) {
                         val t = tides[i]
-                        RuneRing(score, i, t, Modifier.size(68.dp).clip(CircleShape).clickable { score.toggle(t.key) }
-                            .semantics { contentDescription = "Rune ${i + 1}"; stateDescription = if (t.held) "Held" else "Turning" })
+                        RuneRing(game.board, score, i, t, Modifier.size(68.dp).clip(CircleShape).clickable { score.toggle(t.key); taps++ }
+                            .semantics { taps; contentDescription = "Rune ${i + 1}"; stateDescription = if (t.held) "Held" else "Turning" })
                     }
                     repeat(cols - row.size) { androidx.compose.foundation.layout.Spacer(Modifier.size(68.dp)) }
                 }
             }
         }
     }
-    val held = tides.count { it.held }
-    Text(if (held == 0) "All ${tides.size} turning" else "$held held, ${tides.size - held} turning", style = BodyTnum, color = Dim, fontSize = 13.sp)
 }

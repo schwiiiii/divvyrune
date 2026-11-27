@@ -81,7 +81,11 @@ class Layer(val role: Role, val inst: Inst)
  * [glyph] is which rune it shows; a held tide stays where it is.
  */
 class Tide(val key: String, val glyph: Int, val prime: Int, val period: Double, var angle: Double, var held: Boolean) {
+    /** How far it turns each tick (radians). */
+    val step = 2 * PI / (period * Score.TIDE_SCALE)
     val value get() = sin(angle) * Recipe.DRIFT
+    /** Where it is [alpha] of the way to the next tick: held, where it's held. */
+    fun angleAt(alpha: Float) = if (held) angle else angle + step * alpha
 }
 
 /**
@@ -146,7 +150,7 @@ class Score(private val random: Random = Random.Default) {
         if (sim !== this.sim) { deg.clear(); this.sim = sim }
         if (graph !== this.graph || cycle != this.cycle) reseed(graph, level, cycle)
         clock++
-        for (t in tides) if (!t.held) t.angle = (t.angle + 2 * PI / (t.period * TIDE_SCALE)) % (2 * PI)
+        for (t in tides) if (!t.held) t.angle = (t.angle + t.step) % (2 * PI)
 
         val tk = sim.tick
         val settling = cycle == null || tk <= cycle.start
@@ -336,7 +340,7 @@ class Score(private val random: Random = Random.Default) {
         val BG = listOf("filter", "swell", "spread", "flange", "echo")
         /** How many glyphs there are for the ensemble's voices, after the background tides' five. */
         const val LAYER_GLYPHS = 7
-        private const val TIDE_SCALE = 0.4   // 0.4 × 10^TIDE: Recipe.TIDE = 0, the quickest tides
+        internal const val TIDE_SCALE = 0.4   // 0.4 × 10^TIDE: Recipe.TIDE = 0, the quickest tides
         private val PHI = (1 + sqrt(5.0)) / 2
         private val IRR = doubleArrayOf(PI, PHI, sqrt(2.0), Math.E, sqrt(3.0), sqrt(5.0), PI * PI / 4, ln(2.0) * 3, sqrt(7.0), cbrt(2.0) * 2, ln(10.0), sqrt(11.0))
         private val POOLS = mapOf(
