@@ -73,7 +73,7 @@ object Recipe {
     /** Pitched notes below this many Hz move up an octave at a time, so a phone's speaker can play them. */
     const val FLOOR = 200f
     val PARTS = mapOf(
-        Role.APPEAR to Part(Inst.TICK, 0.28f, 1, 0.45f, PitchFrom.WHICH),
+        Role.APPEAR to Part(Inst.TICK, 0.28f, 0, 0.45f, PitchFrom.WHICH),
         Role.SPLIT to Part(Inst.GLASS, 0.1f, 0, 1.97f, PitchFrom.MARBLE),
         Role.JOIN to Part(Inst.PLUCK, 0.31f, 1, 0.6f, PitchFrom.BOARD),
         Role.VANISH to Part(Inst.KALIMBA, 0.19f, 0, 1.6f, PitchFrom.MARBLE),
