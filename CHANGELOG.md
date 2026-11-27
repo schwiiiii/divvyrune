@@ -24,6 +24,7 @@ First release.
   its own rate, so your fractions become the rhythm. Whatever makes a sound flashes. Slow runes turn
   underneath (filter, room, echo, flange, which instruments play), drawn from the build's pieces, numbers and loop, so
   it never plays quite the same way twice. Wood sounds woody, wireframe glassy. Sound can be turned off in Settings.
+- When the flange rune swells and the sound starts to warble, the board ripples gently with it.
 - Runes: lit runes turn as the build plays; tap one to hold it where it is (it dims) and hear what it moves. Held
   runes stay held on that level.
 - A slower speed, ×½, is the new default; the speed button runs ×½, ×1, ×4, ×16. ×16 plays silently.

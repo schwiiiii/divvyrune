@@ -101,6 +101,18 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
         if (piecePulses.size > 64) piecePulses.values.removeAll { clockMs - it.at > 1000f }
     }
 
+    /**
+     * The warble: how strongly the sound's flange sweeps now (0–1, gliding to its target like the synth's) and where
+     * its slow sweep is (0–1, turning at the flange's rate). The board ripples gently with it.
+     */
+    var warble = 0f; private set
+    var warblePhase = 0.0; private set
+    private var warbleTarget = 0f
+    private var warbleHz = 0.11f
+
+    /** The flange heads for [amount] (0–1), sweeping at [hz]. */
+    fun warbleTo(amount: Float, hz: Float) { warbleTarget = amount.coerceIn(0f, 1f); warbleHz = hz }
+
     /** Every target has a way out and every way out is right: the build's exits all meet their targets. */
     var exitsRight = false; private set
 
@@ -138,6 +150,7 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
 
     fun startCheck() {
         restartSim()
+        warbleTarget = 0f   // Check is silent
         w0 = null
         checking = true
     }
@@ -201,6 +214,9 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
     /** Advances the simulation by [dtMs] of real time at [TICKS_PER_SECOND] times [speed]. */
     fun advance(dtMs: Float) {
         clockMs += dtMs.coerceAtMost(100f)
+        val dt = dtMs.coerceAtMost(100f) / 1000f
+        warble += (warbleTarget - warble) * (1 - kotlin.math.exp(-dt / 0.5f))
+        warblePhase = (warblePhase + warbleHz * dt) % 1.0
         if (checking) {
             repeat(40) { if (checking) checkStep() }
             alpha = 1f

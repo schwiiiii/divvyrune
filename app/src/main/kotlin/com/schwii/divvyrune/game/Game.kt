@@ -120,6 +120,7 @@ class Game(
             1f / (BoardState.TICKS_PER_SECOND * board.speed), if (board.speed > 1f) 3 else Recipe.MAX_VOICES)
         val heard = soundOn && board.speed < 16f
         if (heard) board.flash(score.flashes)   // only what's heard flashes
+        board.warbleTo(if (heard) score.mix.flange / Score.FLANGE_MAX else 0f, score.mix.flangeRate)   // and only a heard warble ripples
         val synth = out?.synth ?: return
         if (heard) synth.play(notes, score.mix) else synth.steer(score.mix)
     }

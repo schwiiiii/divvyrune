@@ -25,12 +25,12 @@ class BoardScreenshotTest {
     private val w = 1080
     private val h = 1400
 
-    private fun render(state: BoardState, ticks: Int, name: String): Bitmap {
+    private fun render(state: BoardState, ticks: Int, name: String, still: Boolean = true): Bitmap {
         state.fit(w.toFloat(), h.toFloat())
         repeat(ticks) { state.step() }
         state.advance(0f)
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        BoardRenderer(state, reduceMotion = true).draw(Canvas(bmp), w, h)
+        BoardRenderer(state, reduceMotion = still).draw(Canvas(bmp), w, h)
         File("src/test/screenshots").mkdirs()
         File("src/test/screenshots/$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
         return bmp
@@ -60,5 +60,18 @@ class BoardScreenshotTest {
         val level = Level("mech", 2, listOf(null, null, null))
         render(BoardState(level, decodeGrid(code).tiles!!, density).apply { z = 110 * density }, 9, "board-splitters")
         render(BoardState(level, decodeGrid(code).tiles!!, density).apply { z = 110 * density }, 10, "board-splitters-next")
+    }
+
+    @Test fun warble() {
+        // the flange at its strongest: the board ripples, the marbles ride it, the screen's edges stay put
+        val code = ".. .. IB ..\nSR3 RL ST7 LR\nCB6 RL TL .."
+        val level = Level("mech", 2, listOf(null, null, null))
+        fun state() = BoardState(level, decodeGrid(code).tiles!!, density).apply { z = 110 * density }
+        val calm = render(state(), 9, "board-warble-calm", still = false)
+        val s = state().apply { playing = false; warbleTo(1f, 0.15f); repeat(100) { advance(100f) } }   // the same marbles, only rippled
+        assertTrue(s.warble > 0.99f)
+        val wavy = render(s, 9, "board-warble", still = false)
+        assertTrue((0 until 200).any { wavy.getPixel(w / 2 - 300 + it * 3, h / 2) != calm.getPixel(w / 2 - 300 + it * 3, h / 2) })
+        assertTrue(wavy.getPixel(0, 0) == calm.getPixel(0, 0))
     }
 }
