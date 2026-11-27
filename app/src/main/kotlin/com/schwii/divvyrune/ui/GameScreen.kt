@@ -314,7 +314,7 @@ private fun Toolbar(game: Game) {
     val editor = game.editor
     val board = game.board
     val playing = board.playing
-    var speed by remember { androidx.compose.runtime.mutableIntStateOf(board.speed) }
+    var speed by remember { androidx.compose.runtime.mutableFloatStateOf(board.speed) }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Tool("Select", Modifier.weight(1f), on = editor.selectMode, icon = { selectIcon(it) }) { editor.switchSelectMode(!editor.selectMode) }
         Tool("Undo", Modifier.weight(1f), enabled = editor.canUndo && !board.checking, icon = { undoIcon(it) }) { editor.undo() }
@@ -322,8 +322,8 @@ private fun Toolbar(game: Game) {
             board.playing = !board.playing
         }
         // paused, the speed button steps one tick at a time instead
-        if (playing || board.checking) Tool("Speed", Modifier.weight(1f), text = "×$speed") {
-            board.speed = when (board.speed) { 1 -> 4; 4 -> 16; else -> 1 }; speed = board.speed
+        if (playing || board.checking) Tool("Speed", Modifier.weight(1f), text = if (speed < 1f) "×½" else "×${speed.toInt()}") {
+            board.speed = when (board.speed) { 0.5f -> 1f; 1f -> 4f; 4f -> 16f; else -> 0.5f }; speed = board.speed
         } else Tool("Step", Modifier.weight(1f), icon = { stepIcon(it) }) { board.stepOnce() }
         Tool("Check", Modifier.weight(1f), check = true, enabled = !board.checking, icon = { checkIcon(it) }) { game.startCheck() }
     }

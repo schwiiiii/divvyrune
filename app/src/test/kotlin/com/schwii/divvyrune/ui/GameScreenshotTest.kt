@@ -49,7 +49,7 @@ class GameScreenshotTest {
     }
 
     /** Runs the live simulation for about [ticks] ticks at top speed, as the frame clock would. */
-    private fun Game.run(ticks: Int) { board.speed = 16; repeat(ticks / 9) { board.advance(100f) } }
+    private fun Game.run(ticks: Int) { board.speed = 16f; repeat(ticks / 9) { board.advance(100f) } }
 
     private fun Editor.tapCell(c: Cell) { down(board.screenX(c.x), board.screenY(c.y)); up(board.screenX(c.x), board.screenY(c.y)) }
 
@@ -88,6 +88,16 @@ class GameScreenshotTest {
             compose.runOnIdle { g.showSettings() }
             save("screen-settings")
         } finally { com.schwii.divvyrune.wood.Look.wire = false }
+    }
+
+    @Test fun runes() {
+        // Ninths' reference build playing, two of its runes held
+        val g = gameFor(LEVELS.indexOf(levelNamed("Ninths")), ".. BT .. .. .. ..\n.. RT BL .. .. ..\n.. BR CT6 BR LR LR\n.. RT SB7 SL7 LB ..\nRL BL BT CB6 TL ..\n.. RT X TL .. ..\n.. .. IT .. .. ..", 60f)
+        g.run(400)
+        g.score.toggle("filter"); g.score.toggle(g.score.tides.last().key)
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.showRunes() }
+        save("screen-runes")
     }
 
     @Test fun machineWire() {

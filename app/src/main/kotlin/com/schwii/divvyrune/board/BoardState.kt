@@ -56,7 +56,8 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
 
     /** Animation: ticks per second at speed 1, the speed multiplier, and how far between ticks this frame is. */
     var playing by mutableStateOf(true)
-    var speed = 1
+    /** The speed multiplier: ½ (the default, 3 ticks a second), 1, 4 or 16. */
+    var speed = 0.5f
     var alpha = 1f; private set
     private var acc = 0f
     /** Each flipper's current angle, easing toward the channel it points at next. */
@@ -78,6 +79,11 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
     private var w0: Snapshot? = null
     /** Called when a Check run ends, with the snapshots bounding its measuring window. */
     var onCheckDone: ((Snapshot?, Snapshot) -> Unit)? = null
+    /** Called after every tick of live play (not Check's), for the sound. */
+    var onLiveTick: (() -> Unit)? = null
+
+    /** Every target has a way out and every way out is right: the build's exits all meet their targets. */
+    var exitsRight = false; private set
 
     /** The view's size in pixels, once laid out. */
     var viewW = 0f; private set
@@ -91,6 +97,8 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
         graph = buildGraph(tiles, level, lib)
         sol = solve(graph, level)
         restartSim()
+        exitsRight = sol.ok && graph.errCount == 0 && graph.exits.isNotEmpty() && outNode.all { it >= 0 } &&
+            graph.exits.all { exitTag(it).second != ExitTone.BAD }
         version++
     }
 
@@ -170,15 +178,15 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
     fun screenY(y: Int) = oy + (y + 0.5f) * z
     fun cellAt(sx: Float, sy: Float) = Cell(kotlin.math.floor((sx - ox) / z).toInt(), kotlin.math.floor((sy - oy) / z).toInt())
 
-    /** Advances the simulation by [dtMs] of real time at 6 ticks a second times [speed]. */
+    /** Advances the simulation by [dtMs] of real time at [TICKS_PER_SECOND] times [speed]. */
     fun advance(dtMs: Float) {
         if (checking) {
             repeat(40) { if (checking) checkStep() }
             alpha = 1f
         } else if (playing) {
-            val tickMs = 1000f / (6 * speed)
+            val tickMs = 1000f / (TICKS_PER_SECOND * speed)
             acc += dtMs.coerceAtMost(100f)
-            while (acc >= tickMs) { acc -= tickMs; step(); if (sim.tick % 8 == 0) sampleHist() }
+            while (acc >= tickMs) { acc -= tickMs; step(); if (sim.tick % 8 == 0) sampleHist(); onLiveTick?.invoke() }
             alpha = acc / tickMs
         } else if (stepMs < STEP_MS) {
             stepMs += dtMs.coerceAtMost(100f)
@@ -192,6 +200,7 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
         if (checking || playing) return
         step()
         if (sim.tick % 8 == 0) sampleHist()
+        onLiveTick?.invoke()
         acc = 0f; stepMs = 0f; alpha = 0f
         frame++
     }
@@ -278,6 +287,8 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
         const val HIST = 120
         /** How long a single step takes to play out. */
         const val STEP_MS = 280f
+        /** Ticks a second at speed 1. */
+        const val TICKS_PER_SECOND = 6f
     }
 }
 

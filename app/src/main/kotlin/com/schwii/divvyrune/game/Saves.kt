@@ -119,6 +119,10 @@ fun parseFrac(s: String): Frac? = s.split('/').mapNotNull { it.trim().toIntOrNul
     val machines: Map<String, MachineSave> = emptyMap(),
     /** How the game looks: "wood" or "wire". */
     val look: String = "wood",
+    /** Whether the game plays its sound. */
+    val sound: Boolean = true,
+    /** Held runes, by level name: each held rune's name and where it's held (radians). */
+    val runes: Map<String, Map<String, Double>> = emptyMap(),
 )
 
 /** The save name of the level builder. */
@@ -171,6 +175,18 @@ class Saves(private val store: SaveStore) {
     var look: String
         get() = data.look
         set(v) { if (v != data.look) put(data.copy(look = v)) }
+
+    /** Whether the game plays its sound. */
+    var sound: Boolean
+        get() = data.sound
+        set(v) { if (v != data.sound) put(data.copy(sound = v)) }
+
+    /** Level [name]'s held runes and where each is held. */
+    fun runes(name: String): Map<String, Double> = data.runes[name] ?: emptyMap()
+
+    fun putRunes(name: String, held: Map<String, Double>) {
+        put(data.copy(runes = if (held.isEmpty()) data.runes - name else data.runes + (name to held)))
+    }
 
     private fun put(d: SaveData) { data = d; store.write(json.encodeToString(d)) }
 
