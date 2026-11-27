@@ -25,6 +25,7 @@ import com.schwii.divvyrune.wood.routePoint
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sin
 
 /** The painter for the current look. */
@@ -198,6 +199,15 @@ class BoardRenderer(
             s.heat.getOrNull(i)?.takeIf { it > 0.03f }?.let { painter.heatGlow(c, x, y, z, it) }
             if (!n.inside) s.turnHeat.getOrNull(i)?.takeIf { it > 0.05f }?.let { painter.outline(c, x, y, z, Palette.bad, max(1f, z * 0.06f) * (0.4f + it)) }
         }
+        // what just sounded: the piece flashes in its sound's colour, as big and bright as it was loud
+        val now = s.clockMs
+        for ((i, p) in s.piecePulses) {
+            val age = now - p.at
+            if (age < 0f || age > PULSE_MS || i >= nodes.size) continue
+            val t = age / PULSE_MS
+            val loud = min(1f, p.gain * 4f)
+            painter.pulse(c, lay.x(i), lay.y(i), lay.size(i) * (0.28f + 0.18f * loud + 0.14f * t), pulseColor(p.role), (1 - t) * min(0.55f, 0.2f + p.gain * 2f))
+        }
         // the way each splitter sends: its branches but one dimmed. A marble still rolling out (the first half of a
         // tick) keeps its branch open until it has left; then the splitter shows where the next one goes.
         val leaving = HashMap<Int, Int>()
@@ -226,14 +236,26 @@ class BoardRenderer(
                 else -> lay.at(i, it.curIn, s.exitSide(i), a - 0.5f)
             }
             val sz = if (a < 0.5f && it.pf != i) lay.size(it.pf) else lay.size(i)
+            marbleFlash(c, it.id, p[0], p[1], sz, now)
             painter.marble(c, p[0], p[1], sz, waiting = sim.waiting[i])
         }
         for (g in sim.ghosts) {
             val p = if (a < 0.5f) lay.at(g.from, g.item?.curIn ?: NONE, s.sideTo(g.from, g.to), 0.5f + a)
             else lay.at(g.to, s.sideTo(g.to, g.from), NONE, a - 0.5f)
-            painter.marble(c, p[0], p[1], lay.size(g.from), if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2))
+            val fade = if (a < 0.5f) 1f else max(0f, 1f - (a - 0.5f) * 2)
+            marbleFlash(c, g.id, p[0], p[1], lay.size(g.from), now, fade)
+            painter.marble(c, p[0], p[1], lay.size(g.from), fade)
         }
         editor?.let { drawOverlays(c, it) }
+    }
+
+    /** The marble that just made a sound catches the light in its sound's colour. */
+    private fun marbleFlash(c: Canvas, id: Int, x: Float, y: Float, z: Float, now: Float, fade: Float = 1f) {
+        val p = state.marblePulses[id] ?: return
+        val age = now - p.at
+        if (age < 0f || age > MARBLE_PULSE_MS) return
+        val t = age / MARBLE_PULSE_MS
+        painter.pulse(c, x, y, z * 0.16f * (1.6f + min(1.2f, p.gain * 5f)), pulseColor(p.role), (1 - t) * 0.85f * fade)
     }
 
     /** Selection, the belt being drawn, the selection box, lifted pieces and a tray chip's landing spot. */
@@ -292,4 +314,17 @@ fun drawBuild(c: Canvas, painter: Painter, tiles: Map<Cell, Tile>, lib: MachineL
     val ins = Level("draw", List(tiles.values.count { it.kind == Kind.SRC }) { Frac(1, 1) }, emptyList())
     val g = buildGraph(tiles, ins, lib)
     paintBuild(c, painter, Layout(g, l + (size - w * z) / 2 - x0 * z, t + (size - h * z) / 2 - y0 * z, z), outdated)
+}
+
+/** How long a piece's flash lasts, and a marble's. */
+private const val PULSE_MS = 350f
+private const val MARBLE_PULSE_MS = 300f
+
+/** Each sound's flash colour: splits gold, ways out green, waits red, joins and inputs a light highlight (white on wireframe). */
+private fun pulseColor(r: com.schwii.divvyrune.sound.Role): Int = when (r) {
+    com.schwii.divvyrune.sound.Role.SPLIT -> Palette.stainSrc
+    com.schwii.divvyrune.sound.Role.VANISH -> Palette.stainOut
+    com.schwii.divvyrune.sound.Role.WAIT -> Palette.bad
+    com.schwii.divvyrune.sound.Role.JOIN, com.schwii.divvyrune.sound.Role.APPEAR ->
+        if (com.schwii.divvyrune.wood.Look.wire) Palette.ink else android.graphics.Color.rgb(0xff, 0xf6, 0xe0)
 }

@@ -37,7 +37,10 @@ class Synth(val rate: Int) {
 
     // ---------- the bus ----------
     private var master = 0f; private var cutoff = 18000f; private var rev = 0f; private var echo = 0f
-    private var echoFb = 0.3f; private var echoTime = 0.5f; private var flange = 0f; private var flRate = 0.11f
+    private var echoFb = 0.3f; private var echoTime = 0.5f; private var flange = 0f; private var flRate = 0.11f; private var lift = 0f
+    // low lift: the bass alone, saturated into overtones a small speaker can play, the bass itself taken back out
+    private val liftLpL = Biquad().apply { lowpass(250f, 0.7f, rate) }; private val liftLpR = Biquad().apply { lowpass(250f, 0.7f, rate) }
+    private val liftHpL = Biquad().apply { highpass(220f, 0.7f, rate) }; private val liftHpR = Biquad().apply { highpass(220f, 0.7f, rate) }
     private val lpL = Biquad(); private val lpR = Biquad()
     private val room = Room(rate)
     private val echoL = FloatArray(rate * 4 + 2); private val echoR = FloatArray(rate * 4 + 2)
@@ -84,6 +87,7 @@ class Synth(val rate: Int) {
         echoTime = glide(echoTime, m.echoTime, 0.6f, n)
         flange = glide(flange, m.flange, 0.5f, n)
         flRate = glide(flRate, m.flangeRate, 0.5f, n)
+        lift = glide(lift, m.lift, 0.05f, n)
 
         busL.fill(0f, 0, n); busR.fill(0f, 0, n)
         val vi = voices.iterator()
@@ -119,6 +123,8 @@ class Synth(val rate: Int) {
             flL[flW] = l + fL * 0.5f; flR[flW] = r + fR * 0.5f
             flW = (flW + 1) % flL.size
             l += fL * flange; r += fR * flange
+            l += liftHpL.process(tanh(6 * liftLpL.process(l - fL * flange))) * lift
+            r += liftHpR.process(tanh(6 * liftLpR.process(r - fR * flange))) * lift
             // compressor, then a soft ceiling
             val peak = max(abs(l), abs(r))
             comp += (peak - comp) * if (peak > comp) ATTACK else RELEASE

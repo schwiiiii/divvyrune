@@ -100,6 +100,16 @@ class GameScreenshotTest {
         save("screen-runes")
     }
 
+    @Test fun flashes() {
+        // Ninths playing at ×1: what just sounded flashes, pieces and marbles
+        val g = gameFor(LEVELS.indexOf(levelNamed("Ninths")), ".. BT .. .. .. ..\n.. RT BL .. .. ..\n.. BR CT6 BR LR LR\n.. RT SB7 SL7 LB ..\nRL BL BT CB6 TL ..\n.. RT X TL .. ..\n.. .. IT .. .. ..", 90f)
+        g.board.speed = 1f
+        repeat(240) { g.board.advance(100f) }
+        compose.setContent { GameScreen(g, animate = false) }
+        compose.runOnIdle { g.board.refit() }
+        save("screen-flashes")
+    }
+
     @Test fun machineWire() {
         try {
             val q = "IR SL6 LR CR3\n.. ST3 LR LT\n.. TB .. .."
