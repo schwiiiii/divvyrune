@@ -106,17 +106,10 @@ private fun RuneRing(board: BoardState, score: Score, index: Int, tide: Tide, mo
 fun ColumnScope.RunesSheet(game: Game) {
     val score = game.score
     Text("Runes", style = Body, color = Ink, fontSize = 20.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-    Text(
-        "Your build plays itself. These runes turn slowly underneath, each moving one part of the sound, and come from " +
-            "the build: its pieces, its numbers, its loop. Lit runes are turning; tap one to hold it where it is and it " +
-            "dims. Tap it again to let it turn. Held runes stay held on this level.",
-        style = Body, color = Dim, fontSize = 14.sp,
-    )
-    if (!game.soundOn) Text("The sound is off. Turn it on in Settings.", style = Body, color = Bad, fontSize = 14.sp)
-    if (!game.board.playing) Text("Paused: the runes turn while the build plays.", style = Body, color = Dim, fontSize = 14.sp)
+    if (!game.soundOn) Text("Sound off", style = Body, color = Dim, fontSize = 14.sp)
     val tides = score.tides
     var taps by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }   // re-reads held states after a tap
-    if (tides.isEmpty()) { Text("Press play to wake them.", style = Body, color = Dim, fontSize = 14.sp); return }
+    if (tides.isEmpty()) return
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val cols = (maxWidth / 76.dp).toInt().coerceIn(3, 6)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
