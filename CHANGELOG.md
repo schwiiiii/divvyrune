@@ -18,8 +18,10 @@ First release.
 - Splitters and convergers can close sides: drag along a join or belt again to undo it, and drag a splitter's side
   out to the edge to open or close it.
 - Bridges: draw a belt straight across another and they cross without meeting.
-- Sound: your build plays itself as it runs. Splits pluck, joins answer, inputs tick, waiting marbles ring a bell. An
-  unfinished build plays in a darker scale and resolves to major once every way out is right. Slow runes turn
+- Sound: your build plays itself as it runs. Each level has its own key, and each way out its own chord: the build
+  plays one chord per loop, a way out that isn't right yet hangs unresolved, and once every way out is right the
+  build resolves. Splitters move marbles through the chord's notes; every marble leaving sings; each piece plays at
+  its own rate, so your fractions become the rhythm. Whatever makes a sound flashes. Slow runes turn
   underneath (filter, room, echo, flange, which instruments play), drawn from the build's pieces, numbers and loop, so
   it never plays quite the same way twice. Wood sounds woody, wireframe glassy. Sound can be turned off in Settings.
 - Runes: lit runes turn as the build plays; tap one to hold it where it is (it dims) and hear what it moves. Held

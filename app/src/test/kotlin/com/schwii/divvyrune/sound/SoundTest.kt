@@ -30,9 +30,10 @@ class SoundTest {
         val sim = Sim(graph, level)
         val cycles = CycleFinder(sim).also { it.observe() }
         val score = Score(Random(seed))
+        val number = com.schwii.divvyrune.engine.LEVELS.indexOf(level) + 1
         fun tick(right: Boolean, voices: Int = Recipe.MAX_VOICES): List<Note> {
             sim.step(); cycles.observe()
-            return score.tick(sim, graph, level, cycles.cycle, right, wire = false, tickSeconds = 1 / 3f, maxVoices = voices)
+            return score.tick(sim, graph, level, cycles.cycle, number, 17, { right }, wire = false, tickSeconds = 1 / 3f, maxVoices = voices)
         }
     }
 
@@ -43,18 +44,41 @@ class SoundTest {
         val r = Run(ninths, levelNamed("Ninths"))
         val notes = (1..200).flatMap { r.tick(true) }
         assertTrue(notes.isNotEmpty())
-        assertTrue("splits pluck", notes.any { it.inst == Inst.PLUCK })
+        assertTrue("splits ring glass", notes.any { it.inst == Inst.GLASS })
+        assertTrue("ways out play kalimba", notes.any { it.inst == Inst.KALIMBA })
         assertTrue("inputs tick", notes.any { it.inst == Inst.TICK })
         notes.forEach { assertTrue(it.gain > 0 && it.gain < 1 && it.freq > 20 && it.freq < 20000 && abs(it.pan) <= 1) }
     }
 
-    @Test fun `an unfinished build plays the open scale, then resolves on its loop's first step`() {
+    @Test fun `every marble leaving is heard, from the first`() {
+        for ((code, name) in listOf(ninths to "Ninths", seventeenth to "Seventeenth")) {
+            val r = Run(code, levelNamed(name))
+            repeat(300) {
+                r.tick(false)
+                val leaving = r.sim.ghosts.map { it.id }.toSet()
+                val heard = r.score.flashes.filter { it.role == Role.VANISH && it.marble >= 0 }.map { it.marble }.toSet()
+                assertEquals("$name tick ${r.sim.tick}", leaving, heard)
+            }
+        }
+    }
+
+    @Test fun `notes stay in the level's key and mode, and nothing pitched falls under the floor`() {
+        val level = levelNamed("Ninths")
+        val r = Run(ninths, level)
+        val number = r.number
+        val key = Math.floorMod((number - 1) * 7, 12)
+        val mode = Recipe.MODES[(number - 1) * 5 / 17]
+        val notes = (1..300).flatMap { r.tick(true) }
+        notes.forEach { assertTrue("${pitchClass(it.freq)} in the mode on $key", Math.floorMod(pitchClass(it.freq) - key, 12) in mode) }
+        notes.filter { it.inst != Inst.TICK && it.inst != Inst.HAT }.forEach { assertTrue("${it.freq} Hz", it.freq >= Recipe.FLOOR) }
+    }
+
+    @Test fun `each way out has its own chord, an unfinished one hangs on a sus, and right ones resolve on the loop's start`() {
         val r = Run(ninths, levelNamed("Ninths"))
-        val open = (1..120).flatMap { r.tick(false) }
-        assertTrue(open.isNotEmpty())
-        open.forEach { assertTrue("${pitchClass(it.freq)} in hirajoshi", pitchClass(it.freq) in Recipe.OPEN) }
+        val labels = LinkedHashSet<String>()
+        repeat(120) { r.tick(false); labels += r.score.chord!!.label }
+        assertTrue(labels.toString(), labels.size >= 3 && labels.all { it.endsWith("sus") })
         assertTrue(!r.score.solved)
-        // right now, but it resolves only where the loop begins
         val c = r.cycles.cycle!!
         var resolvedAt = -1
         var bloom = emptyList<Note>()
@@ -64,9 +88,27 @@ class SoundTest {
         }
         assertEquals(0, (resolvedAt - c.start - 1) % c.length)
         assertEquals(4, bloom.size)
-        val solved = (1..60).flatMap { r.tick(true) }
-        solved.forEach { assertTrue(pitchClass(it.freq) in Recipe.SOLVED) }
+        assertTrue(r.score.chord!!.right && !r.score.chord!!.label.endsWith("sus"))
         assertTrue("the room opens", r.score.mix.reverb > 0.5f && r.score.mix.echo > 0.5f)
+    }
+
+    @Test fun `a splitter sounds once a round`() {
+        val r = Run(ninths, levelNamed("Ninths"))
+        repeat(200) { r.tick(true) }
+        var rounds = 0; var heard = 0
+        repeat(90) {
+            r.tick(true)
+            val tk = r.sim.tick
+            r.sim.n.forEachIndexed { i, sn ->
+                val it = sn.item ?: return@forEachIndexed
+                val from = r.sim.n[it.pf]
+                if (it.mt == tk && it.pf != i && from.kind == com.schwii.divvyrune.engine.Kind.SPLIT && from.succ.indexOf(i) == from.succ.size - 1) rounds++
+            }
+            r.sim.ghosts.forEach { g -> val from = r.sim.n[g.from]; if (g.item != null && from.kind == com.schwii.divvyrune.engine.Kind.SPLIT && from.succ.indexOf(g.to) == from.succ.size - 1) rounds++ }
+            heard += r.score.flashes.count { it.role == Role.SPLIT && it.marble >= 0 }
+        }
+        assertTrue(rounds > 0)
+        assertEquals(rounds, heard)
     }
 
     @Test fun `the rune comes from the build`() {
@@ -92,7 +134,6 @@ class SoundTest {
         assertEquals(at, r.score.tides.first { it.key == "filter" }.angle, 0.0)
         assertNotEquals(swell, r.score.tides.first { it.key == "swell" }.angle)
         assertEquals(setOf("filter"), saved.keys)
-        // a fresh score, as on opening the level again
         val again = Run(ninths, levelNamed("Ninths"))
         again.score.setHolds(saved)
         repeat(5) { again.tick(false) }
@@ -108,7 +149,7 @@ class SoundTest {
         val r = Run(seventeenth, levelNamed("Seventeenth"))
         repeat(300) {
             val n = r.tick(true, voices = 3)
-            assertTrue(n.size <= 3 * 4 + 4)
+            assertTrue(n.size <= 3 * 4 + 4 + 4)   // three sounds with their layers, the solved chord, the chord pad
         }
     }
 

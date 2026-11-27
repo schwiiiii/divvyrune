@@ -115,10 +115,13 @@ class Game(
 
     /** One tick of live play, heard: quietly thinner at ×4, silent at ×16. */
     private fun tickSound() {
-        val notes = score.tick(board.sim, board.graph, board.level, board.cycles.cycle, board.exitsRight, Look.wire,
+        val notes = score.tick(board.sim, board.graph, board.level, board.cycles.cycle, levelIndex + 1, LEVELS.size,
+            { board.exitTag(it).second != com.schwii.divvyrune.wood.ExitTone.BAD }, Look.wire,
             1f / (BoardState.TICKS_PER_SECOND * board.speed), if (board.speed > 1f) 3 else Recipe.MAX_VOICES)
+        val heard = soundOn && board.speed < 16f
+        if (heard) board.flash(score.flashes)   // only what's heard flashes
         val synth = out?.synth ?: return
-        if (soundOn && board.speed < 16f) synth.play(notes, score.mix) else synth.steer(score.mix)
+        if (heard) synth.play(notes, score.mix) else synth.steer(score.mix)
     }
 
     /** Whether the game plays its sound; saved. */

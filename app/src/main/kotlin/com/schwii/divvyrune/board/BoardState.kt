@@ -82,6 +82,25 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
     /** Called after every tick of live play (not Check's), for the sound. */
     var onLiveTick: (() -> Unit)? = null
 
+    /** A sound that just played, for the board to flash: when (on [clockMs]), what made it, and how loud. */
+    class Pulse(val at: Float, val role: com.schwii.divvyrune.sound.Role, val gain: Float)
+    /** Recent sounds by the piece (node) that made them, and by the marble (item id). */
+    val piecePulses = HashMap<Int, Pulse>()
+    val marblePulses = HashMap<Int, Pulse>()
+    /** Milliseconds of animation so far, for the flashes. */
+    var clockMs = 0f; private set
+
+    /** Flashes what just sounded. */
+    fun flash(sounds: List<com.schwii.divvyrune.sound.Flash>) {
+        for (f in sounds) {
+            val p = Pulse(clockMs, f.role, f.gain)
+            if (f.node >= 0) piecePulses[f.node] = p
+            if (f.marble >= 0) marblePulses[f.marble] = p
+        }
+        if (marblePulses.size > 64) marblePulses.values.removeAll { clockMs - it.at > 1000f }
+        if (piecePulses.size > 64) piecePulses.values.removeAll { clockMs - it.at > 1000f }
+    }
+
     /** Every target has a way out and every way out is right: the build's exits all meet their targets. */
     var exitsRight = false; private set
 
@@ -113,6 +132,7 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
         outNode = assignOutputs(graph, level, sol)
         hist = List(level.out.size) { ArrayDeque() }
         heat = FloatArray(graph.nodes.size); turnHeat = FloatArray(graph.nodes.size)
+        piecePulses.clear(); marblePulses.clear()
         stepMs = STEP_MS
     }
 
@@ -180,6 +200,7 @@ class BoardState(level: Level, tiles: Tiles, val density: Float = 1f, lib: Machi
 
     /** Advances the simulation by [dtMs] of real time at [TICKS_PER_SECOND] times [speed]. */
     fun advance(dtMs: Float) {
+        clockMs += dtMs.coerceAtMost(100f)
         if (checking) {
             repeat(40) { if (checking) checkStep() }
             alpha = 1f

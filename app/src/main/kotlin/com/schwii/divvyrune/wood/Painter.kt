@@ -316,6 +316,15 @@ open class Painter(private val labelFace: Typeface = Fonts.label, private val la
         rect.set(x - h, y - h, x + h, y + h); c.drawRect(rect, fill)
     }
 
+    /** A soft flash of [color] where a sound just played: a disc of radius [r], fading with [alpha]. */
+    open fun pulse(c: Canvas, x: Float, y: Float, r: Float, color: Int, alpha: Float) {
+        fill.shader = null
+        fill.color = color
+        fill.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
+        c.drawCircle(x, y, r, fill)
+        fill.alpha = 255
+    }
+
     /** A clear glass marble with its shadow, as wide as the channels of a cell [z] across; [alpha] fades it out. */
     open fun marble(c: Canvas, x: Float, y: Float, z: Float, alpha: Float = 1f, waiting: Boolean = false) {
         val r = chan(z) * 0.5f   // it fills the channel it rolls in
